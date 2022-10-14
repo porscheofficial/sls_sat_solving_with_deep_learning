@@ -52,12 +52,14 @@ def network_definition(
 
 
 def train_model(
-    # num_steps: int,
     sample_steps: int,
     field_strength: float,
     train_dataset,
     test_dataset,
+    num_steps=None
 ):
+    if not num_steps:
+        num_steps = len(train_dataset)
     network = hk.without_apply_rng(hk.transform(network_definition))
     params = network.init(jax.random.PRNGKey(42), train_dataset[0].graph)
 
@@ -77,12 +79,12 @@ def train_model(
 
         # here we feed the model the second column of the output, since that is the probability that a "1" assignment
         # for each variable should be drawn
-        model_probs = jax.nn.softmax(logits)[: problem.meta["n"]][:, 1]
+        model_probs = jax.nn.softmax(logits)[: problem.params[0]][:, 1]
         trajectory, energies = moser_walk_sampler(model_probs, problem, s)
         one_hot_encoded_trajectories = jnp.eye(2)[trajectory.astype(dtype=np.int32)]
         trajectory_log_probs = jnp.tensordot(
             one_hot_encoded_trajectories,
-            jax.nn.log_softmax(logits)[: problem.meta["n"]],
+            jax.nn.log_softmax(logits)[: problem.params[0]],
             2,
         )
         unnormalized_weights = jnp.exp(-f * energies)
@@ -98,9 +100,9 @@ def train_model(
         updates, opt = opt_update(g, opt)
         return optax.apply_updates(params, updates), opt
 
-    for i in range(50):
-        instance = train_dataset[0]
-        # upd = partial(update, samples=sample_steps, field_strength)
+    for i in range(num_steps):
+        # in case num_steps is larger than the training set, we just iterate through the training set.
+        instance = train_dataset[i % len(train_dataset)]
         params, opt_state = update(
             sample_steps, field_strength, params, opt_state, instance
         )

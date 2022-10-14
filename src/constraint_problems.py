@@ -26,14 +26,15 @@ import collections
 import random
 
 import jraph
-import jax
 import jax.numpy as jnp
 import numpy as np
 from pysat.formula import CNF
 
 LabeledProblem = collections.namedtuple("Problem", ("graph", "labels", "mask", "meta"))
 
-Problem = collections.namedtuple("Problem", ("graph", "mask", "meta"))
+SATProblem = collections.namedtuple(
+    "AtomicCSP", ("graph", "constraint_utils", "mask", "params")
+)
 
 
 def all_bitstrings(size):
@@ -45,6 +46,7 @@ def all_bitstrings(size):
     return bitstrings
 
 
+# @TODO: Update to edge mask
 def get_2sat_problem(min_n_literals: int, max_n_literals: int) -> LabeledProblem:
     """Creates bipartite-graph representing a randomly generated 2-sat problem.
     Args:
@@ -103,9 +105,10 @@ def get_2sat_problem(min_n_literals: int, max_n_literals: int) -> LabeledProblem
     # the constraint nodes and the padding nodes.
     mask = (np.arange(max_nodes) < n_literals).astype(np.int32)
     meta = {"n_vars": n_literals, "n_constraints": n_constraints}
-    return LabeledProblem(graph=graph, labels=labels, mask=mask, meta=meta)
+    return SATProblem(graph=graph, labels=labels, mask=mask, meta=meta)
 
 
+# @TODO:Update to edge mask
 def get_k_sat_problem(n, m, k):
     n_node = n + m
     nodes = [0 if i < n else 1 for i in range(n_node)]
@@ -134,15 +137,18 @@ def get_k_sat_problem(n, m, k):
     # the constraint nodes and the padding nodes.
     mask = (np.arange(n_node) < n).astype(np.int32)
     meta = {"n": n, "m": m, "k": k}
-    return Problem(graph=graph, mask=mask, meta=meta)
+    return SATProblem(graph=graph, mask=mask, meta=meta)
 
 
 def get_problem_from_cnf(cnf: CNF):
     cnf.clauses = [c for c in cnf.clauses if len(c) > 0]
     n = cnf.nv
     m = len(cnf.clauses)
-    k = max([len(c) for c in cnf.clauses])
-
+    clause_lengths = [len(c) for c in cnf.clauses]
+    k = max(clause_lengths)
+    n_edge = sum(clause_lengths)
+    edge_mask = np.zeros((n_edge, m))
+    constraint_mask = np.zeros((n, m))
     # assert n >= k
 
     edges = []
@@ -153,40 +159,49 @@ def get_problem_from_cnf(cnf: CNF):
     # additional dummy variables and constraints. NB: While this in principles solves the problem,
     # it actually is to be avoided, if possible: This is because it very easy to satisfy all constraint except one
     # by just setting the dummy variables to True. This creates local minima and also breaks locality.
-    if any([len(c) != k for c in cnf.clauses]):
-        m += 2 ** k - 1
-        n += k
-
-        dummy_vars = np.arange(n - k, n)
-        senders.extend(np.repeat(dummy_vars, 2 ** k - 1))
-
-        # we introduce additional constraints to force the dummy variables into the all zeros string
-        additional_constraints = all_bitstrings(k)[1:, :]
-
-        for j in range(2 ** k - 1):
-            edges.extend(additional_constraints[j, :])
-            receivers.extend(np.repeat(m - 2 ** k + 1, k))
+    # if any([len(c) != k for c in cnf.clauses]):
+    #     m += 2 ** k - 1
+    #     n += k
+    #
+    #     dummy_vars = np.arange(n - k, n)
+    #     senders.extend(np.repeat(dummy_vars, 2 ** k - 1))
+    #
+    #     # we introduce additional constraints to force the dummy variables into the all zeros string
+    #     additional_constraints = all_bitstrings(k)[1:, :]
+    #
+    #     for j in range(2 ** k - 1):
+    #         edges.extend(additional_constraints[j, :])
+    #         receivers.extend(np.repeat(m - 2 ** k + 1, k))
 
     n_node = n + m
     nodes = [0 if i < n else 1 for i in range(n_node)]
+    edge_counter = 0
+    for j, c in enumerate(cnf.clauses):
 
-    for j, c in enumerate(cnf.clauses, start=n):
-        support = np.arange(n - k, n)
-        support[: len(c)] = [(abs(l) - 1) for l in c]
+        edge_mask[edge_counter : edge_counter + len(c), j] = 1 / len(c)
+        edge_counter += len(c)
 
-        vals = np.zeros(k)
-        vals[: len(c)] = (np.sign(c) + 1) // 2
+        support = [(abs(l) - 1) for l in c]
+        constraint_mask[support, j] = 1
 
-        assert len(support) == k
-        assert len(vals) == k
+        assert len(support) == len(
+            set(support)
+        ), "Multiple occurences of single variable in constraint"
+
+        vals = ((np.sign(c) + 1) // 2).astype(np.int32)
 
         senders.extend(support)
-        edges.extend(vals.astype(np.int32))
-        receivers.extend(np.repeat(j, k))
+        edges.extend(vals)
+        receivers.extend(np.repeat(j + n, len(c)))
+
+    assert len(nodes) == n_node
+    assert len(receivers) == len(senders)
+    assert len(senders) == len(edges)
+    assert len(edges) == n_edge
 
     graph = jraph.GraphsTuple(
         n_node=np.asarray([n_node]),
-        n_edge=np.asarray([m * k]),
+        n_edge=np.asarray([n_edge]),
         edges=np.eye(2)[edges],
         nodes=np.eye(2)[nodes],
         globals=None,
@@ -197,18 +212,31 @@ def get_problem_from_cnf(cnf: CNF):
     # For the loss calculation we create a mask for the nodes, which masks
     # the constraint nodes and the padding nodes.
     mask = (np.arange(n_node) < n).astype(np.int32)
-    meta = {"n": n, "m": m, "k": k}
+    return SATProblem(
+        graph=graph,
+        mask=mask,
+        constraint_utils=(edge_mask, clause_lengths, constraint_mask),
+        params=[n, m, k],
+    )
 
-    return Problem(graph=graph, mask=mask, meta=meta)
 
-
-def violated_constraints(problem: Problem, assignment):
+def violated_constraints(problem: SATProblem, assignment):
     graph = problem.graph
-    n, m, k = problem.meta.values()
     edge_is_violated = jnp.mod(
         jnp.asarray(graph.edges[:, 1], dtype=np.int32) + assignment[graph.senders], 2
     )
-    constraint_is_violated = (
-        jax.vmap(jnp.sum)(jnp.reshape(edge_is_violated, (m, k))) == k
-    )
+
+    # we changed this to deal with general constraint problems:
+    # we hand down a list of constraint lengths.
+    # we introduce an "edge mask", a weighted matrix of size (number of edges) x m. We then multiply this
+    # with edge_is_violated and finally check whether the result lies below the number of constraints
+    edge_mask, constraint_lengths, _ = problem.constraint_utils
+    violated_constraint_edges = edge_is_violated @ edge_mask  # (x,) @ (x,m)  = (m,)
+
+    # teh edge mask is weighted, a constraint is violated iff the violated edge weights sum to 1.
+    constraint_is_violated = violated_constraint_edges == 1
+
+    # constraint_is_violated = (
+    #     jax.vmap(jnp.sum)(jnp.reshape(edge_is_violated, (m, k))) == k
+    # )
     return constraint_is_violated
