@@ -24,18 +24,25 @@ literals.
 
 import collections
 import random
+from functools import partial
 
+import jax
 import jraph
 import jax.numpy as jnp
 import numpy as np
 from pysat.formula import CNF
+from pysat.solvers import Cadical
 
 LabeledProblem = collections.namedtuple("Problem", ("graph", "labels", "mask", "meta"))
 
 SATProblem = collections.namedtuple(
-    "AtomicCSP", ("graph", "constraint_utils", "mask", "params")
+    "SATProblem", ("graph", "constraint_utils", "mask", "params")
 )
 
+class HashableSATProblem(SATProblem):
+    def __hash__(self):
+        return hash(tuple(self.params))
+        # return " ".join([hash(a.tostring()) for a in self.constraint_utils])
 
 def all_bitstrings(size):
     bitstrings = np.ndarray((2 ** size, size), dtype=int)
@@ -137,6 +144,8 @@ def get_k_sat_problem(n, m, k):
     # the constraint nodes and the padding nodes.
     mask = (np.arange(n_node) < n).astype(np.int32)
     meta = {"n": n, "m": m, "k": k}
+
+    # finally, we create the labels if any have been fed
     return SATProblem(graph=graph, mask=mask, meta=meta)
 
 
@@ -144,16 +153,13 @@ def get_problem_from_cnf(cnf: CNF):
     cnf.clauses = [c for c in cnf.clauses if len(c) > 0]
     n = cnf.nv
     m = len(cnf.clauses)
+    n_node = n + m
     clause_lengths = [len(c) for c in cnf.clauses]
     k = max(clause_lengths)
     n_edge = sum(clause_lengths)
     edge_mask = np.zeros((n_edge, m))
-    constraint_mask = np.zeros((n, m))
+    constraint_mask = np.zeros((n + m, m))
     # assert n >= k
-
-    edges = []
-    senders = []
-    receivers = []
 
     # for sake of jitting, if the cnf isn't already strictly in k-cnf form, we introduce
     # additional dummy variables and constraints. NB: While this in principles solves the problem,
@@ -173,7 +179,9 @@ def get_problem_from_cnf(cnf: CNF):
     #         edges.extend(additional_constraints[j, :])
     #         receivers.extend(np.repeat(m - 2 ** k + 1, k))
 
-    n_node = n + m
+    edges = []
+    senders = []
+    receivers = []
     nodes = [0 if i < n else 1 for i in range(n_node)]
     edge_counter = 0
     for j, c in enumerate(cnf.clauses):
@@ -209,28 +217,42 @@ def get_problem_from_cnf(cnf: CNF):
         receivers=np.asarray(receivers),
     )
 
+    # I wanted to use this to ensure a static shape of the graph for jitting.
+    # jraph.pad_with_graphs(instance.graph, max_n_node, max_n_edge)
+    # graph = jraph.pad_with_graphs(graph, 10000, 10000)
+
     # For the loss calculation we create a mask for the nodes, which masks
     # the constraint nodes and the padding nodes.
     mask = (np.arange(n_node) < n).astype(np.int32)
-    return SATProblem(
+    return HashableSATProblem(
         graph=graph,
         mask=mask,
-        constraint_utils=(edge_mask, clause_lengths, constraint_mask),
-        params=[n, m, k],
+        constraint_utils=(jnp.asarray(edge_mask), jnp.asarray(clause_lengths), jnp.asarray(constraint_mask)),
+        params=[n, m, k]
     )
 
 
+def get_solved_problem_from_cnf(cnf: CNF, solver=Cadical()):
+    solver.append_formula(cnf.clauses)
+    solution_found = solver.solve()
+    solution = None
+    if solution_found:
+        solution = solver.get_model()
+    return get_problem_from_cnf(cnf, solution)
+
+
+@partial(jax.jit, static_argnames=("problem",))
 def violated_constraints(problem: SATProblem, assignment):
     graph = problem.graph
     edge_is_violated = jnp.mod(
-        jnp.asarray(graph.edges[:, 1], dtype=np.int32) + assignment[graph.senders], 2
+        graph.edges[:, 1] + assignment[graph.senders], 2
     )
 
     # we changed this to deal with general constraint problems:
     # we hand down a list of constraint lengths.
     # we introduce an "edge mask", a weighted matrix of size (number of edges) x m. We then multiply this
     # with edge_is_violated and finally check whether the result lies below the number of constraints
-    edge_mask, constraint_lengths, _ = problem.constraint_utils
+    edge_mask, _, _ = problem.constraint_utils
     violated_constraint_edges = edge_is_violated @ edge_mask  # (x,) @ (x,m)  = (m,)
 
     # teh edge mask is weighted, a constraint is violated iff the violated edge weights sum to 1.
