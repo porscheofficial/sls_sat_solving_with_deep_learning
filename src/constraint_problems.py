@@ -36,7 +36,7 @@ from pysat.solvers import Cadical
 LabeledProblem = collections.namedtuple("Problem", ("graph", "labels", "mask", "meta"))
 
 SATProblem = collections.namedtuple(
-    "SATProblem", ("graph", "constraint_utils", "mask", "params")
+    "SATProblem", ("graph", "mask", "params")
 )
 
 class HashableSATProblem(SATProblem):
@@ -157,8 +157,8 @@ def get_problem_from_cnf(cnf: CNF):
     clause_lengths = [len(c) for c in cnf.clauses]
     k = max(clause_lengths)
     n_edge = sum(clause_lengths)
-    edge_mask = np.zeros((n_edge, m))
-    constraint_mask = np.zeros((n + m, m))
+#     edge_mask = np.zeros((n_edge, m))
+#     constraint_mask = np.zeros((n + m, m))
     # assert n >= k
 
     # for sake of jitting, if the cnf isn't already strictly in k-cnf form, we introduce
@@ -186,11 +186,11 @@ def get_problem_from_cnf(cnf: CNF):
     edge_counter = 0
     for j, c in enumerate(cnf.clauses):
 
-        edge_mask[edge_counter : edge_counter + len(c), j] = 1 / len(c)
-        edge_counter += len(c)
+#         edge_mask[edge_counter : edge_counter + len(c), j] = 1 / len(c)
+#         edge_counter += len(c)
 
         support = [(abs(l) - 1) for l in c]
-        constraint_mask[support, j] = 1
+#         constraint_mask[support, j] = 1
 
         assert len(support) == len(
             set(support)
@@ -202,11 +202,13 @@ def get_problem_from_cnf(cnf: CNF):
         edges.extend(vals)
         receivers.extend(np.repeat(j + n, len(c)))
 
-    assert len(nodes) == n_node
-    assert len(receivers) == len(senders)
-    assert len(senders) == len(edges)
-    assert len(edges) == n_edge
+#     assert len(nodes) == n_node
+#     assert len(receivers) == len(senders)
+#     assert len(senders) == len(edges)
+#     assert len(edges) == n_edge
 
+    print("done creating objects")
+    
     graph = jraph.GraphsTuple(
         n_node=np.asarray([n_node]),
         n_edge=np.asarray([n_edge]),
@@ -223,11 +225,14 @@ def get_problem_from_cnf(cnf: CNF):
 
     # For the loss calculation we create a mask for the nodes, which masks
     # the constraint nodes and the padding nodes.
+    
+    print("done creating GraphsTuple")
+    
     mask = (np.arange(n_node) < n).astype(np.int32)
-    return HashableSATProblem(
+    return SATProblem(
         graph=graph,
         mask=mask,
-        constraint_utils=(jnp.asarray(edge_mask), jnp.asarray(clause_lengths), jnp.asarray(constraint_mask)),
+#         constraint_utils=(jnp.asarray(edge_mask), jnp.asarray(clause_lengths), jnp.asarray(constraint_mask)),
         params=[n, m, k]
     )
 

@@ -1,4 +1,3 @@
-import time
 import jraph
 import jax
 import haiku as hk
@@ -49,37 +48,21 @@ def network_definition(
     return hk.Linear(2)(graph.nodes)
 
 
-def accuracy
-
 def train_model(
         sample_steps: int,
         field_strength: float,
         train_dataset,
         test_dataset,
         num_steps=None,
-        num_epochs=1
 ):
-    # if not num_steps:
-    #     num_steps = len(train_dataset)
-    #
+    if not num_steps:
+        num_steps = len(train_dataset)
 
-
-
-
-    for epoch in range(num_epochs):
-        start_time = time.time()
-        for x, y in training_generator:
-            y = one_hot(y, n_targets)
-            params = update(params, x, y)
-        epoch_time = time.time() - start_time
-
-size = len(dataloader.dataset)
-    for batch, (X, y) in enumerate(dataloader):
     seed = jax.random.PRNGKey(42)
-    # random_instances = jax.random.randint(
-    #     seed, shape=(num_steps,), minval=0, maxval=len(train_dataset)
-    # )
-    #
+    random_instances = jax.random.randint(
+        seed, shape=(num_steps,), minval=0, maxval=len(train_dataset)
+    )
+
     network = hk.without_apply_rng(hk.transform(network_definition))
     params = network.init(seed, train_dataset[random_instances[0]].graph)
 
@@ -125,8 +108,7 @@ size = len(dataloader.dataset)
 
     # @partial(jax.jit, static_argnums=(0, 1))
     def update(s, f, sd, ps, opt, problem):
-        loss = partial(supervised_prediction_loss, s, f, sd)
-        # loss = partial(unsupervised_prediction_loss, s, f, sd)
+        loss = partial(unsupervised_prediction_loss, s, f, sd)
         g = jax.grad(loss)(ps, problem)
         updates, opt = opt_update(g, opt)
         return optax.apply_updates(params, updates), opt
