@@ -35,14 +35,14 @@ from pysat.solvers import Cadical
 
 LabeledProblem = collections.namedtuple("Problem", ("graph", "labels", "mask", "meta"))
 
-SATProblem = collections.namedtuple(
-    "SATProblem", ("graph", "mask", "params")
-)
+SATProblem = collections.namedtuple("SATProblem", ("graph", "mask", "params"))
+
 
 class HashableSATProblem(SATProblem):
     def __hash__(self):
         return hash(tuple(self.params))
         # return " ".join([hash(a.tostring()) for a in self.constraint_utils])
+
 
 def all_bitstrings(size):
     bitstrings = np.ndarray((2 ** size, size), dtype=int)
@@ -149,7 +149,7 @@ def get_k_sat_problem(n, m, k):
     return SATProblem(graph=graph, mask=mask, meta=meta)
 
 
-def get_problem_from_cnf(cnf: CNF):
+def get_problem_from_cnf(cnf: CNF, pad_nodes=0, pad_edges=0):
     cnf.clauses = [c for c in cnf.clauses if len(c) > 0]
     n = cnf.nv
     m = len(cnf.clauses)
@@ -157,8 +157,8 @@ def get_problem_from_cnf(cnf: CNF):
     clause_lengths = [len(c) for c in cnf.clauses]
     k = max(clause_lengths)
     n_edge = sum(clause_lengths)
-#     edge_mask = np.zeros((n_edge, m))
-#     constraint_mask = np.zeros((n + m, m))
+    #     edge_mask = np.zeros((n_edge, m))
+    #     constraint_mask = np.zeros((n + m, m))
     # assert n >= k
 
     # for sake of jitting, if the cnf isn't already strictly in k-cnf form, we introduce
@@ -185,12 +185,11 @@ def get_problem_from_cnf(cnf: CNF):
     nodes = [0 if i < n else 1 for i in range(n_node)]
     edge_counter = 0
     for j, c in enumerate(cnf.clauses):
-
-#         edge_mask[edge_counter : edge_counter + len(c), j] = 1 / len(c)
-#         edge_counter += len(c)
+        #         edge_mask[edge_counter : edge_counter + len(c), j] = 1 / len(c)
+        #         edge_counter += len(c)
 
         support = [(abs(l) - 1) for l in c]
-#         constraint_mask[support, j] = 1
+        #         constraint_mask[support, j] = 1
 
         assert len(support) == len(
             set(support)
@@ -202,13 +201,11 @@ def get_problem_from_cnf(cnf: CNF):
         edges.extend(vals)
         receivers.extend(np.repeat(j + n, len(c)))
 
-#     assert len(nodes) == n_node
-#     assert len(receivers) == len(senders)
-#     assert len(senders) == len(edges)
-#     assert len(edges) == n_edge
+    #     assert len(nodes) == n_node
+    #     assert len(receivers) == len(senders)
+    #     assert len(senders) == len(edges)
+    #     assert len(edges) == n_edge
 
-    print("done creating objects")
-    
     graph = jraph.GraphsTuple(
         n_node=np.asarray([n_node]),
         n_edge=np.asarray([n_edge]),
@@ -219,21 +216,23 @@ def get_problem_from_cnf(cnf: CNF):
         receivers=np.asarray(receivers),
     )
 
-    # I wanted to use this to ensure a static shape of the graph for jitting.
     # jraph.pad_with_graphs(instance.graph, max_n_node, max_n_edge)
-    # graph = jraph.pad_with_graphs(graph, 10000, 10000)
+
+    n_edges = len(edges)
+    if pad_nodes > n_node or pad_edges > n_edges:
+        graph = jraph.pad_with_graphs(
+            graph, max(pad_nodes, n_node), max(pad_edges, n_edges)
+        )
 
     # For the loss calculation we create a mask for the nodes, which masks
     # the constraint nodes and the padding nodes.
-    
-    print("done creating GraphsTuple")
-    
-    mask = (np.arange(n_node) < n).astype(np.int32)
+
+    mask = (np.arange(pad_nodes) < n).astype(np.int32)
     return SATProblem(
         graph=graph,
         mask=mask,
-#         constraint_utils=(jnp.asarray(edge_mask), jnp.asarray(clause_lengths), jnp.asarray(constraint_mask)),
-        params=[n, m, k]
+        #         constraint_utils=(jnp.asarray(edge_mask), jnp.asarray(clause_lengths), jnp.asarray(constraint_mask)),
+        params=[n, m, k],
     )
 
 
@@ -249,9 +248,7 @@ def get_solved_problem_from_cnf(cnf: CNF, solver=Cadical()):
 @partial(jax.jit, static_argnames=("problem",))
 def violated_constraints(problem: SATProblem, assignment):
     graph = problem.graph
-    edge_is_violated = jnp.mod(
-        graph.edges[:, 1] + assignment[graph.senders], 2
-    )
+    edge_is_violated = jnp.mod(graph.edges[:, 1] + assignment[graph.senders], 2)
 
     # we changed this to deal with general constraint problems:
     # we hand down a list of constraint lengths.
