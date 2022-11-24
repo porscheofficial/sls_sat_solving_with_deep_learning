@@ -21,10 +21,10 @@ class SATTrainingDataset(data.Dataset):
     def __init__(self, data_dir, already_unzipped=True):
         self.data_dir = data_dir
         self.already_unzipped = already_unzipped
-        solved_instances = glob.glob(join(data_dir, "*_sol.pkl"))
+        solved_instances = glob.glob(join(data_dir, 'processed', 'solved', "*_sol.pkl"))
         self.instances = []
         for f in solved_instances:
-            name = splitext(f)[0][:-4]
+            name = f.split('.cnf')[0]
             problem_file = self._get_problem_file(name)
             cnf = CNF(from_string=problem_file.read())
             instance = SATInstanceMeta(name, cnf.nv, len(cnf.clauses), sum(len(c) for c in cnf.clauses))
@@ -61,14 +61,6 @@ class SATTrainingDataset(data.Dataset):
         return problem, self.solution_dict_to_array(solution_dict)
 
 
-def timed_solve(max_time, p):
-    try:
-        return func_timeout(max_time, nnf.kissat.solve, args=(p,))
-    except FunctionTimedOut:
-        print(f"Could not be solved within time limit of {max_time} seconds")
-    return None
-
-
 def collate_fn(batch):
     problems, solutions = zip(*batch)
     masks, graphs = zip(*((p.mask, p.graph) for p in problems))
@@ -94,6 +86,14 @@ class JraphDataLoader(data.DataLoader):
                                              worker_init_fn=worker_init_fn)
 
 
+def timed_solve(max_time, p):
+    try:
+        return func_timeout(max_time, nnf.kissat.solve, args=(p,))
+    except FunctionTimedOut:
+        print(f"Could not be solved within time limit of {max_time} seconds")
+    return None
+
+
 def create_solutions_from_cnf(path, time_limit=MAX_TIME):
     return create_solutions(path, time_limit, suffix="*.cnf", open_util=open)
 
@@ -106,11 +106,11 @@ def create_solutions(path, time_limit, suffix, open_util):
     regex = join(path, suffix)
     for f in glob.glob(regex):
         print(f"processing {f}")
-        root = splitext(f)[0]
+        root = f.split('.cnf')[0]
         solved_target_name = root + "_sol.pkl"
         unsolved_target_name = root + "_unsol.pkl"
-        # solved_target_name = join(path, solved_target_name)
-        # unsolved_target_name = join(path, unsolved_target_name)
+        solved_target_name = join('processed', 'solved', solved_target_name)
+        unsolved_target_name = join('processed', 'unsolved', unsolved_target_name)
         if exists(solved_target_name) or exists(unsolved_target_name):
             print("solution file already exists")
             continue

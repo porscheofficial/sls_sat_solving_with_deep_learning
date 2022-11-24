@@ -2,43 +2,75 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 from functools import partial
+from jax.experimental.sparse import BCOO
+from constraint_problems import SATProblem
 
-from constraint_problems import violated_constraints, SATProblem
 
 
-def moser_walk(weights, problem, n_steps, seed):
 
-    @partial(jax.jit, static_argnames=("prob"))
+def moser_walk(
+        weights,
+        problem,
+        n_steps,
+        seed,
+        force_trajectory=False
+):
+    # noinspection PyShadowingNames
+    @partial(jax.jit, static_argnames="prob")
     def step(state, prob: SATProblem):
         current, _, counter, rng_key = state
         _, rng_key = jax.random.split(rng_key)
 
         # identify violated constraint
         constraint_is_violated = violated_constraints(prob, current)
-        j = np.argmax(constraint_is_violated)  # , size=1)[0]
+        j = np.argmax(constraint_is_violated)
         num_violations = np.sum(constraint_is_violated)
-        # resample the first violated constraint (or the first constraint if none are violated)
-        _, _, constraint_mask = prob.constraint_utils
+        # resample the first violated constraint (or the first constraint if none are violated
+
+        e = len(prob.graph.edges)
+        n, m, k = prob.params
+        constraint_mask_sp = BCOO(
+            (np.ones(e), np.column_stack((prob.graph.senders, prob.graph.receivers))),
+            shape=(n, m),
+        ).todense()
 
         randomness = jax.random.bernoulli(rng_key, weights)
-        next = jnp.where(constraint_mask[:, j], randomness, current)
-        return next, num_violations, counter + 1, rng_key
+        # noinspection PyShadowingBuiltins
+        new = jnp.where(constraint_mask_sp[:, j], randomness, current)
+        return new, num_violations, counter + 1, rng_key
 
-    @partial(jax.jit, static_argnames=("limit"))
+    @partial(jax.jit, static_argnames="prob")
+    def step_trajectory(i, state, prob: SATProblem):
+        assignments, energies, i, i = state
+        current = assignments[i, :]
+        new, num_violations, _, _ = step(current, prob)
+        energies = energies.at[i].set(num_violations)
+        assignments = assignments.at[i + 1, :].set(new)
+        return assignments, energies
+
+    @partial(jax.jit, static_argnames="limit")
     def is_solution(state, limit):
         _, energy, counter, _ = state
         return (energy > 0) & (counter < limit)
 
-
     rng_key = jax.random.PRNGKey(seed)
-    random_assignment = jax.random.bernoulli(rng_key, weights)
-    constraint_is_violated = violated_constraints(problem, random_assignment)
-    num_violations = np.sum(constraint_is_violated)
-    trajectory, energy, _, _ = jax.lax.while_loop(
-        cond_fun=partial(is_solution, limit=n_steps),
-        body_fun=partial(step, prob=problem),
-        init_val=(random_assignment, num_violations, np.int64(1), rng_key),
-    )
+    if force_trajectory:
+        random_assignments = jax.random.bernoulli(
+            rng_key, weights, (n_steps, weights.shape[0])
+        )
+        init_energies = np.zeros(n_steps, dtype=np.int32)
+        trajectory, energy = jax.lax.fori_loop(
+            0, n_steps, partial(step_trajectory, prob=problem), (random_assignments, init_energies),
+        )
+    else:
+        random_assignment = jax.random.bernoulli(rng_key, weights)
+        constraint_is_violated = violated_constraints(problem, random_assignment)
+        num_violations = np.sum(constraint_is_violated)
+        trajectory, energy, _, _ = jax.lax.while_loop(
+            cond_fun=partial(is_solution, limit=n_steps),
+            body_fun=partial(step, prob=problem),
+            init_val=(random_assignment, num_violations, np.int64(1), rng_key),
+        )
 
     return trajectory, energy
 
@@ -86,4 +118,31 @@ def moser_walk_sampler(weights, problem, n_steps, seed):
     return trajectory, energy
 
 
-#%%
+@partial(jax.jit, static_argnames=("problem",))
+def violated_constraints(problem: SATProblem, assignment):
+    graph = problem.graph
+    edge_is_violated = jnp.mod(graph.edges[:, 1] + assignment[graph.senders], 2)
+
+    # we can generate a sparse matrix here. This should be compiled once initially.
+    e = len(graph.edges)
+    _, m, _ = problem.params
+    edge_mask_sp = BCOO(
+        (np.ones(e), np.column_stack((np.arange(e), graph.receivers))), shape=(e, m)
+    )
+    # we changed this to deal with general constraint problems:
+    # we hand down a list of constraint lengths.
+    # we introduce an "edge mask", a weighted matrix of size (number of edges) x m. We then multiply this
+    # with edge_is_violated and finally check whether the result lies below the number of constraints
+    # edge_mask, _, _ = problem.constraint_utils
+    violated_constraint_edges = edge_is_violated @ edge_mask_sp  # (x,) @ (x,m)  = (m,)
+
+    # teh edge mask is weighted, a constraint is violated iff the violated edge weights sum to 1.
+    constraint_is_violated = violated_constraint_edges == problem.clause_lengths
+
+    # constraint_is_violated = (
+    #     jax.vmap(jnp.sum)(jnp.reshape(edge_is_violated, (m, k))) == k
+    # )
+    return constraint_is_violated
+
+
+# %%

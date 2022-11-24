@@ -25,7 +25,7 @@ def one_hot(x, k, dtype=jnp.float32):
     return jnp.array(x[:, None] == jnp.arange(k), dtype)
 
 
-def train(path="../Data/blocksworld"):
+def train(path="../Data/blocksworld", rel_path='processed'):
     sat_data = SATTrainingDataset(path)
     train_data, test_data = data.random_split(sat_data, [0.8, 0.2])
 
@@ -69,6 +69,7 @@ def train(path="../Data/blocksworld"):
         # print("Training set accuracy {}".format(train_acc))
         print("Test set accuracy {}".format(test_acc))
 
+    # TODO: Save the model here
 
 if __name__ == "__main__":
     train()
