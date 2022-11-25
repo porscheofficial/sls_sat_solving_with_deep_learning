@@ -41,6 +41,7 @@ SATProblem = collections.namedtuple("SATProblem", ("graph", "mask", "params", "c
 
 class HashableSATProblem(SATProblem):
     def __hash__(self):
+        # TODO: Change hash function
         return hash(tuple(self.params))
         # return " ".join([hash(a.tostring()) for a in self.constraint_utils])
 
