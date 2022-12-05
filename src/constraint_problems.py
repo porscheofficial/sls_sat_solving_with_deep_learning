@@ -23,14 +23,9 @@ literals.
 """
 
 import collections
-import random
-from functools import partial
-
-import jax
 import jraph
-import jax.numpy as jnp
 import numpy as np
-from jax.experimental.sparse import BCOO
+import random
 from pysat.formula import CNF
 from pysat.solvers import Cadical
 
@@ -41,9 +36,15 @@ SATProblem = collections.namedtuple("SATProblem", ("graph", "mask", "params", "c
 
 class HashableSATProblem(SATProblem):
     def __hash__(self):
-        # TODO: Change hash function
-        return hash(tuple(self.params))
-        # return " ".join([hash(a.tostring()) for a in self.constraint_utils])
+        return hash((self.graph.senders.tostring(),
+                     self.graph.receivers.tostring(),
+                     self.graph.edges.tostring(),
+                     self.params,
+                     tuple(self.clause_lengths)
+                     ))
+
+    def __eq__(self, other):
+        return self.__hash__() == other.__hash__()
 
 
 def all_bitstrings(size):
@@ -160,10 +161,6 @@ def get_problem_from_cnf(cnf: CNF, pad_nodes=0, pad_edges=0):
     k = max(clause_lengths)
     n_edge = sum(clause_lengths)
 
-    #     edge_mask = np.zeros((n_edge, m))
-    #     constraint_mask = np.zeros((n + m, m))
-    # assert n >= k
-
     # for sake of jitting, if the cnf isn't already strictly in k-cnf form, we introduce
     # additional dummy variables and constraints. NB: While this in principles solves the problem,
     # it actually is to be avoided, if possible: This is because it very easy to satisfy all constraint except one
@@ -186,17 +183,11 @@ def get_problem_from_cnf(cnf: CNF, pad_nodes=0, pad_edges=0):
     senders = []
     receivers = []
     nodes = [0 if i < n else 1 for i in range(n_node)]
-    edge_counter = 0
     for j, c in enumerate(cnf.clauses):
-        # edge_datae_counter : edge_counter + len(c), j] = 1 / len(c)
-        #         edge_counter += len(c)
-
         support = [(abs(l) - 1) for l in c]
-        #         constraint_mask[support, j] = 1
-
         assert len(support) == len(
             set(support)
-        ), "Multiple occurences of single variable in constraint"
+        ), "Multiple occurrences of single variable in constraint"
 
         vals = ((np.sign(c) + 1) // 2).astype(np.int32)
 
@@ -219,7 +210,8 @@ def get_problem_from_cnf(cnf: CNF, pad_nodes=0, pad_edges=0):
         receivers=np.asarray(receivers),
     )
 
-    # jraph.pad_with_graphs(instance.graph, max_n_node, max_n_edge
+    # padding done in case we want to jit the graph, this is relevant mostly for training the gnn model, not for
+    # executing moser's walk on single instances
 
     if pad_nodes > n_node or pad_edges > n_edge:
         n_node = max(pad_nodes, n_node)
@@ -232,12 +224,12 @@ def get_problem_from_cnf(cnf: CNF, pad_nodes=0, pad_edges=0):
     # the constraint nodes and the padding nodes.
 
     mask = (np.arange(pad_nodes) < n).astype(np.int32)
+
     return HashableSATProblem(
         graph=graph,
         mask=mask,
-        clause_lengths=jnp.array(clause_lengths),
-        #         constraint_utils=(jnp.asarray(edge_mask), jnp.asarray(clause_lengths), jnp.asarray(constraint_mask)),
-        params=[n, m, k],
+        clause_lengths=clause_lengths,
+        params=(n, m, k)
     )
 
 

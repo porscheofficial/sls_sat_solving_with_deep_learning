@@ -63,7 +63,7 @@ class SATTrainingDataset(data.Dataset):
 
 def collate_fn(batch):
     problems, solutions = zip(*batch)
-    masks, graphs = zip(*((p.mask, p.graph) for p in problems))
+    masks, graphs = zip(*((np.fromstring(p.mask), p.graph) for p in problems))
     return (np.concatenate(masks), jraph.batch(graphs)), np.concatenate(solutions)
 
 
@@ -124,3 +124,21 @@ def create_solutions(path, time_limit, suffix, open_util):
                 with open(solved_target_name, "wb") as out:
                     pickle.dump(s, out)
                     print(f"written solution for {root}")
+
+
+def create_candidates(data_dir, sample_size, threshold):
+    solved_instances = glob.glob(join(data_dir, "*_sol.pkl"))
+    for g in solved_instances:
+        with open(g, "rb") as f:
+            p = pickle.load(f)
+        n = np.array(list(p.values()), dtype=bool)
+        samples = sample_candidates(n, sample_size, threshold)
+        name = g.split('_sol.pkl')[0]
+        with open(name + "_samples.npy", "wb") as f:
+            np.save(f, samples)
+
+
+def sample_candidates(original, sample_size, threshold):
+    np.random.seed(sum(original))
+    condition = np.random.random((sample_size, original.shape[0])) < threshold
+    return np.where(condition, np.invert(original), original)
