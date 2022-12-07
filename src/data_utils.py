@@ -18,7 +18,8 @@ SATInstanceMeta = namedtuple("SATInstanceMeta", ("name", "n", "m", "n_edges"))
 
 
 class SATTrainingDataset(data.Dataset):
-    def __init__(self, data_dir, already_unzipped=True):
+    def __init__(self, data_dir, already_unzipped=True, return_candidates=True): ####MODIFIED####
+        self.return_candidates = return_candidates ####MODIFIED####
         self.data_dir = data_dir
         self.already_unzipped = already_unzipped
         solved_instances = glob.glob(join(data_dir, 'processed', 'solved', "*_sol.pkl"))
@@ -32,7 +33,43 @@ class SATTrainingDataset(data.Dataset):
 
         self.max_n_node = max(i.n + i.m for i in self.instances)
         self.max_n_edge = max(i.n_edges for i in self.instances)
+        
 
+    def _return_all_candidates(self, idx):
+        # die neue Methode hier
+        instance_name = self.instances[idx].name
+        problem_file = self._get_problem_file(instance_name)
+        problem = get_problem_from_cnf(
+            cnf=CNF(from_string=problem_file.read()),
+            pad_nodes=self.max_n_node,
+            pad_edges=self.max_n_edge
+        )
+        target_name = instance_name + "_samples_sol.npy"
+        target_func=np.load(target_name)
+
+        weights= 0#tbf!    
+        return((target_func,weights))
+
+        
+    def _return_only_solution(self, idx):
+        # alte Methode hier
+        instance_name = self.instances[idx].name
+        problem_file = self._get_problem_file(instance_name)
+        problem = get_problem_from_cnf(
+            cnf=CNF(from_string=problem_file.read()),
+            pad_nodes=self.max_n_node,
+            pad_edges=self.max_n_edge
+        )
+        target_name = instance_name + "_sol.pkl"
+        with open(target_name, "rb") as f:
+            solution_dict = pickle.load(f)
+            target_func=self.solution_dict_to_array(solution_dict)
+            
+        weights= 0#tbf!    
+        return((target_func,weights))
+    
+    
+    
     def __len__(self):
         return len(self.instances)
 
@@ -47,18 +84,9 @@ class SATTrainingDataset(data.Dataset):
         else:
             return gzip.open(name + ".cnf.gz", "rt")
 
-    def __getitem__(self, idx):
-        instance_name = self.instances[idx].name
-        problem_file = self._get_problem_file(instance_name)
-        problem = get_problem_from_cnf(
-            cnf=CNF(from_string=problem_file.read()),
-            pad_nodes=self.max_n_node,
-            pad_edges=self.max_n_edge
-        )
-        target_name = instance_name + "_sol.pkl"
-        with open(target_name, "rb") as f:
-            solution_dict = pickle.load(f)
-        return problem, self.solution_dict_to_array(solution_dict)
+    def __getitem__(self, idx):            
+        target_func = self._return_all_candidates if self.return_candidates else self._return_only_solution
+        return problem, target_func(idx)
 
 
 def collate_fn(batch):
@@ -136,6 +164,24 @@ def create_candidates(data_dir, sample_size, threshold):
         name = g.split('_sol.pkl')[0]
         with open(name + "_samples.npy", "wb") as f:
             np.save(f, samples)
+          
+        
+#### NEW! ####  
+
+def create_candidates_with_sol(data_dir, sample_size, threshold):
+    solved_instances = glob.glob(join(data_dir, "*_sol.pkl"))
+    for g in solved_instances:
+        with open(g, "rb") as f:
+            p = pickle.load(f)
+        n = np.array(list(p.values()), dtype=bool)
+        samples = sample_candidates(n, sample_size-1, threshold)
+        samples = np.concatenate((np.reshape(n,(1,len(n))),samples),axis=0)
+        name = g.split('_sol.pkl')[0]
+        with open(name + "_samples_sol.npy", "wb") as f:
+            np.save(f, samples)
+    return(samples)
+            
+
 
 
 def sample_candidates(original, sample_size, threshold):
