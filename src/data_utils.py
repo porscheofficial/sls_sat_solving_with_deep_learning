@@ -188,3 +188,6 @@ def sample_candidates(original, sample_size, threshold):
     np.random.seed(sum(original))
     condition = np.random.random((sample_size, original.shape[0])) < threshold
     return np.where(condition, np.invert(original), original)
+
+
+##MK
