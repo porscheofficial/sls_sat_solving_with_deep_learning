@@ -113,10 +113,10 @@ class SATTrainingDataset(data.Dataset):
                 pad_edges=self.max_n_edge
             )
             target_name = instance_name + "_samples_sol.npy"
-            target_func=np.load(target_name) #np.array which stores candidates and solution to problem
+            candidates=np.load(target_name) #np.array which stores candidates and solution to problem
 
-            energies=vmap(number_of_violated_constraints ,in_axes=(None,0),out_axes=0)(problem,target_func)
-            return problem, [target_func ,energies]
+            energies=vmap(number_of_violated_constraints ,in_axes=(None,0),out_axes=0)(problem,candidates)
+            return problem, (candidates ,energies)
         else:
             # alte Methode hier
             instance_name = self.instances[idx].name
@@ -130,18 +130,20 @@ class SATTrainingDataset(data.Dataset):
             target_name = instance_name + "_sol.pkl"
             with open(target_name, "rb") as f:
                 solution_dict = pickle.load(f)
-                target_func=self.solution_dict_to_array(solution_dict)
-        
-            return problem,target_func,energies
+                candidates=self.solution_dict_to_array(solution_dict)
+            energies=number_of_violated_constraints(problem,candidates)
+            return problem,(candidates,energies)
 
 
 
 
 
 def collate_fn(batch):
-    problems, solutions = zip(*batch)
+    problems, tuples = zip(*batch)
+    candidates, energies = zip(*tuples) ###this might be the problem...
+    print(energies)
     masks, graphs = zip(*((np.fromstring(p.mask), p.graph) for p in problems))
-    return (np.concatenate(masks), jraph.batch(graphs)), np.concatenate(solutions)
+    return (np.concatenate(masks), jraph.batch(graphs)), (np.concatenate(candidates), np.concatenate(energies))
 
 
 class JraphDataLoader(data.DataLoader):

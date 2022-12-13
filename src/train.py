@@ -43,7 +43,7 @@ def train(path='/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/
 
         #TBD!!! -> change this function here
 
-        g=jax.grad(new_prediction_loss)(params, *x, y)
+        g=jax.grad(new_prediction_loss)(params, *x, *y)
 
         ####
 
@@ -61,14 +61,14 @@ def train(path='/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/
 
 
     @jax.jit
-    def new_prediction_loss(params, graph, candidates, f: float):
+    def new_prediction_loss(params, mask, graph, candidates, energies, f: float):
             decoded_nodes = network.apply(params, graph)
             candidates = one_hot(candidates, 2)
             # We interpret the decoded nodes as a pair of logits for each node.
-            log_prob = jax.nn.log_softmax(decoded_nodes) * candidates[0]
-            weights = jax.nn.softmax(- f * candidates[1])
+            log_prob = jax.nn.log_softmax(decoded_nodes) * candidates
+            weights = jax.nn.softmax(- f * energies)
             weighted_log_probs = jnp.dot(log_prob, weights)
-            return -weighted_log_probs
+            return -jnp.sum(weighted_log_probs * mask[:, None]) / jnp.sum(mask)
     
     
 
