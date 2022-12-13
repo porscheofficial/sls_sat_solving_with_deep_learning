@@ -6,7 +6,7 @@ from functools import partial
 import jax.numpy as jnp
 import numpy as np
 
-from random_walk import moser_walk_sampler
+#from random_walk import moser_walk_sampler
 
 
 def network_definition(
@@ -47,7 +47,7 @@ def network_definition(
 
     return hk.Linear(2)(graph.nodes)
 
-
+'''
 def train_model(
         sample_steps: int,
         field_strength: float,
@@ -142,3 +142,4 @@ def train_model(
             print("step %r loss train %r test %r", i, test_loss)
             # logging.info("step %r loss train %r test %r", step, train_loss, test_loss)
     return network, params
+'''

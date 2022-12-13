@@ -11,6 +11,8 @@ import numpy as np
 from pysat.formula import CNF
 from collections import namedtuple
 from constraint_problems import get_problem_from_cnf
+from random_walk import number_of_violated_constraints
+from jax import vmap
 
 MAX_TIME = 20
 
@@ -22,19 +24,22 @@ class SATTrainingDataset(data.Dataset):
         self.return_candidates = return_candidates ####MODIFIED####
         self.data_dir = data_dir
         self.already_unzipped = already_unzipped
-        solved_instances = glob.glob(join(data_dir, 'processed', 'solved', "*_sol.pkl"))
+        #solved_instances = glob.glob(join(data_dir, 'processed', 'solved', "*_sol.pkl"))
+        solved_instances = glob.glob(join(data_dir, "*_sol.pkl"))
+
         self.instances = []
         for f in solved_instances:
-            name = f.split('.cnf')[0]
+            #print(f)
+            name= f.split("_sol.pkl")[0]
+            #name = f.split('.cnf')[0]
             problem_file = self._get_problem_file(name)
             cnf = CNF(from_string=problem_file.read())
             instance = SATInstanceMeta(name, cnf.nv, len(cnf.clauses), sum(len(c) for c in cnf.clauses))
             self.instances.append(instance)
-
         self.max_n_node = max(i.n + i.m for i in self.instances)
         self.max_n_edge = max(i.n_edges for i in self.instances)
         
-
+    '''
     def _return_all_candidates(self, idx):
         # die neue Methode hier
         instance_name = self.instances[idx].name
@@ -45,15 +50,22 @@ class SATTrainingDataset(data.Dataset):
             pad_edges=self.max_n_edge
         )
         target_name = instance_name + "_samples_sol.npy"
-        target_func=np.load(target_name)
+        target_func=np.load(target_name) #np.array which stores candidates and solution to problem
+
+        #violated_constraints_for_candidates=np.sum(violated_constraints(problem, target_func),axis=0)
+        #print(np.shape(violated_constraints_for_candidates))
+        #weights=
+        #for i in range(len(target_func)):
+        #    weights += np.exp(-beta*)
 
         weights= 0#tbf!    
-        return((target_func,weights))
+        return(problem,target_func,weights)
 
         
     def _return_only_solution(self, idx):
         # alte Methode hier
         instance_name = self.instances[idx].name
+        print(self.instances[idx].name)
         problem_file = self._get_problem_file(instance_name)
         problem = get_problem_from_cnf(
             cnf=CNF(from_string=problem_file.read()),
@@ -66,9 +78,8 @@ class SATTrainingDataset(data.Dataset):
             target_func=self.solution_dict_to_array(solution_dict)
             
         weights= 0#tbf!    
-        return((target_func,weights))
-    
-    
+        return(problem,target_func,weights)
+    '''
     
     def __len__(self):
         return len(self.instances)
@@ -84,9 +95,47 @@ class SATTrainingDataset(data.Dataset):
         else:
             return gzip.open(name + ".cnf.gz", "rt")
 
+
+    '''
     def __getitem__(self, idx):            
-        target_func = self._return_all_candidates if self.return_candidates else self._return_only_solution
-        return problem, target_func(idx)
+        return_value = self._return_all_candidates if self.return_candidates else self._return_only_solution
+        return return_value
+    '''
+
+    def __getitem__(self, idx):
+        if self.return_candidates:
+            # die neue Methode hier
+            instance_name = self.instances[idx].name
+            problem_file = self._get_problem_file(instance_name)
+            problem = get_problem_from_cnf(
+                cnf=CNF(from_string=problem_file.read()),
+                pad_nodes=self.max_n_node,
+                pad_edges=self.max_n_edge
+            )
+            target_name = instance_name + "_samples_sol.npy"
+            target_func=np.load(target_name) #np.array which stores candidates and solution to problem
+
+            energies=vmap(number_of_violated_constraints ,in_axes=(None,0),out_axes=0)(problem,target_func)
+            return problem, [target_func ,energies]
+        else:
+            # alte Methode hier
+            instance_name = self.instances[idx].name
+            print(self.instances[idx].name)
+            problem_file = self._get_problem_file(instance_name)
+            problem = get_problem_from_cnf(
+                cnf=CNF(from_string=problem_file.read()),
+                pad_nodes=self.max_n_node,
+                pad_edges=self.max_n_edge
+            )
+            target_name = instance_name + "_sol.pkl"
+            with open(target_name, "rb") as f:
+                solution_dict = pickle.load(f)
+                target_func=self.solution_dict_to_array(solution_dict)
+        
+            return problem,target_func,energies
+
+
+
 
 
 def collate_fn(batch):
@@ -179,7 +228,6 @@ def create_candidates_with_sol(data_dir, sample_size, threshold):
         name = g.split('_sol.pkl')[0]
         with open(name + "_samples_sol.npy", "wb") as f:
             np.save(f, samples)
-    return(samples)
             
 
 
