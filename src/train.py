@@ -24,6 +24,7 @@ def one_hot(x, k, dtype=jnp.float32):
     """Create a one-hot encoding of x of size k."""
     return jnp.array(x[:, None] == jnp.arange(k), dtype)
 
+vmap_one_hot=jax.vmap(one_hot, in_axes=(0,None), out_axes=0)
 
 def train(path='/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/ml_based_sat_solver/BroadcastTestSet_subset/' , rel_path='processed'): # used previously as path: "../Data/blocksworld" ## 
     sat_data = SATTrainingDataset(path)
@@ -38,13 +39,30 @@ def train(path='/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/
     opt_state = opt_init(params)
 
     @jax.jit
-    def update(params, opt_state, x, y):
+    def compute_log_probs(decoded_nodes, mask,candidate):
+            #return jax.nn.log_softmax(decoded_nodes) * candidate ###this is incompatible regarding the dimensions
+            print("shape", np.shape(jax.nn.log_softmax(decoded_nodes) * mask[:, None]))
+            return jnp.tensordot(candidate,
+                jax.nn.log_softmax(decoded_nodes) * mask[:, None],
+                2,
+            )
+
+            ###NEED TO CHECK THIS!!! Currently not working
+
+    #vmap_compute_log_probs=jax.vmap(compute_log_probs, in_axes=(None,None, 0), out_axes=0)
+
+    @jax.jit
+    def update(params, opt_state, x, y, f):
+        c = y[0]
+        e = y[1]
+        
         #g = jax.grad(prediction_loss)(params, *x, y)
 
         #TBD!!! -> change this function here
 
-        g=jax.grad(new_prediction_loss)(params, *x, *y)
+        #g=jax.grad(new_prediction_loss)(params, *x, *y, f)
 
+        g=jax.grad(batched_loss)(params, *x, c,e, f)
         ####
 
         updates, opt_state = opt_update(g, opt_state)
@@ -61,28 +79,45 @@ def train(path='/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/
 
 
     @jax.jit
-    def new_prediction_loss(params, mask, graph, candidates, energies, f: float):
+    def new_prediction_loss_single(params, mask, graph, candidate, energy, f: float):
             decoded_nodes = network.apply(params, graph)
-            candidates = one_hot(candidates, 2)
+            candidate = one_hot(candidate, 2)
             # We interpret the decoded nodes as a pair of logits for each node.
-            log_prob = jax.nn.log_softmax(decoded_nodes) * candidates
-            weights = jax.nn.softmax(- f * energies)
+            log_prob = jax.nn.log_softmax(decoded_nodes) * candidate
+            weights = jax.nn.softmax(- f * energy)
             weighted_log_probs = jnp.dot(log_prob, weights)
             return -jnp.sum(weighted_log_probs * mask[:, None]) / jnp.sum(mask)
     
+
+    @jax.jit
+    def new_prediction_loss(params, mask, graph, candidates, energies, f: float):
+                decoded_nodes = network.apply(params, graph)
+                #print(np.shape(candidates))
+                candidates = vmap_one_hot(candidates, 2)
+                #print(np.shape(candidates))
+                # We interpret the decoded nodes as a pair of logits for each node.
+                print(np.shape(jax.nn.log_softmax(decoded_nodes)))
+                print(np.shape(candidates[0]))
+                log_prob = compute_log_probs(decoded_nodes, mask, candidates)#jax.nn.log_softmax(decoded_nodes) * candidates
+                print(np.shape(log_prob))
+                print(np.shape(candidates))
+                weights = jax.nn.softmax(- f * energies)
+                weighted_log_probs = jnp.dot(log_prob, weights)
+                return -jnp.sum(weighted_log_probs * mask[:, None]) / jnp.sum(mask)
     
 
-    
-
-    # batched_loss = jax.vmap(prediction_loss, in_axes=(None, 0))
+    batched_loss = jax.vmap(new_prediction_loss_single, in_axes=(None, None, None, 1,1, None), out_axes=0)
 
     print("Entering training loop")
 
     for epoch in range(NUM_EPOCHS):
         start_time = time.time()
-        for (x, y) in train_loader:
-            params, opt_state = update(params, opt_state, x, y)
-            # print(f"{batch} done")
+        for (p, ce) in train_loader:
+            #c=ce[0]
+            #e=ce[1]
+            for i in range(0,len(ce[1])):#,len(e)):
+                params, opt_state = update(params, opt_state, p, ce[:][i], f)
+            print(f"{batch} done")
         epoch_time = time.time() - start_time
 
         # train_acc = accuracy(params, train_images, train_labels)

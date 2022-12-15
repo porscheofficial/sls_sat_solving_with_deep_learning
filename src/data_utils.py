@@ -13,6 +13,7 @@ from collections import namedtuple
 from constraint_problems import get_problem_from_cnf
 from random_walk import number_of_violated_constraints
 from jax import vmap
+from jax.numpy import asarray
 
 MAX_TIME = 20
 
@@ -141,9 +142,8 @@ class SATTrainingDataset(data.Dataset):
 def collate_fn(batch):
     problems, tuples = zip(*batch)
     candidates, energies = zip(*tuples) ###this might be the problem...
-    print(energies)
     masks, graphs = zip(*((np.fromstring(p.mask), p.graph) for p in problems))
-    return (np.concatenate(masks), jraph.batch(graphs)), (np.concatenate(candidates), np.concatenate(energies))
+    return (np.concatenate(masks), jraph.batch(graphs)), (candidates, asarray(energies))#(list(zip(*candidates)), np.concatenate(jax.numpy.asarray(energies)))
 
 
 class JraphDataLoader(data.DataLoader):
