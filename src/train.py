@@ -7,8 +7,9 @@ from torch.utils import data
 import numpy as np
 from data_utils import SATTrainingDataset, JraphDataLoader
 from model import network_definition
+import matplotlib.pyplot as plt
 
-NUM_EPOCHS = 10
+NUM_EPOCHS = 3#10
 f=0.1
 
 # # Make a batched version of the forwarding
@@ -55,17 +56,13 @@ def train(path='/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/
             batch_graphs=x[1]
             batch_c=y[0]
             batch_e=y[1]
-            #print(len(batch_masks))
-            #print(len(batch_graphs))
-            #print(len(batch_c))
-            print(len(batch_e))
-            #print(batch_e[0])
-            #print(batch_e)
-            loss=new_prediction_loss(params, batch_masks[0], batch_graphs[0], batch_c[0], batch_e[0], f)
-            print(loss)
-            g=jax.grad(new_prediction_loss)(params, batch_masks[0], batch_graphs[0], batch_c[0], batch_e[0], f)
-            #g=jax.grad(batched_loss)(params, *x, c, e, f)
-            ####
+
+            batchsize=len(batch_e)
+            if batchsize==1:
+                g=jax.grad(new_prediction_loss)(params, batch_masks[0], batch_graphs[0], batch_c[0], batch_e[0], f)
+            else:
+                g=jax.grad(batched_loss_slow)(params, batch_masks, batch_graphs, batch_c, batch_e, f)
+
             updates, opt_state = opt_update(g, opt_state)
             return optax.apply_updates(params, updates), opt_state
 
@@ -92,10 +89,19 @@ def train(path='/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/
             return loss
 
 
-    #batched_loss = jax.vmap(new_prediction_loss_single, in_axes=(None, None, None, 1,1, None), out_axes=0)
+    #@jax.jit (do not use it here! Otherwise it does not work!)
+    def batched_loss_slow(params, batch_masks, batch_graphs, batch_candidates, batch_energies, f: float):
+            batchsize=len(batch_energies)
+            loss_vec=np.zeros(batchsize)
+            for i in range(batchsize):
+                loss_vec[i]=new_prediction_loss(params, batch_masks[i], batch_graphs[i], batch_candidates[i], batch_energies[i], f)
+            loss_sum=np.sum(loss_vec)/batchsize
+            return loss_sum
+
+    #batched_loss = jnp.sum(jax.vmap(new_prediction_loss, in_axes=(None, 0, 0, 0,0, None), out_axes=0))
 
     print("Entering training loop")
-
+    test_acc_list=[]
     for epoch in range(NUM_EPOCHS):
         start_time = time.time()
         counter=0
@@ -112,16 +118,11 @@ def train(path='/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/
             #print(len(batch_e))
             #print(batch_e)
             params, opt_state = update(params, opt_state, batch_p, batch_ce, f)
-            print("params", np.shape(params))
-        '''
-        for (p, ce) in train_loader:
-            #c=ce[0]
-            #e=ce[1]
-            for i in range(0,len(ce[1])):#,len(e)):
-                params, opt_state = update(params, opt_state, p, ce[:][i], f)
-            print(f"{batch} done")
+            #print("params", np.shape(params))
+            print("batch", counter, "done")
+
         epoch_time = time.time() - start_time
-        '''
+        
         # train_acc = accuracy(params, train_images, train_labels)
         # test_acc = accuracy(params, test_images, test_labels)
         print("Epoch {} in {:0.2f} sec".format(epoch, epoch_time))
@@ -129,14 +130,19 @@ def train(path='/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/
         #test_acc = jnp.mean(jnp.asarray([prediction_loss(params, p.mask, p.graph, s) for (p, s) in test_data]))
 
         #TBD!!!
-
-        test_acc = jnp.mean(jnp.asarray([new_prediction_loss(p, p.graph, c, f) for (p, c) in test_data]))
-        
+        test_acc_now=[]
+        for (p, ce) in test_data:
+            test_acc_now.append(new_prediction_loss(params, p[0], p[1], ce[0],ce[1] , f))
+        print(test_acc_now)
+        test_acc_list.append(jnp.mean(test_acc_now))
         ##
 
         # print("Training set accuracy {}".format(train_acc))
-        print("Test set accuracy {}".format(test_acc))
-
+        print("Test set accuracy {}".format(jnp.mean(test_acc_now)))
+    print(test_acc_list)
+    plt.plot(np.arange(0,NUM_EPOCHS,1), test_acc_list)
+    plt.savefig("test_acc.jpg", dpi=300, format="jpg")
+    plt.show()
     # TODO: Save the model here
 
 if __name__ == "__main__":
