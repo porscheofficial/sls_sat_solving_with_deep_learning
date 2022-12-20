@@ -142,8 +142,10 @@ class SATTrainingDataset(data.Dataset):
 def collate_fn(batch):
     problems, tuples = zip(*batch)
     candidates, energies = zip(*tuples) ###this might be the problem...
-    masks, graphs = zip(*((np.fromstring(p.mask), p.graph) for p in problems))
-    return (np.concatenate(masks), jraph.batch(graphs)), (candidates, asarray(energies))#(list(zip(*candidates)), np.concatenate(jax.numpy.asarray(energies)))
+    #masks, graphs = zip(*((np.fromstrint(p.mask), p.graph) for p in problems))
+    masks, graphs = zip(*((p.mask, p.graph) for p in problems))
+    #return (np.concatenate(masks), jraph.batch(graphs)), (candidates, asarray(energies))#(list(zip(*candidates)), np.concatenate(jax.numpy.asarray(energies)))
+    return (masks, graphs), (candidates, asarray(energies))#(list(zip(*candidates)), np.concatenate(jax.numpy.asarray(energies)))
 
 
 class JraphDataLoader(data.DataLoader):
