@@ -58,6 +58,7 @@ def train(path='/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/
             batch_e=y[1]
 
             batchsize=len(batch_e)
+            #print("batchsize", batchsize)
             if batchsize==1:
                 g=jax.grad(new_prediction_loss)(params, batch_masks[0], batch_graphs[0], batch_c[0], batch_e[0], f)
             else:
@@ -100,6 +101,19 @@ def train(path='/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/
 
     #batched_loss = jnp.sum(jax.vmap(new_prediction_loss, in_axes=(None, 0, 0, 0,0, None), out_axes=0))
 
+
+    #@jax.jit
+    def test_loss(params, graph, mask, candidates, energies,f):
+        decoded_nodes = network.apply(params, graph)
+        candidates = vmap_one_hot(candidates, 2)
+        log_prob=vmap_compute_log_probs(decoded_nodes, mask, candidates)
+        weights = jax.nn.softmax(- f * energies)
+        weighted_log_probs = jax.vmap(jnp.dot,axis_name=(0,0), out_axes=0)(log_prob, weights)
+        summed_weighted_log_probs=np.sum(weighted_log_probs, axis=0) #sum over all candidates
+        loss=-jnp.sum(summed_weighted_log_probs @ mask[:, None]) / jnp.sum(mask)
+        #print(np.shape(loss))
+        return loss
+
     print("Entering training loop")
     test_acc_list=[]
     for epoch in range(NUM_EPOCHS):
@@ -130,19 +144,23 @@ def train(path='/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/
         #test_acc = jnp.mean(jnp.asarray([prediction_loss(params, p.mask, p.graph, s) for (p, s) in test_data]))
 
         #TBD!!!
-        test_acc_now=[]
-        for (p, ce) in test_data:
-            test_acc_now.append(new_prediction_loss(params, p[0], p[1], ce[0],ce[1] , f))
-        print(test_acc_now)
-        test_acc_list.append(jnp.mean(test_acc_now))
+        
+        #test_acc_now=[]
+        #for (p, ce) in test_data:
+        #    loss=test_loss(params, p[0], p[1], ce[0],ce[1] , f)
+        #    print(loss)
+        #    test_acc_now.append(loss)
+        #print(test_acc_now)
+        #test_acc_list.append(jnp.mean(test_acc_now))
+        
         ##
 
         # print("Training set accuracy {}".format(train_acc))
-        print("Test set accuracy {}".format(jnp.mean(test_acc_now)))
-    print(test_acc_list)
-    plt.plot(np.arange(0,NUM_EPOCHS,1), test_acc_list)
-    plt.savefig("test_acc.jpg", dpi=300, format="jpg")
-    plt.show()
+        #print("Test set accuracy {}".format(jnp.mean(test_acc_now)))
+    #print(test_acc_list)
+    #plt.plot(np.arange(0,NUM_EPOCHS,1), test_acc_list)
+    #plt.savefig("test_acc.jpg", dpi=300, format="jpg")
+    #plt.show()
     # TODO: Save the model here
 
 if __name__ == "__main__":
