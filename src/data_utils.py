@@ -234,21 +234,6 @@ def create_candidates(data_dir, sample_size, threshold):
         with open(g, "rb") as f:
             p = pickle.load(f)
         n = np.array(list(p.values()), dtype=bool)
-        samples = sample_candidates(n, sample_size, threshold)
-        name = g.split("_sol.pkl")[0]
-        with open(name + "_samples.npy", "wb") as f:
-            np.save(f, samples)
-
-
-#### NEW! ####
-
-
-def create_candidates_with_sol(data_dir, sample_size, threshold):
-    solved_instances = glob.glob(join(data_dir, "*_sol.pkl"))
-    for g in solved_instances:
-        with open(g, "rb") as f:
-            p = pickle.load(f)
-        n = np.array(list(p.values()), dtype=bool)
         samples = sample_candidates(n, sample_size - 1, threshold)
         samples = np.concatenate((np.reshape(n, (1, len(n))), samples), axis=0)
         name = g.split("_sol.pkl")[0]
