@@ -114,9 +114,9 @@ class SATTrainingDataset(data.Dataset):
             )
             target_name = instance_name + "_samples_sol.npy"
             candidates = np.load(target_name)  # np.array which stores candidates and solution to problem
-
+            padded_candidates = np.pad(candidates, pad_width=((0, 0), (0, len(problem.mask) - candidates.shape[1])))
             energies = vmap(number_of_violated_constraints, in_axes=(None, 0), out_axes=0)(problem, candidates)
-            return problem, (candidates, energies)
+            return problem, (padded_candidates, energies)
         else:
             # alte Methode hier
             instance_name = self.instances[idx].name

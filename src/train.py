@@ -46,8 +46,10 @@ def train(
     @jax.jit
     def compute_log_probs(decoded_nodes, mask, candidate):
         a = jax.nn.log_softmax(decoded_nodes) * mask[:, None]
-        b = jnp.dot(candidate, a.T)
+        b = candidate * a
         return b
+        # b = jnp.dot(candidate, a.T)
+        # return b
 
     vmap_compute_log_probs = jax.vmap(compute_log_probs, in_axes=(None, None, 0), out_axes=0)
 
@@ -83,8 +85,8 @@ def train(
         log_prob = vmap_compute_log_probs(decoded_nodes, mask, candidates)
         weights = jax.nn.softmax(- f * energies)
         weighted_log_probs = jax.vmap(jnp.dot, axis_name=(0, 0), out_axes=0)(log_prob, weights)
-        summed_weighted_log_probs = np.sum(weighted_log_probs, axis=0)  # sum over all candidates
-        loss = -jnp.sum(summed_weighted_log_probs @ mask[:, None]) / jnp.sum(mask)
+        loss = -jnp.sum(weighted_log_probs) / jnp.sum(mask)  # sum over all candidates and variables
+        # loss = -jnp.sum(summed_weighted_log_probs @ mask[:, None]) / jnp.sum(mask)
         # print(np.shape(loss))
         return loss
 
@@ -162,5 +164,3 @@ def train(
 
 if __name__ == "__main__":
     train()
-
-print("done")
