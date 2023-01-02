@@ -74,6 +74,7 @@ class JraphDataLoader(data.DataLoader):
                  pin_memory=False, drop_last=False,
                  timeout=0, worker_init_fn=None):
         super(self.__class__, self).__init__(dataset,
+
                                              batch_size=batch_size,
                                              shuffle=shuffle,
                                              sampler=sampler,
