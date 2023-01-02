@@ -1,19 +1,19 @@
+from collections import namedtuple
+from os.path import join, exists
+
 import glob
 import gzip
-from os.path import join, exists, splitext
-import pickle
-
-import jraph
 import nnf
-from func_timeout import func_timeout, FunctionTimedOut
-from torch.utils import data
 import numpy as np
-from pysat.formula import CNF
-from collections import namedtuple
-from constraint_problems import get_problem_from_cnf
-from random_walk import number_of_violated_constraints
+import pickle
+from func_timeout import func_timeout, FunctionTimedOut
 from jax import vmap
 from jax.numpy import asarray
+from pysat.formula import CNF
+from torch.utils import data
+
+from constraint_problems import get_problem_from_cnf
+from random_walk import number_of_violated_constraints
 
 MAX_TIME = 20
 
@@ -21,7 +21,9 @@ SATInstanceMeta = namedtuple("SATInstanceMeta", ("name", "n", "m", "n_edges"))
 
 
 class SATTrainingDataset(data.Dataset):
-    def __init__(self, data_dir, already_unzipped=True, return_candidates=True):  ####MODIFIED####
+    def __init__(
+        self, data_dir, already_unzipped=True, return_candidates=True
+    ):  ####MODIFIED####
         self.return_candidates = return_candidates  ####MODIFIED####
         self.data_dir = data_dir
         self.already_unzipped = already_unzipped
@@ -35,12 +37,14 @@ class SATTrainingDataset(data.Dataset):
             # name = f.split('.cnf')[0]
             problem_file = self._get_problem_file(name)
             cnf = CNF(from_string=problem_file.read())
-            instance = SATInstanceMeta(name, cnf.nv, len(cnf.clauses), sum(len(c) for c in cnf.clauses))
+            instance = SATInstanceMeta(
+                name, cnf.nv, len(cnf.clauses), sum(len(c) for c in cnf.clauses)
+            )
             self.instances.append(instance)
         self.max_n_node = max(i.n + i.m for i in self.instances)
         self.max_n_edge = max(i.n_edges for i in self.instances)
 
-    '''
+    """
     def _return_all_candidates(self, idx):
         # die neue Methode hier
         instance_name = self.instances[idx].name
@@ -80,15 +84,16 @@ class SATTrainingDataset(data.Dataset):
             
         weights= 0#tbf!    
         return(problem,target_func,weights)
-    '''
+    """
 
     def __len__(self):
         return len(self.instances)
 
     def solution_dict_to_array(self, solution_dict):
-        return np.pad(np.array(list(solution_dict.values()), dtype=int),
-                      (0, self.max_n_node - len(solution_dict))
-                      )
+        return np.pad(
+            np.array(list(solution_dict.values()), dtype=int),
+            (0, self.max_n_node - len(solution_dict)),
+        )
 
     def _get_problem_file(self, name):
         if self.already_unzipped:
@@ -96,11 +101,11 @@ class SATTrainingDataset(data.Dataset):
         else:
             return gzip.open(name + ".cnf.gz", "rt")
 
-    '''
+    """
     def __getitem__(self, idx):            
         return_value = self._return_all_candidates if self.return_candidates else self._return_only_solution
         return return_value
-    '''
+    """
 
     def __getitem__(self, idx):
         if self.return_candidates:
@@ -110,12 +115,19 @@ class SATTrainingDataset(data.Dataset):
             problem = get_problem_from_cnf(
                 cnf=CNF(from_string=problem_file.read()),
                 pad_nodes=self.max_n_node,
-                pad_edges=self.max_n_edge
+                pad_edges=self.max_n_edge,
             )
             target_name = instance_name + "_samples_sol.npy"
-            candidates = np.load(target_name)  # np.array which stores candidates and solution to problem
-            padded_candidates = np.pad(candidates, pad_width=((0, 0), (0, len(problem.mask) - candidates.shape[1])))
-            energies = vmap(number_of_violated_constraints, in_axes=(None, 0), out_axes=0)(problem, candidates)
+            candidates = np.load(
+                target_name
+            )  # np.array which stores candidates and solution to problem
+            padded_candidates = np.pad(
+                candidates,
+                pad_width=((0, 0), (0, len(problem.mask) - candidates.shape[1])),
+            )
+            energies = vmap(
+                number_of_violated_constraints, in_axes=(None, 0), out_axes=0
+            )(problem, candidates)
             return problem, (padded_candidates, energies)
         else:
             # alte Methode hier
@@ -125,7 +137,7 @@ class SATTrainingDataset(data.Dataset):
             problem = get_problem_from_cnf(
                 cnf=CNF(from_string=problem_file.read()),
                 pad_nodes=self.max_n_node,
-                pad_edges=self.max_n_edge
+                pad_edges=self.max_n_edge,
             )
             target_name = instance_name + "_sol.pkl"
             with open(target_name, "rb") as f:
@@ -142,26 +154,38 @@ def collate_fn(batch):
     masks, graphs = zip(*((p.mask, p.graph) for p in problems))
     # return (np.concatenate(masks), jraph.batch(graphs)), (candidates, asarray(energies))#(list(zip(*candidates)), np.concatenate(jax.numpy.asarray(energies)))
     return (masks, graphs), (
-        candidates, asarray(energies))  # (list(zip(*candidates)), np.concatenate(jax.numpy.asarray(energies)))
+        candidates,
+        asarray(energies),
+    )  # (list(zip(*candidates)), np.concatenate(jax.numpy.asarray(energies)))
 
 
 class JraphDataLoader(data.DataLoader):
-    def __init__(self, dataset, batch_size=1,
-                 shuffle=False, sampler=None,
-                 batch_sampler=None, num_workers=0,
-                 pin_memory=False, drop_last=False,
-                 timeout=0, worker_init_fn=None):
-        super(self.__class__, self).__init__(dataset,
-                                             batch_size=batch_size,
-                                             shuffle=shuffle,
-                                             sampler=sampler,
-                                             batch_sampler=batch_sampler,
-                                             num_workers=num_workers,
-                                             collate_fn=collate_fn,
-                                             pin_memory=pin_memory,
-                                             drop_last=drop_last,
-                                             timeout=timeout,
-                                             worker_init_fn=worker_init_fn)
+    def __init__(
+        self,
+        dataset,
+        batch_size=1,
+        shuffle=False,
+        sampler=None,
+        batch_sampler=None,
+        num_workers=0,
+        pin_memory=False,
+        drop_last=False,
+        timeout=0,
+        worker_init_fn=None,
+    ):
+        super(self.__class__, self).__init__(
+            dataset,
+            batch_size=batch_size,
+            shuffle=shuffle,
+            sampler=sampler,
+            batch_sampler=batch_sampler,
+            num_workers=num_workers,
+            collate_fn=collate_fn,
+            pin_memory=pin_memory,
+            drop_last=drop_last,
+            timeout=timeout,
+            worker_init_fn=worker_init_fn,
+        )
 
 
 def timed_solve(max_time, p):
@@ -184,11 +208,11 @@ def create_solutions(path, time_limit, suffix, open_util):
     regex = join(path, suffix)
     for f in glob.glob(regex):
         print(f"processing {f}")
-        root = f.split('.cnf')[0]
+        root = f.split(".cnf")[0]
         solved_target_name = root + "_sol.pkl"
         unsolved_target_name = root + "_unsol.pkl"
-        solved_target_name = join('processed', 'solved', solved_target_name)
-        unsolved_target_name = join('processed', 'unsolved', unsolved_target_name)
+        solved_target_name = join("processed", "solved", solved_target_name)
+        unsolved_target_name = join("processed", "unsolved", unsolved_target_name)
         if exists(solved_target_name) or exists(unsolved_target_name):
             print("solution file already exists")
             continue
@@ -211,12 +235,13 @@ def create_candidates(data_dir, sample_size, threshold):
             p = pickle.load(f)
         n = np.array(list(p.values()), dtype=bool)
         samples = sample_candidates(n, sample_size, threshold)
-        name = g.split('_sol.pkl')[0]
+        name = g.split("_sol.pkl")[0]
         with open(name + "_samples.npy", "wb") as f:
             np.save(f, samples)
 
 
-#### NEW! ####  
+#### NEW! ####
+
 
 def create_candidates_with_sol(data_dir, sample_size, threshold):
     solved_instances = glob.glob(join(data_dir, "*_sol.pkl"))
@@ -226,7 +251,7 @@ def create_candidates_with_sol(data_dir, sample_size, threshold):
         n = np.array(list(p.values()), dtype=bool)
         samples = sample_candidates(n, sample_size - 1, threshold)
         samples = np.concatenate((np.reshape(n, (1, len(n))), samples), axis=0)
-        name = g.split('_sol.pkl')[0]
+        name = g.split("_sol.pkl")[0]
         with open(name + "_samples_sol.npy", "wb") as f:
             np.save(f, samples)
 
