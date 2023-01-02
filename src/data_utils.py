@@ -21,10 +21,10 @@ class SATTrainingDataset(data.Dataset):
     def __init__(self, data_dir, already_unzipped=True):
         self.data_dir = data_dir
         self.already_unzipped = already_unzipped
-        solved_instances = glob.glob(join(data_dir, 'processed', 'solved', "*_sol.pkl"))
+        solved_instances = glob.glob(join(data_dir, "*_sol.pkl"))
         self.instances = []
         for f in solved_instances:
-            name = f.split('.cnf')[0]
+            name = f.split('_')[0]
             problem_file = self._get_problem_file(name)
             cnf = CNF(from_string=problem_file.read())
             instance = SATInstanceMeta(name, cnf.nv, len(cnf.clauses), sum(len(c) for c in cnf.clauses))

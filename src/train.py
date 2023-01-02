@@ -5,8 +5,8 @@ import jax.numpy as jnp
 import jax
 from torch.utils import data
 
-from src.data_utils import SATTrainingDataset, JraphDataLoader
-from src.model import network_definition
+from data_utils import SATTrainingDataset, JraphDataLoader
+from model import network_definition
 
 NUM_EPOCHS = 10
 
@@ -25,11 +25,11 @@ def one_hot(x, k, dtype=jnp.float32):
     return jnp.array(x[:, None] == jnp.arange(k), dtype)
 
 
-def train(path="../Data/blocksworld", rel_path='processed'):
+def train(path="../Data/BroadcastTestSet"):
     sat_data = SATTrainingDataset(path)
     train_data, test_data = data.random_split(sat_data, [0.8, 0.2])
 
-    train_loader = JraphDataLoader(train_data, batch_size=4, shuffle=True)
+    train_loader = JraphDataLoader(train_data, batch_size=1, shuffle=True)
 
     network = hk.without_apply_rng(hk.transform(network_definition))
     params = network.init(jax.random.PRNGKey(42), sat_data[0][0].graph)
