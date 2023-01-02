@@ -21,25 +21,25 @@ SATInstanceMeta = namedtuple("SATInstanceMeta", ("name", "n", "m", "n_edges"))
 
 
 class SATTrainingDataset(data.Dataset):
-    def __init__(self, data_dir, already_unzipped=True, return_candidates=True): ####MODIFIED####
-        self.return_candidates = return_candidates ####MODIFIED####
+    def __init__(self, data_dir, already_unzipped=True, return_candidates=True):  ####MODIFIED####
+        self.return_candidates = return_candidates  ####MODIFIED####
         self.data_dir = data_dir
         self.already_unzipped = already_unzipped
-        #solved_instances = glob.glob(join(data_dir, 'processed', 'solved', "*_sol.pkl"))
+        # solved_instances = glob.glob(join(data_dir, 'processed', 'solved', "*_sol.pkl"))
         solved_instances = glob.glob(join(data_dir, "*_sol.pkl"))
 
         self.instances = []
         for f in solved_instances:
-            #print(f)
-            name= f.split("_sol.pkl")[0]
-            #name = f.split('.cnf')[0]
+            # print(f)
+            name = f.split("_sol.pkl")[0]
+            # name = f.split('.cnf')[0]
             problem_file = self._get_problem_file(name)
             cnf = CNF(from_string=problem_file.read())
             instance = SATInstanceMeta(name, cnf.nv, len(cnf.clauses), sum(len(c) for c in cnf.clauses))
             self.instances.append(instance)
         self.max_n_node = max(i.n + i.m for i in self.instances)
         self.max_n_edge = max(i.n_edges for i in self.instances)
-        
+
     '''
     def _return_all_candidates(self, idx):
         # die neue Methode hier
@@ -81,7 +81,7 @@ class SATTrainingDataset(data.Dataset):
         weights= 0#tbf!    
         return(problem,target_func,weights)
     '''
-    
+
     def __len__(self):
         return len(self.instances)
 
@@ -95,7 +95,6 @@ class SATTrainingDataset(data.Dataset):
             return open(name + ".cnf", "rt")
         else:
             return gzip.open(name + ".cnf.gz", "rt")
-
 
     '''
     def __getitem__(self, idx):            
@@ -114,10 +113,10 @@ class SATTrainingDataset(data.Dataset):
                 pad_edges=self.max_n_edge
             )
             target_name = instance_name + "_samples_sol.npy"
-            candidates=np.load(target_name) #np.array which stores candidates and solution to problem
+            candidates = np.load(target_name)  # np.array which stores candidates and solution to problem
 
-            energies=vmap(number_of_violated_constraints ,in_axes=(None,0),out_axes=0)(problem,candidates)
-            return problem, (candidates ,energies)
+            energies = vmap(number_of_violated_constraints, in_axes=(None, 0), out_axes=0)(problem, candidates)
+            return problem, (candidates, energies)
         else:
             # alte Methode hier
             instance_name = self.instances[idx].name
@@ -131,21 +130,19 @@ class SATTrainingDataset(data.Dataset):
             target_name = instance_name + "_sol.pkl"
             with open(target_name, "rb") as f:
                 solution_dict = pickle.load(f)
-                candidates=self.solution_dict_to_array(solution_dict)
-            energies=number_of_violated_constraints(problem,candidates)
-            return problem,(candidates,energies)
-
-
-
+                candidates = self.solution_dict_to_array(solution_dict)
+            energies = number_of_violated_constraints(problem, candidates)
+            return problem, (candidates, energies)
 
 
 def collate_fn(batch):
     problems, tuples = zip(*batch)
-    candidates, energies = zip(*tuples) ###this might be the problem...
-    #masks, graphs = zip(*((np.fromstrint(p.mask), p.graph) for p in problems))
+    candidates, energies = zip(*tuples)  ###this might be the problem...
+    # masks, graphs = zip(*((np.fromstrint(p.mask), p.graph) for p in problems))
     masks, graphs = zip(*((p.mask, p.graph) for p in problems))
-    #return (np.concatenate(masks), jraph.batch(graphs)), (candidates, asarray(energies))#(list(zip(*candidates)), np.concatenate(jax.numpy.asarray(energies)))
-    return (masks, graphs), (candidates, asarray(energies))#(list(zip(*candidates)), np.concatenate(jax.numpy.asarray(energies)))
+    # return (np.concatenate(masks), jraph.batch(graphs)), (candidates, asarray(energies))#(list(zip(*candidates)), np.concatenate(jax.numpy.asarray(energies)))
+    return (masks, graphs), (
+        candidates, asarray(energies))  # (list(zip(*candidates)), np.concatenate(jax.numpy.asarray(energies)))
 
 
 class JraphDataLoader(data.DataLoader):
@@ -217,8 +214,8 @@ def create_candidates(data_dir, sample_size, threshold):
         name = g.split('_sol.pkl')[0]
         with open(name + "_samples.npy", "wb") as f:
             np.save(f, samples)
-          
-        
+
+
 #### NEW! ####  
 
 def create_candidates_with_sol(data_dir, sample_size, threshold):
@@ -227,18 +224,14 @@ def create_candidates_with_sol(data_dir, sample_size, threshold):
         with open(g, "rb") as f:
             p = pickle.load(f)
         n = np.array(list(p.values()), dtype=bool)
-        samples = sample_candidates(n, sample_size-1, threshold)
-        samples = np.concatenate((np.reshape(n,(1,len(n))),samples),axis=0)
+        samples = sample_candidates(n, sample_size - 1, threshold)
+        samples = np.concatenate((np.reshape(n, (1, len(n))), samples), axis=0)
         name = g.split('_sol.pkl')[0]
         with open(name + "_samples_sol.npy", "wb") as f:
             np.save(f, samples)
-            
-
 
 
 def sample_candidates(original, sample_size, threshold):
     np.random.seed(sum(original))
     condition = np.random.random((sample_size, original.shape[0])) < threshold
     return np.where(condition, np.invert(original), original)
-
-
