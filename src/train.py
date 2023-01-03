@@ -5,11 +5,12 @@ import numpy as np
 import optax
 import time
 from torch.utils import data
+import matplotlib.pyplot as plt
 
 from data_utils import SATTrainingDataset, JraphDataLoader
 from model import network_definition
 
-NUM_EPOCHS = 3  # 10
+NUM_EPOCHS = 5  # 10
 f = 0.1
 
 
@@ -36,7 +37,7 @@ def train(
     sat_data = SATTrainingDataset(path)
     train_data, test_data = data.random_split(sat_data, [0.8, 0.2])
 
-    train_loader = JraphDataLoader(train_data, batch_size=2, shuffle=True)
+    train_loader = JraphDataLoader(train_data, batch_size=1, shuffle=True)
 
     network = hk.without_apply_rng(hk.transform(network_definition))
     params = network.init(jax.random.PRNGKey(42), sat_data[0][0].graph)
@@ -93,15 +94,11 @@ def train(
         weighted_log_probs = jax.vmap(jnp.dot, axis_name=(0, 0), out_axes=0)(
             log_prob, weights
         )
-        summed_weighted_log_probs = np.sum(
-            weighted_log_probs, axis=0
-        )  # sum over all candidates
-        loss = -jnp.sum(summed_weighted_log_probs @ mask[:, None]) / jnp.sum(mask)
-        # print(np.shape(loss))
+        loss = -jnp.sum(weighted_log_probs) / jnp.sum(mask)
         return loss
 
     print("Entering training loop")
-    test_acc_list = []
+    test_acc_list = np.zeros(NUM_EPOCHS)
     for epoch in range(NUM_EPOCHS):
         start_time = time.time()
         for counter, (batch_p, batch_ce) in enumerate(train_loader):
@@ -120,11 +117,13 @@ def train(
         # TBD!!!
 
         # test_acc_now=[]
-        # for (p, ce) in test_data:
-        #    loss=test_loss(params, p[0], p[1], ce[0],ce[1] , f)
-        #    print(loss)
-        #    test_acc_now.append(loss)
-        # print(test_acc_now)
+        summed_loss = 0
+        counter = 0
+        for (p, ce) in test_data:
+            counter = counter + 1
+            loss = test_loss(params, p[0], p[1], ce[0], ce[1], f)
+            summed_loss = summed_loss + loss
+        test_acc_list[epoch] = summed_loss / counter
         # test_acc_list.append(jnp.mean(test_acc_now))
 
         ##
@@ -132,9 +131,9 @@ def train(
         # print("Training set accuracy {}".format(train_acc))
         # print("Test set accuracy {}".format(jnp.mean(test_acc_now)))
     # print(test_acc_list)
-    # plt.plot(np.arange(0,NUM_EPOCHS,1), test_acc_list)
+    plt.plot(np.arange(0, NUM_EPOCHS, 1), test_acc_list)
     # plt.savefig("test_acc.jpg", dpi=300, format="jpg")
-    # plt.show()
+    plt.show()
     # TODO: Save the model here
 
 
