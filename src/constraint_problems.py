@@ -226,7 +226,7 @@ def get_problem_from_cnf(cnf: CNF, pad_nodes=0, pad_edges=0):
     # For the loss calculation we create a mask for the nodes, which masks
     # the constraint nodes and the padding nodes.
 
-    mask = (np.arange(pad_nodes) < n).astype(np.int32)
+    mask = (np.arange(n_node) < n).astype(np.int32)
 
     return HashableSATProblem(
         graph=graph, mask=mask, clause_lengths=clause_lengths, params=(n, m, k)
