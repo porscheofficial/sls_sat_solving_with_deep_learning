@@ -21,10 +21,8 @@ SATInstanceMeta = namedtuple("SATInstanceMeta", ("name", "n", "m", "n_edges"))
 
 
 class SATTrainingDataset(data.Dataset):
-    def __init__(
-        self, data_dir, already_unzipped=True, return_candidates=True
-    ):  ####MODIFIED####
-        self.return_candidates = return_candidates  ####MODIFIED####
+    def __init__(self, data_dir, already_unzipped=True, return_candidates=True):
+        self.return_candidates = return_candidates
         self.data_dir = data_dir
         self.already_unzipped = already_unzipped
         # solved_instances = glob.glob(join(data_dir, 'processed', 'solved', "*_sol.pkl"))
@@ -121,9 +119,12 @@ class SATTrainingDataset(data.Dataset):
             candidates = np.load(
                 target_name
             )  # np.array which stores candidates and solution to problem
+            N = len(problem.mask)  # total number of nodes in (padded) graph
+            n, _, _ = problem.params  # number of variables nodes in instance
+
             padded_candidates = np.pad(
                 candidates,
-                pad_width=((0, 0), (0, len(problem.mask) - candidates.shape[1])),
+                pad_width=((0, 0), (0, N - n)),
             )
             energies = vmap(
                 number_of_violated_constraints, in_axes=(None, 0), out_axes=0
