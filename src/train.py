@@ -151,6 +151,15 @@ def train(
         model_params = [batch_size, f, NUM_EPOCHS]
         np.save(model_path, [model_params, train_acc_list, test_acc_list])
 
+        # print("Training set accuracy {}".format(train_acc))
+        # print("Test set accuracy {}".format(jnp.mean(test_acc_now)))
+    # print(test_acc_list)
+    plt.plot(np.arange(1, NUM_EPOCHS + 1, 1), test_acc_list, "o--")
+    plt.ylabel("test loss")
+    plt.xlabel("epoch")
+    plt.tight_layout()
+    plt.savefig("test_acc.jpg", dpi=300, format="jpg")
+    plt.show()
     # TODO: Save the model here
 
 
