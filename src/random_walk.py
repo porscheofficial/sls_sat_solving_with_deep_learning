@@ -3,6 +3,7 @@ import jax.numpy as jnp
 import numpy as np
 from functools import partial
 from jax.experimental.sparse import BCOO
+
 from constraint_problems import SATProblem
 
 
@@ -20,8 +21,11 @@ def moser_walk(weights, problem, n_steps, seed, keep_trajectory=False):
         e = len(prob.graph.edges)
         n, m, k = prob.params
         adjacency_matrix = BCOO(
-            (np.ones(e, dtype=bool), np.column_stack((prob.graph.senders, prob.graph.receivers))),
-            shape=(n, m)
+            (
+                np.ones(e, dtype=bool),
+                np.column_stack((prob.graph.senders, prob.graph.receivers)),
+            ),
+            shape=(n, m),
         ).todense()
 
         randomness = jax.random.bernoulli(rng_key, weights)
@@ -52,7 +56,7 @@ def moser_walk(weights, problem, n_steps, seed, keep_trajectory=False):
         step_func = step_trajectory
         initial_assignment = jnp.zeros((n_steps, weights.shape[0]), dtype=bool)
         initial_assignment.at[0].set(initial_assignment[0, :])
-        energy = jnp.zeros((n_steps, ))
+        energy = jnp.zeros((n_steps,))
         energy.at[0].set(energy[0])
 
     else:
@@ -66,13 +70,13 @@ def moser_walk(weights, problem, n_steps, seed, keep_trajectory=False):
             energy,
             0,
             rng_key,
-        )
+        ),
     )
     return output, energy, counter
 
 
 @partial(jax.jit, static_argnames=("problem",))
-#@jax.jit
+# @jax.jit
 def violated_constraints(problem: SATProblem, assignment):
     graph = problem.graph
     edge_is_violated = jnp.mod(graph.edges[:, 1] + assignment[graph.senders].T, 2)
@@ -84,11 +88,37 @@ def violated_constraints(problem: SATProblem, assignment):
     )
 
     violated_constraint_edges = edge_is_violated @ edge_mask_sp  # (,x) @ (x,m)  = (,m)
-    constraint_is_violated = violated_constraint_edges == jnp.asarray(problem.clause_lengths)
+    constraint_is_violated = violated_constraint_edges == jnp.asarray(
+        problem.clause_lengths
+    )
 
     # constraint_is_violated = (
     #     jax.vmap(jnp.sum)(jnp.reshape(edge_is_violated, (m, k))) == k
     # )
     return constraint_is_violated
+
+
+@partial(jax.jit, static_argnames=("problem",))
+# @jax.jit
+def number_of_violated_constraints(problem: SATProblem, assignment):
+    graph = problem.graph
+    edge_is_violated = jnp.mod(graph.edges[:, 1] + assignment[graph.senders].T, 2)
+
+    e = len(graph.edges)
+    _, m, k = problem.params
+    edge_mask_sp = BCOO(
+        (np.ones(e), np.column_stack((np.arange(e), graph.receivers))), shape=(e, m)
+    )
+
+    violated_constraint_edges = edge_is_violated @ edge_mask_sp  # (,x) @ (x,m)  = (,m)
+    constraint_is_violated = violated_constraint_edges == jnp.asarray(
+        problem.clause_lengths
+    )
+
+    # constraint_is_violated = (
+    #     jax.vmap(jnp.sum)(jnp.reshape(edge_is_violated, (m, k))) == k
+    # )
+    return np.sum(constraint_is_violated.astype(int), axis=0)
+
 
 # %%

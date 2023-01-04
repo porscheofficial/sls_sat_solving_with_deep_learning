@@ -31,27 +31,32 @@ from pysat.solvers import Cadical
 
 LabeledProblem = collections.namedtuple("Problem", ("graph", "labels", "mask", "meta"))
 
-SATProblem = collections.namedtuple("SATProblem", ("graph", "mask", "params", "clause_lengths"))
+SATProblem = collections.namedtuple(
+    "SATProblem", ("graph", "mask", "params", "clause_lengths")
+)
 
 
 class HashableSATProblem(SATProblem):
     def __hash__(self):
-        return hash((self.graph.senders.tostring(),
-                     self.graph.receivers.tostring(),
-                     self.graph.edges.tostring(),
-                     self.params,
-                     tuple(self.clause_lengths)
-                     ))
+        return hash(
+            (
+                self.graph.senders.tostring(),
+                self.graph.receivers.tostring(),
+                self.graph.edges.tostring(),
+                self.params,
+                tuple(self.clause_lengths),
+            )
+        )
 
     def __eq__(self, other):
         return self.__hash__() == other.__hash__()
 
 
 def all_bitstrings(size):
-    bitstrings = np.ndarray((2 ** size, size), dtype=int)
+    bitstrings = np.ndarray((2**size, size), dtype=int)
     for i in range(size):
         bitstrings[:, i] = np.tile(
-            np.repeat(np.array([0, 1]), 2 ** (size - i - 1)), 2 ** i
+            np.repeat(np.array([0, 1]), 2 ** (size - i - 1)), 2**i
         )
     return bitstrings
 
@@ -216,20 +221,15 @@ def get_problem_from_cnf(cnf: CNF, pad_nodes=0, pad_edges=0):
     if pad_nodes > n_node or pad_edges > n_edge:
         n_node = max(pad_nodes, n_node)
         n_edge = max(pad_edges, n_edge)
-        graph = jraph.pad_with_graphs(
-            graph, n_node, n_edge
-        )
+        graph = jraph.pad_with_graphs(graph, n_node, n_edge)
 
     # For the loss calculation we create a mask for the nodes, which masks
     # the constraint nodes and the padding nodes.
 
-    mask = (np.arange(pad_nodes) < n).astype(np.int32)
+    mask = (np.arange(n_node) < n).astype(np.int32)
 
     return HashableSATProblem(
-        graph=graph,
-        mask=mask,
-        clause_lengths=clause_lengths,
-        params=(n, m, k)
+        graph=graph, mask=mask, clause_lengths=clause_lengths, params=(n, m, k)
     )
 
 
