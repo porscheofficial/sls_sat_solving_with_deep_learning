@@ -3,6 +3,7 @@ from os.path import join, exists
 
 import glob
 import gzip
+import jraph
 import nnf
 import numpy as np
 import pickle
@@ -21,20 +22,15 @@ SATInstanceMeta = namedtuple("SATInstanceMeta", ("name", "n", "m", "n_edges"))
 
 
 class SATTrainingDataset(data.Dataset):
-    def __init__(
-        self, data_dir, already_unzipped=True, return_candidates=True
-    ):  ####MODIFIED####
-        self.return_candidates = return_candidates  ####MODIFIED####
+    def __init__(self, data_dir, already_unzipped=True, return_candidates=True):
+        self.return_candidates = return_candidates
         self.data_dir = data_dir
         self.already_unzipped = already_unzipped
-        # solved_instances = glob.glob(join(data_dir, 'processed', 'solved', "*_sol.pkl"))
         solved_instances = glob.glob(join(data_dir, "*_sol.pkl"))
 
         self.instances = []
         for f in solved_instances:
-            # print(f)
             name = f.split("_sol.pkl")[0]
-            # name = f.split('.cnf')[0]
             problem_file = self._get_problem_file(name)
             cnf = CNF(from_string=problem_file.read())
             instance = SATInstanceMeta(
@@ -43,48 +39,6 @@ class SATTrainingDataset(data.Dataset):
             self.instances.append(instance)
         self.max_n_node = max(i.n + i.m for i in self.instances)
         self.max_n_edge = max(i.n_edges for i in self.instances)
-
-    """
-    def _return_all_candidates(self, idx):
-        # die neue Methode hier
-        instance_name = self.instances[idx].name
-        problem_file = self._get_problem_file(instance_name)
-        problem = get_problem_from_cnf(
-            cnf=CNF(from_string=problem_file.read()),
-            pad_nodes=self.max_n_node,
-            pad_edges=self.max_n_edge
-        )
-        target_name = instance_name + "_samples_sol.npy"
-        target_func=np.load(target_name) #np.array which stores candidates and solution to problem
-
-        #violated_constraints_for_candidates=np.sum(violated_constraints(problem, target_func),axis=0)
-        #print(np.shape(violated_constraints_for_candidates))
-        #weights=
-        #for i in range(len(target_func)):
-        #    weights += np.exp(-beta*)
-
-        weights= 0#tbf!    
-        return(problem,target_func,weights)
-
-        
-    def _return_only_solution(self, idx):
-        # alte Methode hier
-        instance_name = self.instances[idx].name
-        print(self.instances[idx].name)
-        problem_file = self._get_problem_file(instance_name)
-        problem = get_problem_from_cnf(
-            cnf=CNF(from_string=problem_file.read()),
-            pad_nodes=self.max_n_node,
-            pad_edges=self.max_n_edge
-        )
-        target_name = instance_name + "_sol.pkl"
-        with open(target_name, "rb") as f:
-            solution_dict = pickle.load(f)
-            target_func=self.solution_dict_to_array(solution_dict)
-            
-        weights= 0#tbf!    
-        return(problem,target_func,weights)
-    """
 
     def __len__(self):
         return len(self.instances)
@@ -101,62 +55,58 @@ class SATTrainingDataset(data.Dataset):
         else:
             return gzip.open(name + ".cnf.gz", "rt")
 
-    """
-    def __getitem__(self, idx):            
-        return_value = self._return_all_candidates if self.return_candidates else self._return_only_solution
-        return return_value
-    """
-
     def __getitem__(self, idx):
+        instance_name = self.instances[idx].name
+        problem_file = self._get_problem_file(instance_name)
+        problem = get_problem_from_cnf(
+            cnf=CNF(from_string=problem_file.read()),
+            pad_nodes=self.max_n_node,
+            pad_edges=self.max_n_edge,
+        )
+        N = len(problem.mask)  # total number of nodes in (padded) graph
+        n, _, _ = problem.params  # number of variables nodes in instance
+
         if self.return_candidates:
-            # die neue Methode hier
-            instance_name = self.instances[idx].name
-            problem_file = self._get_problem_file(instance_name)
-            problem = get_problem_from_cnf(
-                cnf=CNF(from_string=problem_file.read()),
-                pad_nodes=self.max_n_node,
-                pad_edges=self.max_n_edge,
-            )
+            # return not just solution but also generated candidates
             target_name = instance_name + "_samples_sol.npy"
             candidates = np.load(
                 target_name
             )  # np.array which stores candidates and solution to problem
+
             padded_candidates = np.pad(
                 candidates,
-                pad_width=((0, 0), (0, len(problem.mask) - candidates.shape[1])),
+                pad_width=((0, 0), (0, N - n)),
             )
             energies = vmap(
                 number_of_violated_constraints, in_axes=(None, 0), out_axes=0
             )(problem, candidates)
             return problem, (padded_candidates, energies)
         else:
-            # alte Methode hier
-            instance_name = self.instances[idx].name
-            print(self.instances[idx].name)
-            problem_file = self._get_problem_file(instance_name)
-            problem = get_problem_from_cnf(
-                cnf=CNF(from_string=problem_file.read()),
-                pad_nodes=self.max_n_node,
-                pad_edges=self.max_n_edge,
-            )
+            # return only solution
             target_name = instance_name + "_sol.pkl"
             with open(target_name, "rb") as f:
                 solution_dict = pickle.load(f)
                 candidates = self.solution_dict_to_array(solution_dict)
             energies = number_of_violated_constraints(problem, candidates)
-            return problem, (candidates, energies)
+            # candidates already padded inside solution_dict_to_array but repeated here for transparency
+            padded_candidates = np.pad(
+                candidates,
+                pad_width=(0, N - n),
+            )
+            return problem, (padded_candidates, energies)
 
 
 def collate_fn(batch):
     problems, tuples = zip(*batch)
-    candidates, energies = zip(*tuples)  ###this might be the problem...
-    # masks, graphs = zip(*((np.fromstrint(p.mask), p.graph) for p in problems))
+    candidates, energies = zip(*tuples)
     masks, graphs = zip(*((p.mask, p.graph) for p in problems))
-    # return (np.concatenate(masks), jraph.batch(graphs)), (candidates, asarray(energies))#(list(zip(*candidates)), np.concatenate(jax.numpy.asarray(energies)))
-    return (masks, graphs), (
-        candidates,
-        asarray(energies),
-    )  # (list(zip(*candidates)), np.concatenate(jax.numpy.asarray(energies)))
+    batched_masks = np.concatenate(masks)
+    batched_graphs = jraph.batch(graphs)
+    batched_candidates = np.vstack([c.T for c in candidates])
+    batched_energies = np.vstack(
+        [np.repeat([e], len(m), axis=0) for (e, m) in zip(energies, masks)]
+    )
+    return (batched_masks, batched_graphs), (batched_candidates, batched_energies)
 
 
 class JraphDataLoader(data.DataLoader):

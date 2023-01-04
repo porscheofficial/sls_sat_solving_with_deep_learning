@@ -12,15 +12,14 @@ from model import network_definition
 
 NUM_EPOCHS = 5  # 10
 f = 0.1
-
-
-# # Make a batched version of the forwarding
-# batched_predict = jax.vmap(network.apply, in_axes=(None, 0))
-
-
-# def loss(params, problems, targets):
-#     preds = batched_predict(params, problems)
-#     return -jnp.mean(preds * targets)
+batch_size = 1
+path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/ml_based_sat_solver/BroadcastTestSet_subset"
+img_path = (
+    "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/"
+)
+model_path = (
+    "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/"
+)
 
 
 def one_hot(x, k, dtype=jnp.float32):
@@ -32,12 +31,19 @@ vmap_one_hot = jax.vmap(one_hot, in_axes=(0, None), out_axes=0)
 
 
 def train(
+    batch_size,
+    f,
+    NUM_EPOCHS,
     path="/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/ml_based_sat_solver/BroadcastTestSet_subset",
-):  # used previously as path: "../Data/blocksworld" ###path="../Data/BroadcastTestSet",
+    img_path=False,
+    model_path=False,
+):  # used previously as path: "../Data/blocksworld"
+
     sat_data = SATTrainingDataset(path)
+
     train_data, test_data = data.random_split(sat_data, [0.8, 0.2])
 
-    train_loader = JraphDataLoader(train_data, batch_size=1, shuffle=True)
+    train_loader = JraphDataLoader(train_data, batch_size=batch_size, shuffle=True)
 
     network = hk.without_apply_rng(hk.transform(network_definition))
     params = network.init(jax.random.PRNGKey(42), sat_data[0][0].graph)
@@ -48,132 +54,102 @@ def train(
     @jax.jit
     def compute_log_probs(decoded_nodes, mask, candidate):
         a = jax.nn.log_softmax(decoded_nodes) * mask[:, None]
-        b = candidate * a
-        return b
-        # b = jnp.dot(candidate, a.T)
-        # return b
+        return candidate * a
 
     vmap_compute_log_probs = jax.vmap(
-        compute_log_probs, in_axes=(None, None, 0), out_axes=0
+        compute_log_probs, in_axes=(None, None, 1), out_axes=1
     )
 
     @jax.jit
-    def update(params, opt_state, x, y, f):
-        batch_masks = x[0]
-        batch_graphs = x[1]
-        batch_c = y[0]
-        batch_e = y[1]
+    def update(params, opt_state, batch_masks, batch_graphs, batch_c, batch_e, f):
 
-        batchsize = len(batch_e)
-        # print("batchsize", batchsize)
-        if batchsize == 1:
-            g = jax.grad(new_prediction_loss)(
-                params, batch_masks[0], batch_graphs[0], batch_c[0], batch_e[0], f
-            )
-        else:
-            g = jax.grad(batched_loss_slow)(
-                params, batch_masks, batch_graphs, batch_c, batch_e, f
-            )
+        g = jax.grad(prediction_loss)(
+            params, batch_masks, batch_graphs, batch_c, batch_e, f
+        )
 
         updates, opt_state = opt_update(g, opt_state)
         return optax.apply_updates(params, updates), opt_state
 
     @jax.jit
-    def prediction_loss(params, mask, graph, solution):
-        decoded_nodes = network.apply(params, graph)
-        solution = one_hot(solution, 2)
-        # We interpret the decoded nodes as a pair of logits for each node.
-        log_prob = jax.nn.log_softmax(decoded_nodes) * solution
-        return -jnp.sum(log_prob * mask[:, None]) / jnp.sum(mask)
-
-    @jax.jit
-    def new_prediction_loss(params, mask, graph, candidates, energies, f: float):
-        decoded_nodes = network.apply(params, graph)
-        candidates = vmap_one_hot(candidates, 2)
-        log_prob = vmap_compute_log_probs(decoded_nodes, mask, candidates)
-        weights = jax.nn.softmax(-f * energies)
-        weighted_log_probs = jax.vmap(jnp.dot, axis_name=(0, 0), out_axes=0)(
-            log_prob, weights
-        )
-        loss = -jnp.sum(weighted_log_probs) / jnp.sum(
-            mask
-        )  # sum over all candidates and variables
-        # loss = -jnp.sum(summed_weighted_log_probs @ mask[:, None]) / jnp.sum(mask)
-        # print(np.shape(loss))
+    def prediction_loss(params, mask, graph, candidates, energies, f: float):
+        decoded_nodes = network.apply(params, graph)  # (B*N, 2)
+        candidates = vmap_one_hot(candidates, 2)  # (B*N, K, 2))
+        log_prob = vmap_compute_log_probs(
+            decoded_nodes, mask, candidates
+        )  # (B*N, K, 2)
+        weights = jax.nn.softmax(-f * energies)  # (B*N, K)
+        loss = -jnp.sum(weights * jnp.sum(log_prob, axis=-1)) / jnp.sum(mask)  # ()
         return loss
-
-    # @jax.jit (do not use it here! Otherwise it does not work!)
-    def batched_loss_slow(
-        params, batch_masks, batch_graphs, batch_candidates, batch_energies, f: float
-    ):
-        batchsize = len(batch_energies)
-        loss_vec = np.zeros(batchsize)
-        for i in range(batchsize):
-            loss_vec[i] = new_prediction_loss(
-                params,
-                batch_masks[i],
-                batch_graphs[i],
-                batch_candidates[i],
-                batch_energies[i],
-                f,
-            )
-        loss_sum = np.sum(loss_vec) / batchsize
-        return loss_sum
-
-    # batched_loss = jnp.sum(jax.vmap(new_prediction_loss, in_axes=(None, 0, 0, 0,0, None), out_axes=0))
 
     # @jax.jit
     def test_loss(params, graph, mask, candidates, energies, f):
-        decoded_nodes = network.apply(params, graph)
-        candidates = vmap_one_hot(candidates, 2)
-        log_prob = vmap_compute_log_probs(decoded_nodes, mask, candidates)
-        weights = jax.nn.softmax(-f * energies)
-        weighted_log_probs = jax.vmap(jnp.dot, axis_name=(0, 0), out_axes=0)(
-            log_prob, weights
-        )
-        loss = -jnp.sum(weighted_log_probs) / jnp.sum(mask)
+        decoded_nodes = network.apply(params, graph)  # (N, 2)
+        candidates = vmap_one_hot(candidates, 2)  # (N, K, 2)
+        a = jax.nn.log_softmax(decoded_nodes) * mask[:, None]
+        log_prob = candidates * a
+        energies_new = np.array(
+            np.repeat([energies], len(mask), axis=0)
+        ).T  # maps energies (K,) to energies_new (N, K)
+        weights = jax.nn.softmax(-f * energies_new)  # (N, K)
+        loss = -jnp.sum(weights * jnp.sum(log_prob, axis=-1)) / jnp.sum(mask)  # ()
         return loss
 
     print("Entering training loop")
     test_acc_list = np.zeros(NUM_EPOCHS)
+    train_acc_list = np.zeros(NUM_EPOCHS)
     for epoch in range(NUM_EPOCHS):
         start_time = time.time()
         for counter, (batch_p, batch_ce) in enumerate(train_loader):
             print("batch_number", counter)
-            # batch_masks=batch_p[0]
-            # batch_graphs=batch_p[1]
-            # batch_c=batch_ce[0]
-            # batch_e=batch_ce[1]
-            # print(len(batch_masks))
-            # print(len(batch_graphs))
-            # print(len(batch_c))
-            # print(len(batch_e))
-            # print(batch_e)
-            params, opt_state = update(params, opt_state, batch_p, batch_ce, f)
-            # print("params", np.shape(params))
-            print("batch", counter, "done")
+            params, opt_state = update(params, opt_state, *batch_p, *batch_ce, f)
 
         epoch_time = time.time() - start_time
 
-        # train_acc = accuracy(params, train_images, train_labels)
-        # test_acc = accuracy(params, test_images, test_labels)
         print("Epoch {} in {:0.2f} sec".format(epoch, epoch_time))
 
-        # test_acc = jnp.mean(jnp.asarray([prediction_loss(params, p.mask, p.graph, s) for (p, s) in test_data]))
-
-        # TBD!!!
-
-        # test_acc_now=[]
         summed_loss = 0
         counter = 0
         for (p, ce) in test_data:
+            candidates = np.array([c for c in ce[0]])
             counter = counter + 1
-            loss = test_loss(params, p[0], p[1], ce[0], ce[1], f)
+            loss = test_loss(params, p[0], p[1], candidates, ce[1], f)
             summed_loss = summed_loss + loss
         test_acc_list[epoch] = summed_loss / counter
-        # test_acc_list.append(jnp.mean(test_acc_now))
 
-        ##
+        summed_loss = 0
+        counter = 0
+        for (p, ce) in train_data:
+            candidates = np.array([c for c in ce[0]])
+            counter = counter + 1
+            loss = test_loss(params, p[0], p[1], candidates, ce[1], f)
+            summed_loss = summed_loss + loss
+        train_acc_list[epoch] = summed_loss / counter
+        print("Training set accuracy {}".format(train_acc_list[epoch]))
+        print("Test set accuracy {}".format(test_acc_list[epoch]))
+    if img_path != False:
+        plt.plot(
+            np.arange(0, NUM_EPOCHS, 1),
+            test_acc_list,
+            "o--",
+            label="test accuracy",
+            alpha=0.4,
+        )
+        plt.plot(
+            np.arange(0, NUM_EPOCHS, 1),
+            test_acc_list,
+            "o--",
+            label="train accuracy",
+            alpha=0.4,
+        )
+        plt.xlabel("epoch")
+        plt.ylabel("accuracy of model / loss")
+        plt.grid()
+        plt.legend()
+        plt.tight_layout()
+        plt.savefig(img_path + "accuracy.jpg", dpi=300, format="jpg")
+    if model_path != False:
+        model_params = [batch_size, f, NUM_EPOCHS]
+        np.save(model_path, [model_params, train_acc_list, test_acc_list])
 
         # print("Training set accuracy {}".format(train_acc))
         # print("Test set accuracy {}".format(jnp.mean(test_acc_now)))
@@ -188,4 +164,6 @@ def train(
 
 
 if __name__ == "__main__":
-    train()
+    train(
+        batch_size, f, NUM_EPOCHS, path=path, img_path=img_path, model_path=model_path
+    )
