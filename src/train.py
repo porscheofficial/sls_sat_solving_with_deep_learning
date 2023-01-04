@@ -32,7 +32,7 @@ vmap_one_hot = jax.vmap(one_hot, in_axes=(0, None), out_axes=0)
 
 
 def train(
-    path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/ml_based_sat_solver/BroadcastTestSet_subset"
+    path="/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/ml_based_sat_solver/BroadcastTestSet_subset",
 ):  # used previously as path: "../Data/blocksworld" ###path="../Data/BroadcastTestSet",
     sat_data = SATTrainingDataset(path)
     train_data, test_data = data.random_split(sat_data, [0.8, 0.2])
@@ -131,9 +131,7 @@ def train(
         weighted_log_probs = jax.vmap(jnp.dot, axis_name=(0, 0), out_axes=0)(
             log_prob, weights
         )
-        loss = -jnp.sum(weighted_log_probs) / jnp.sum(
-            mask
-        )
+        loss = -jnp.sum(weighted_log_probs) / jnp.sum(mask)
         return loss
 
     print("Entering training loop")
@@ -161,26 +159,26 @@ def train(
         # test_acc = accuracy(params, test_images, test_labels)
         print("Epoch {} in {:0.2f} sec".format(epoch, epoch_time))
 
-        #test_acc = jnp.mean(jnp.asarray([prediction_loss(params, p.mask, p.graph, s) for (p, s) in test_data]))
+        # test_acc = jnp.mean(jnp.asarray([prediction_loss(params, p.mask, p.graph, s) for (p, s) in test_data]))
 
         # TBD!!!
 
-        #test_acc_now=[]
+        # test_acc_now=[]
         summed_loss = 0
         counter = 0
         for (p, ce) in test_data:
             counter = counter + 1
-            loss = test_loss(params, p[0], p[1], ce[0],ce[1] , f)
+            loss = test_loss(params, p[0], p[1], ce[0], ce[1], f)
             summed_loss = summed_loss + loss
         test_acc_list[epoch] = summed_loss / counter
-        #test_acc_list.append(jnp.mean(test_acc_now))
+        # test_acc_list.append(jnp.mean(test_acc_now))
 
         ##
 
         # print("Training set accuracy {}".format(train_acc))
         # print("Test set accuracy {}".format(jnp.mean(test_acc_now)))
-    #print(test_acc_list)
-    plt.plot(np.arange(0,NUM_EPOCHS,1), test_acc_list)
+    # print(test_acc_list)
+    plt.plot(np.arange(0, NUM_EPOCHS, 1), test_acc_list)
     # plt.savefig("test_acc.jpg", dpi=300, format="jpg")
     plt.show()
     # TODO: Save the model here
