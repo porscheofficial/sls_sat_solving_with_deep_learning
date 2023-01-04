@@ -122,7 +122,7 @@ def train(
         print("Epoch {} in {:0.2f} sec".format(epoch, epoch_time))
 
         test_acc_list[epoch + 1] = compute_loss(test_data)
-        train_acc_list[epoch] = compute_loss(train_data)
+        train_acc_list[epoch + 1] = compute_loss(train_data)
         print("Training set accuracy {}".format(train_acc_list[epoch + 1]))
         print("Test set accuracy {}".format(test_acc_list[epoch + 1]))
     if img_path != False:
@@ -135,7 +135,7 @@ def train(
         )
         plt.plot(
             np.arange(0, NUM_EPOCHS + 1, 1),
-            test_acc_list,
+            train_acc_list,
             "o--",
             label="train accuracy",
             alpha=0.4,
