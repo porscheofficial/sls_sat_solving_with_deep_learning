@@ -1,6 +1,7 @@
 {
     "python.formatting.provider": "black",
     "python.linting.pylintEnabled": false,
-    "python.linting.mypyEnabled": true,
-    "python.linting.enabled": true
+    "python.linting.mypyEnabled": false,
+    "python.linting.enabled": true,
+    "python.linting.flake8Enabled": true
 }
