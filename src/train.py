@@ -94,9 +94,23 @@ def train(
         loss = -jnp.sum(weights * jnp.sum(log_prob, axis=-1)) / jnp.sum(mask)  # ()
         return loss
 
+    def compute_loss(dataset):
+        summed_loss = 0
+        counter = 0
+        for (p, ce) in dataset:
+            candidates = np.array([c for c in ce[0]])
+            counter = counter + 1
+            loss = test_loss(params, p[0], p[1], candidates, ce[1], f)
+            summed_loss = summed_loss + loss
+        return summed_loss / counter
+
     print("Entering training loop")
-    test_acc_list = np.zeros(NUM_EPOCHS)
-    train_acc_list = np.zeros(NUM_EPOCHS)
+    test_acc_list = np.zeros(NUM_EPOCHS + 1)
+    train_acc_list = np.zeros(NUM_EPOCHS + 1)
+
+    test_acc_list[0] = compute_loss(test_data)
+    train_acc_list[0] = compute_loss(train_data)
+
     for epoch in range(NUM_EPOCHS):
         start_time = time.time()
         for counter, (batch_p, batch_ce) in enumerate(train_loader):
@@ -107,35 +121,20 @@ def train(
 
         print("Epoch {} in {:0.2f} sec".format(epoch, epoch_time))
 
-        summed_loss = 0
-        counter = 0
-        for (p, ce) in test_data:
-            candidates = np.array([c for c in ce[0]])
-            counter = counter + 1
-            loss = test_loss(params, p[0], p[1], candidates, ce[1], f)
-            summed_loss = summed_loss + loss
-        test_acc_list[epoch] = summed_loss / counter
-
-        summed_loss = 0
-        counter = 0
-        for (p, ce) in train_data:
-            candidates = np.array([c for c in ce[0]])
-            counter = counter + 1
-            loss = test_loss(params, p[0], p[1], candidates, ce[1], f)
-            summed_loss = summed_loss + loss
-        train_acc_list[epoch] = summed_loss / counter
-        print("Training set accuracy {}".format(train_acc_list[epoch]))
-        print("Test set accuracy {}".format(test_acc_list[epoch]))
+        test_acc_list[epoch + 1] = compute_loss(test_data)
+        train_acc_list[epoch] = compute_loss(train_data)
+        print("Training set accuracy {}".format(train_acc_list[epoch + 1]))
+        print("Test set accuracy {}".format(test_acc_list[epoch + 1]))
     if img_path != False:
         plt.plot(
-            np.arange(0, NUM_EPOCHS, 1),
+            np.arange(0, NUM_EPOCHS + 1, 1),
             test_acc_list,
             "o--",
             label="test accuracy",
             alpha=0.4,
         )
         plt.plot(
-            np.arange(0, NUM_EPOCHS, 1),
+            np.arange(0, NUM_EPOCHS + 1, 1),
             test_acc_list,
             "o--",
             label="train accuracy",
