@@ -1,3 +1,5 @@
+import collections
+
 import haiku as hk
 import jax
 import jax.numpy as jnp
@@ -8,12 +10,16 @@ from torch.utils import data
 import matplotlib.pyplot as plt
 
 from data_utils import SATTrainingDataset, JraphDataLoader
-from model import network_definition
+from model import network_definition, get_model_probabilities
+from random_walk import moser_walk
 
-NUM_EPOCHS = 5  # 10
+NUM_EPOCHS = 3  # 10
 f = 0.1
-batch_size = 10
-path = "../Data/blocksworld"
+batch_size = 2
+path = "../Data/BroadcastTestSet"
+N_STEPS_MOSER = 1000
+
+
 # "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/ml_based_sat_solver/BroadcastTestSet_subset"
 # img_path = (
 #     "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/"
@@ -44,27 +50,39 @@ vmap_compute_log_probs = jax.vmap(
 )
 
 
-def plot_accuracy_fig(test_acc_list, train_acc_list):
-    plt.plot(
-        np.arange(0, NUM_EPOCHS + 1, 1),
-        test_acc_list,
-        "o--",
-        label="test accuracy",
-        alpha=0.4,
+def evaluate_on_moser(
+    network,
+    params,
+    problem,
+    n_steps,
+    keep_trajectory=False,
+):
+    model_probabilities = get_model_probabilities(network, params, problem)
+    output, energy, counter = moser_walk(
+        model_probabilities, problem, n_steps, seed=0, keep_trajectory=keep_trajectory
     )
-    plt.plot(
-        np.arange(0, NUM_EPOCHS + 1, 1),
-        train_acc_list,
-        "o--",
-        label="train accuracy",
-        alpha=0.4,
-    )
+    n, _, _ = problem.params
+    return np.min(energy) / n
+
+
+def plot_accuracy_fig(*eval_results):
+    for eval_result in eval_results:
+        plt.plot(
+            np.arange(0, NUM_EPOCHS + 1, 1),
+            np.array(eval_result.results),
+            "o--",
+            label=eval_result.name,
+            alpha=0.4,
+        )
     plt.xlabel("epoch")
     plt.ylabel("accuracy of model / loss")
     plt.grid()
     plt.legend()
     plt.tight_layout()
     plt.show()
+
+
+EvalResults = collections.namedtuple("EvalResult", ("name", "results"))
 
 
 def train(
@@ -75,7 +93,6 @@ def train(
     img_path=False,
     model_path=False,
 ):
-
     sat_data = SATTrainingDataset(path)
 
     train_data, test_data = data.random_split(sat_data, [0.8, 0.2])
@@ -112,13 +129,21 @@ def train(
         return loss
 
     print("Entering training loop")
-    test_acc_list = np.zeros(NUM_EPOCHS + 1)
-    train_acc_list = np.zeros(NUM_EPOCHS + 1)
 
     evaluate = lambda loader: np.mean([prediction_loss(params, b, f) for b in loader])
+    evaluate_moser = lambda data_subset: np.mean(
+        [
+            evaluate_on_moser(
+                network, params, sat_data.get_unpadded_problem(i), N_STEPS_MOSER
+            )
+            for i in data_subset.indices
+        ]
+    )
 
-    test_acc_list[0] = evaluate(test_loader)
-    train_acc_list[0] = evaluate(train_eval_loader)
+    test_eval = EvalResults("Test loss", [evaluate(test_loader)])
+    train_eval = EvalResults("Train loss", [evaluate(train_eval_loader)])
+    test_moser_eval = EvalResults("Moser loss", [evaluate_moser(test_data)])
+    eval_objects = [test_eval, train_eval, test_moser_eval]
 
     for epoch in range(NUM_EPOCHS):
         start_time = time.time()
@@ -130,19 +155,21 @@ def train(
 
         print("Epoch {} in {:0.2f} sec".format(epoch, epoch_time))
 
-        test_acc_list[epoch + 1] = evaluate(test_loader)
-        train_acc_list[epoch + 1] = evaluate(train_eval_loader)
-        print("Training set accuracy {}".format(train_acc_list[epoch + 1]))
-        print("Test set accuracy {}".format(test_acc_list[epoch + 1]))
+        test_eval.results.append(evaluate(test_loader))
+        train_eval.results.append(evaluate(train_eval_loader))
+        test_moser_eval.results.append(evaluate_moser(test_data))
 
-    plot_accuracy_fig(test_acc_list, train_acc_list)
+        for eval_result in eval_objects:
+            print(f"{eval_result.name}: {eval_result.results[-1]}")
+
+    plot_accuracy_fig(*eval_objects)
 
     if img_path:
         plt.savefig(img_path + "accuracy.jpg", dpi=300, format="jpg")
 
     if model_path:
         model_params = [params, batch_size, f, NUM_EPOCHS]
-        np.save(model_path, [model_params, train_acc_list, test_acc_list])
+        np.save(model_path, [model_params, *eval_objects])
 
 
 if __name__ == "__main__":

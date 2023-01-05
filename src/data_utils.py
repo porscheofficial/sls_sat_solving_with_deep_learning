@@ -9,7 +9,6 @@ import numpy as np
 import pickle
 from func_timeout import func_timeout, FunctionTimedOut
 from jax import vmap
-from jax.numpy import asarray
 from pysat.formula import CNF
 from torch.utils import data
 
@@ -54,6 +53,13 @@ class SATTrainingDataset(data.Dataset):
             return open(name + ".cnf", "rt")
         else:
             return gzip.open(name + ".cnf.gz", "rt")
+
+    def get_unpadded_problem(self, idx):
+        instance_name = self.instances[idx].name
+        problem_file = self._get_problem_file(instance_name)
+        return get_problem_from_cnf(
+            cnf=CNF(from_string=problem_file.read()),
+        )
 
     def __getitem__(self, idx):
         instance_name = self.instances[idx].name

@@ -40,3 +40,22 @@ def network_definition(
         graph = gn(graph)
 
     return hk.Linear(2)(graph.nodes)
+
+
+def get_model_probabilities(network, params, problem):
+    """
+    Helper method that returns, for each, problem variable, the Bernoulli parameter of the model for this variable.
+    That is, the ith value of the returned array is the probability with which the model will assign 1 to the
+    ith variable.
+
+    The reasoning for choosing the first, rather than the zeroth, column of the model output below is as follows:
+
+    - When evaluating the loss function, candidates are one-hot encoded, which means that when a satisfying assignment
+    for a problem sets variable i to 1, then this will increase the likelihood that the model will set this variable to
+    1, meaning, all else being equal, a larger Bernoulli weight in element [i,1] of the model output. As a result the
+    right column of the softmax of the model output equals the models likelihood for setting variables to 1, which is
+    what we seek.
+    """
+    n, _, _ = problem.params
+    decoded_nodes = network.apply(params, problem.graph)
+    return jax.nn.softmax(decoded_nodes)[:n, 1]

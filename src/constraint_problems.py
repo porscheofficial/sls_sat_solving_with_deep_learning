@@ -157,7 +157,7 @@ def get_k_sat_problem(n, m, k):
     return SATProblem(graph=graph, mask=mask, meta=meta)
 
 
-def get_problem_from_cnf(cnf: CNF, pad_nodes=0, pad_edges=0):
+def get_problem_from_cnf(cnf: CNF, pad_nodes=0, pad_edges=0) -> HashableSATProblem:
     cnf.clauses = [c for c in cnf.clauses if len(c) > 0]
     n = cnf.nv
     m = len(cnf.clauses)
