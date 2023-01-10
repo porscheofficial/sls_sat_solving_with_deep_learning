@@ -13,11 +13,11 @@ from data_utils import SATTrainingDataset, JraphDataLoader
 from model import network_definition, get_model_probabilities
 from random_walk import moser_walk
 
-NUM_EPOCHS = 3  # 10
+NUM_EPOCHS = 10  # 10
 f = 0.1
 batch_size = 2
 path = "../Data/BroadcastTestSet"
-N_STEPS_MOSER = 1000
+N_STEPS_MOSER = 10000
 
 
 # "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/ml_based_sat_solver/BroadcastTestSet_subset"
