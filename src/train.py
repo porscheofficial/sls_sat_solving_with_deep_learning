@@ -9,9 +9,9 @@ import time
 from torch.utils import data
 import matplotlib.pyplot as plt
 
-from data_utils import SATTrainingDataset, JraphDataLoader
-from model import network_definition, get_model_probabilities
-from random_walk import moser_walk
+from src.data_utils import SATTrainingDataset, JraphDataLoader
+from src.model import network_definition, get_model_probabilities
+from src.random_walk import moser_walk
 import mlflow
 from pathlib import Path
 import tempfile
@@ -23,22 +23,8 @@ batch_size = 2
 path = "../Data/blocksworld"
 N_STEPS_MOSER = 1000
 
-MODEL_REGISTRY = Path("experiments")
-Path(MODEL_REGISTRY).mkdir(exist_ok=True)  # create experiments dir
-mlflow.set_tracking_uri("file://" + str(MODEL_REGISTRY.absolute()))
-
-EXPERIMENT_NAME = "mlflow-demo"
-# EXPERIMENT_ID = mlflow.create_experiment(EXPERIMENT_NAME)
-EXPERIMENT_ID = mlflow.set_experiment(EXPERIMENT_NAME)
-
-
-# "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/ml_based_sat_solver/BroadcastTestSet_subset"
-# img_path = (
-#     "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/"
-# )
-# model_path = (
-#     "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/"
-# )
+MODEL_REGISTRY = Path("experiment_tracking/experiments_storing")
+EXPERIMENT_NAME = "mlflow-demo2"
 
 
 #  AUXILIARY METHODS
@@ -105,6 +91,7 @@ def train(
     path,
     img_path=False,
     model_path=False,
+    experiment_tracking=False,
 ):
     sat_data = SATTrainingDataset(path)
 
@@ -161,21 +148,25 @@ def train(
     for epoch in range(NUM_EPOCHS):
         start_time = time.time()
         for counter, batch in enumerate(train_loader):
-            print("batch_number", counter)
+            # print("batch_number", counter)
             params, opt_state = update(params, opt_state, batch, f)
 
         epoch_time = time.time() - start_time
 
-        print("Epoch {} in {:0.2f} sec".format(epoch, epoch_time))
+        # print("Epoch {} in {:0.2f} sec".format(epoch, epoch_time))
 
         test_eval.results.append(evaluate(test_loader))
         train_eval.results.append(evaluate(train_eval_loader))
         test_moser_eval.results.append(evaluate_moser(test_data))
-
+        loss_str = "Epoch" + str(epoch) + " in {:0.2f} sec,".format(epoch, epoch_time)
         for eval_result in eval_objects:
-            print(f"{eval_result.name}: {eval_result.results[-1]}")
-            mlflow.log_metric(eval_result.name, eval_result.results[-1], step=epoch)
-
+            # print(f"{eval_result.name}: {eval_result.results[-1]}")
+            loss_str = (
+                loss_str + f"{eval_result.name}: {np.round(eval_result.results[-1],4)}"
+            )
+            if experiment_tracking == True:
+                mlflow.log_metric(eval_result.name, eval_result.results[-1], step=epoch)
+        print(loss_str)
     if img_path:
         plot_accuracy_fig(*eval_objects)
         plt.savefig(img_path + "accuracy.jpg", dpi=300, format="jpg")
@@ -195,10 +186,32 @@ def train(
 #        json.dump(d, indent=2, sort_keys=False, fp=fp)
 
 
-if __name__ == "__main__":
+def experiment_tracking_train(
+    MODEL_REGISTRY,
+    EXPERIMENT_NAME,
+    batch_size,
+    f,
+    NUM_EPOCHS,
+    N_STEPS_MOSER,
+    path,
+    img_path=False,
+    model_path=False,
+):
+    Path(MODEL_REGISTRY).mkdir(exist_ok=True)  # create experiments dir
+    mlflow.set_tracking_uri("file://" + str(MODEL_REGISTRY.absolute()))
+    mlflow.set_experiment(EXPERIMENT_NAME)
     with mlflow.start_run():
         # train and evaluate
-        artifacts = train(batch_size, f, NUM_EPOCHS, N_STEPS_MOSER, path)
+        artifacts = train(
+            batch_size,
+            f,
+            NUM_EPOCHS,
+            N_STEPS_MOSER,
+            path,
+            img_path,
+            model_path,
+            experiment_tracking=True,
+        )
         # log key hyperparameters
         mlflow.log_params(
             {
@@ -208,8 +221,11 @@ if __name__ == "__main__":
                 "N_STEPS_MOSER": N_STEPS_MOSER,
             }
         )
-        # log params after learning
+        # log params which are a result of learning
         with tempfile.TemporaryDirectory() as dp:
             joblib.dump(artifacts["params"], Path(dp, "params.pkl"))
-            # save_dict(artifacts["params"], Path(dp, "params.json"))
             mlflow.log_artifact(dp)
+
+
+if __name__ == "__main__":
+    experiment_tracking_train(MODEL_REGISTRY, EXPERIMENT_NAME)
