@@ -12,12 +12,24 @@ import matplotlib.pyplot as plt
 from data_utils import SATTrainingDataset, JraphDataLoader
 from model import network_definition, get_model_probabilities
 from random_walk import moser_walk
+import mlflow
+from pathlib import Path
+import tempfile
+import joblib
 
-NUM_EPOCHS = 10  # 10
+NUM_EPOCHS = 2  # 10
 f = 0.1
 batch_size = 2
-path = "../Data/BroadcastTestSet"
-N_STEPS_MOSER = 10000
+path = "../Data/blocksworld"
+N_STEPS_MOSER = 1000
+
+MODEL_REGISTRY = Path("experiments")
+Path(MODEL_REGISTRY).mkdir(exist_ok=True)  # create experiments dir
+mlflow.set_tracking_uri("file://" + str(MODEL_REGISTRY.absolute()))
+
+EXPERIMENT_NAME = "mlflow-demo"
+# EXPERIMENT_ID = mlflow.create_experiment(EXPERIMENT_NAME)
+EXPERIMENT_ID = mlflow.set_experiment(EXPERIMENT_NAME)
 
 
 # "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/ml_based_sat_solver/BroadcastTestSet_subset"
@@ -89,6 +101,7 @@ def train(
     batch_size,
     f,
     NUM_EPOCHS,
+    N_STEPS_MOSER,
     path,
     img_path=False,
     model_path=False,
@@ -161,16 +174,42 @@ def train(
 
         for eval_result in eval_objects:
             print(f"{eval_result.name}: {eval_result.results[-1]}")
-
-    plot_accuracy_fig(*eval_objects)
+            mlflow.log_metric(eval_result.name, eval_result.results[-1], step=epoch)
 
     if img_path:
+        plot_accuracy_fig(*eval_objects)
         plt.savefig(img_path + "accuracy.jpg", dpi=300, format="jpg")
 
     if model_path:
         model_params = [params, batch_size, f, NUM_EPOCHS]
         np.save(model_path, [model_params, *eval_objects])
 
+    return {
+        "params": params,
+    }
+
+
+# def save_dict(d, filepath):
+#    """Save dict to a json file."""
+#    with open(filepath, "w") as fp:
+#        json.dump(d, indent=2, sort_keys=False, fp=fp)
+
 
 if __name__ == "__main__":
-    train(batch_size, f, NUM_EPOCHS, path=path)
+    with mlflow.start_run():
+        # train and evaluate
+        artifacts = train(batch_size, f, NUM_EPOCHS, N_STEPS_MOSER, path)
+        # log key hyperparameters
+        mlflow.log_params(
+            {
+                "f": f,
+                "batch_size": batch_size,
+                "NUM_EPOCHS": NUM_EPOCHS,
+                "N_STEPS_MOSER": N_STEPS_MOSER,
+            }
+        )
+        # log params after learning
+        with tempfile.TemporaryDirectory() as dp:
+            joblib.dump(artifacts["params"], Path(dp, "params.pkl"))
+            # save_dict(artifacts["params"], Path(dp, "params.json"))
+            mlflow.log_artifact(dp)
