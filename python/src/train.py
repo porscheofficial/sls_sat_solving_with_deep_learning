@@ -12,13 +12,14 @@ import matplotlib.pyplot as plt
 from data_utils import SATTrainingDataset, JraphDataLoader
 from model import network_definition, get_model_probabilities
 from random_walk import moser_walk
+import moser_rust
 
 NUM_EPOCHS = 10  # 10
 f = 0.1
-batch_size = 2
-path = "../Data/BroadcastTestSet"
+batch_size = 3
+path = "Data/blocksworld"
 N_STEPS_MOSER = 10000
-
+N_RUNS_MOSER = 2
 
 # "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/ml_based_sat_solver/BroadcastTestSet_subset"
 # img_path = (
@@ -130,19 +131,38 @@ def train(
 
     print("Entering training loop")
 
-    evaluate = lambda loader: np.mean([prediction_loss(params, b, f) for b in loader])
-    evaluate_moser = lambda data_subset: np.mean(
-        [
-            evaluate_on_moser(
-                network, params, sat_data.get_unpadded_problem(i), N_STEPS_MOSER
+    def evaluate(loader):
+        return np.mean([prediction_loss(params, b, f) for b in loader])
+
+    def evaluate_moser_jax(data_subset):
+        return np.mean(
+            [
+                evaluate_on_moser(
+                    network, params, sat_data.get_unpadded_problem(i), N_STEPS_MOSER
+                )
+                for i in data_subset.indices
+            ]
+        )
+
+    def evaluate_moser_rust(data_subset):
+
+        av_energies = []
+
+        for idx in data_subset.indices:
+            problem_path = sat_data.instances[idx].name + ".cnf"
+            problem = sat_data.get_unpadded_problem(idx)
+            model_probabilities = get_model_probabilities(network, params, problem)
+            _, _, final_energies = moser_rust.run_moser_python(
+                problem_path, model_probabilities.ravel(), N_STEPS_MOSER, N_RUNS_MOSER
             )
-            for i in data_subset.indices
-        ]
-    )
+            _, m, _ = problem.params
+            av_energies.append(np.mean(final_energies) / m)
+
+        return np.mean(av_energies)
 
     test_eval = EvalResults("Test loss", [evaluate(test_loader)])
     train_eval = EvalResults("Train loss", [evaluate(train_eval_loader)])
-    test_moser_eval = EvalResults("Moser loss", [evaluate_moser(test_data)])
+    test_moser_eval = EvalResults("Moser loss", [evaluate_moser_rust(test_data)])
     eval_objects = [test_eval, train_eval, test_moser_eval]
 
     for epoch in range(NUM_EPOCHS):
@@ -157,7 +177,7 @@ def train(
 
         test_eval.results.append(evaluate(test_loader))
         train_eval.results.append(evaluate(train_eval_loader))
-        test_moser_eval.results.append(evaluate_moser(test_data))
+        test_moser_eval.results.append(evaluate_moser_rust(test_data))
 
         for eval_result in eval_objects:
             print(f"{eval_result.name}: {eval_result.results[-1]}")
