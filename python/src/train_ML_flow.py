@@ -1,3 +1,7 @@
+import sys
+
+sys.path.append("../../")
+
 import mlflow
 from pathlib import Path
 import tempfile

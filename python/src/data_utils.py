@@ -1,6 +1,6 @@
 import sys
 
-sys.path.append("../")
+sys.path.append("../../")
 
 from collections import namedtuple
 from os.path import join, exists
@@ -16,8 +16,8 @@ from jax import vmap
 from pysat.formula import CNF
 from torch.utils import data
 
-from python.src.constraint_problems import get_problem_from_cnf
-from python.src.random_walk import number_of_violated_constraints
+from constraint_problems import get_problem_from_cnf
+from random_walk import number_of_violated_constraints
 
 MAX_TIME = 20
 

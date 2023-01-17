@@ -1,3 +1,7 @@
+# import sys
+# sys.path.append('../../../')
+# print(sys.path)
+
 import collections
 
 import haiku as hk
@@ -10,9 +14,9 @@ from torch.utils import data
 import matplotlib.pyplot as plt
 
 import moser_rust
-from python.src.data_utils import SATTrainingDataset, JraphDataLoader
-from python.src.model import network_definition, get_model_probabilities
-from python.src.random_walk import moser_walk
+from data_utils import SATTrainingDataset, JraphDataLoader
+from model import network_definition, get_model_probabilities
+from random_walk import moser_walk
 import mlflow
 from pathlib import Path
 import tempfile
@@ -99,7 +103,7 @@ def train(
     sat_data = SATTrainingDataset(path)
 
     train_data, test_data = data.random_split(sat_data, [0.8, 0.2])
-    train_eval_data, _ = data.random_split(sat_data, [0.2, 0.8])
+    train_eval_data, _ = data.random_split(train_data, [0.2, 0.8])
 
     train_loader = JraphDataLoader(train_data, batch_size=batch_size, shuffle=True)
     test_loader = JraphDataLoader(test_data, batch_size=batch_size)
@@ -164,8 +168,11 @@ def train(
 
     test_eval = EvalResults("Test loss", [evaluate(test_loader)])
     train_eval = EvalResults("Train loss", [evaluate(train_eval_loader)])
-    test_moser_eval = EvalResults("Moser loss", [evaluate_moser_rust(test_data)])
-    eval_objects = [test_eval, train_eval, test_moser_eval]
+    test_moser_eval = EvalResults("Moser loss (test)", [evaluate_moser_rust(test_data)])
+    train_moser_eval = EvalResults(
+        "Moser loss (train)", [evaluate_moser_rust(train_eval_data)]
+    )
+    eval_objects = [test_eval, train_eval, test_moser_eval, train_moser_eval]
 
     for epoch in range(NUM_EPOCHS):
         start_time = time.time()
@@ -180,6 +187,7 @@ def train(
         test_eval.results.append(evaluate(test_loader))
         train_eval.results.append(evaluate(train_eval_loader))
         test_moser_eval.results.append(evaluate_moser_rust(test_data))
+        train_moser_eval.results.append(evaluate_moser_rust(train_eval_data))
         loss_str = "Epoch {} in {:0.2f} sec".format(epoch, epoch_time) + ";  "
         for eval_result in eval_objects:
             # print(f"{eval_result.name}: {eval_result.results[-1]}")

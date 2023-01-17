@@ -17,6 +17,11 @@ def network_definition(
         embed_edge_fn=jax.vmap(hk.Linear(output_size=16)),
         embed_node_fn=jax.vmap(hk.Linear(output_size=16)),
     )
+    # embedding = jraph.GraphMapFeatures(
+    #    embed_edge_fn=jax.vmap(hk.Linear(output_size=32)),
+    #    embed_node_fn=jax.vmap(hk.Linear(output_size=32)),
+    # )
+
     graph = embedding(graph)
 
     def mlp(dims):
@@ -29,6 +34,7 @@ def network_definition(
     @jraph.concatenated_args
     def update_fn(features):
         net = mlp([20, 20, 20])
+        # net = mlp([40, 40, 40])
         return net(features)
 
     for _ in range(num_message_passing_steps):

@@ -1,6 +1,6 @@
 import sys
 
-sys.path.append("../")
+sys.path.append("../../")
 
 import jax
 import jax.numpy as jnp
@@ -8,7 +8,7 @@ import numpy as np
 from functools import partial
 from jax.experimental.sparse import BCOO
 
-from python.src.constraint_problems import SATProblem
+from constraint_problems import SATProblem
 
 
 def moser_walk(weights, problem, n_steps, seed, keep_trajectory=False):
