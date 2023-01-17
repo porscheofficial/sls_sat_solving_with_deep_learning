@@ -9,10 +9,6 @@ import time
 from torch.utils import data
 import matplotlib.pyplot as plt
 
-from data_utils import SATTrainingDataset, JraphDataLoader
-from model import network_definition, get_model_probabilities
-from random_walk import moser_walk
-import moser_rust
 from src.data_utils import SATTrainingDataset, JraphDataLoader
 from src.model import network_definition, get_model_probabilities
 from src.random_walk import moser_walk
@@ -27,8 +23,8 @@ batch_size = 2
 path = "../Data/blocksworld"
 N_STEPS_MOSER = 1000
 
-MODEL_REGISTRY = Path("experiment_tracking/experiments_storing")
-EXPERIMENT_NAME = "mlflow-demo2"
+# MODEL_REGISTRY = Path("experiment_tracking/experiments_storing")
+# EXPERIMENT_NAME = "mlflow-demo2"
 
 
 #  AUXILIARY METHODS
@@ -134,38 +130,19 @@ def train(
 
     print("Entering training loop")
 
-    def evaluate(loader):
-        return np.mean([prediction_loss(params, b, f) for b in loader])
-
-    def evaluate_moser_jax(data_subset):
-        return np.mean(
-            [
-                evaluate_on_moser(
-                    network, params, sat_data.get_unpadded_problem(i), N_STEPS_MOSER
-                )
-                for i in data_subset.indices
-            ]
-        )
-
-    def evaluate_moser_rust(data_subset):
-
-        av_energies = []
-
-        for idx in data_subset.indices:
-            problem_path = sat_data.instances[idx].name + ".cnf"
-            problem = sat_data.get_unpadded_problem(idx)
-            model_probabilities = get_model_probabilities(network, params, problem)
-            _, _, final_energies = moser_rust.run_moser_python(
-                problem_path, model_probabilities.ravel(), N_STEPS_MOSER, N_RUNS_MOSER
+    evaluate = lambda loader: np.mean([prediction_loss(params, b, f) for b in loader])
+    evaluate_moser = lambda data_subset: np.mean(
+        [
+            evaluate_on_moser(
+                network, params, sat_data.get_unpadded_problem(i), N_STEPS_MOSER
             )
-            _, m, _ = problem.params
-            av_energies.append(np.mean(final_energies) / m)
-
-        return np.mean(av_energies)
+            for i in data_subset.indices
+        ]
+    )
 
     test_eval = EvalResults("Test loss", [evaluate(test_loader)])
     train_eval = EvalResults("Train loss", [evaluate(train_eval_loader)])
-    test_moser_eval = EvalResults("Moser loss", [evaluate_moser_rust(test_data)])
+    test_moser_eval = EvalResults("Moser loss", [evaluate_moser(test_data)])
     eval_objects = [test_eval, train_eval, test_moser_eval]
 
     for epoch in range(NUM_EPOCHS):
@@ -180,8 +157,8 @@ def train(
 
         test_eval.results.append(evaluate(test_loader))
         train_eval.results.append(evaluate(train_eval_loader))
-        test_moser_eval.results.append(evaluate_moser_rust(test_data))
-
+        test_moser_eval.results.append(evaluate_moser(test_data))
+        loss_str = "Epoch" + str(epoch) + " in {:0.2f} sec,".format(epoch, epoch_time)
         for eval_result in eval_objects:
             # print(f"{eval_result.name}: {eval_result.results[-1]}")
             loss_str = (
@@ -208,7 +185,7 @@ def train(
 #    with open(filepath, "w") as fp:
 #        json.dump(d, indent=2, sort_keys=False, fp=fp)
 
-
+"""
 def experiment_tracking_train(
     MODEL_REGISTRY,
     EXPERIMENT_NAME,
@@ -252,3 +229,16 @@ def experiment_tracking_train(
 
 if __name__ == "__main__":
     experiment_tracking_train(MODEL_REGISTRY, EXPERIMENT_NAME)
+"""
+
+if __name__ == "__main__":
+    train(
+        batch_size,
+        f,
+        NUM_EPOCHS,
+        N_STEPS_MOSER,
+        path,
+        img_path=False,
+        model_path=False,
+        experiment_tracking=False,
+    )
