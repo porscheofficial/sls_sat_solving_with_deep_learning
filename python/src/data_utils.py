@@ -16,8 +16,8 @@ from jax import vmap
 from pysat.formula import CNF
 from torch.utils import data
 
-from src.constraint_problems import get_problem_from_cnf
-from src.random_walk import number_of_violated_constraints
+from python.src.constraint_problems import get_problem_from_cnf
+from python.src.random_walk import number_of_violated_constraints
 
 MAX_TIME = 20
 

@@ -3,7 +3,7 @@ from pathlib import Path
 import tempfile
 import joblib
 
-from train import train
+from python.src.train import train
 
 NUM_EPOCHS = 2  # 10
 f = 0.1
@@ -22,6 +22,7 @@ def experiment_tracking_train(
     f,
     NUM_EPOCHS,
     N_STEPS_MOSER,
+    N_RUNS_MOSER,
     path,
     img_path=False,
     model_path=False,
@@ -36,6 +37,7 @@ def experiment_tracking_train(
             f,
             NUM_EPOCHS,
             N_STEPS_MOSER,
+            N_RUNS_MOSER,
             path,
             img_path,
             model_path,

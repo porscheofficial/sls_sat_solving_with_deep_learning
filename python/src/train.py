@@ -9,13 +9,10 @@ import time
 from torch.utils import data
 import matplotlib.pyplot as plt
 
-from data_utils import SATTrainingDataset, JraphDataLoader
-from model import network_definition, get_model_probabilities
-from random_walk import moser_walk
 import moser_rust
-from src.data_utils import SATTrainingDataset, JraphDataLoader
-from src.model import network_definition, get_model_probabilities
-from src.random_walk import moser_walk
+from python.src.data_utils import SATTrainingDataset, JraphDataLoader
+from python.src.model import network_definition, get_model_probabilities
+from python.src.random_walk import moser_walk
 import mlflow
 from pathlib import Path
 import tempfile
@@ -26,6 +23,7 @@ f = 0.1
 batch_size = 2
 path = "../Data/blocksworld"
 N_STEPS_MOSER = 1000
+N_RUNS_MOSER = 2
 
 MODEL_REGISTRY = Path("experiment_tracking/experiments_storing")
 EXPERIMENT_NAME = "mlflow-demo2"
@@ -92,6 +90,7 @@ def train(
     f,
     NUM_EPOCHS,
     N_STEPS_MOSER,
+    N_RUNS_MOSER,
     path,
     img_path=False,
     model_path=False,
@@ -181,11 +180,13 @@ def train(
         test_eval.results.append(evaluate(test_loader))
         train_eval.results.append(evaluate(train_eval_loader))
         test_moser_eval.results.append(evaluate_moser_rust(test_data))
-
+        loss_str = "Epoch {} in {:0.2f} sec".format(epoch, epoch_time) + ";  "
         for eval_result in eval_objects:
             # print(f"{eval_result.name}: {eval_result.results[-1]}")
             loss_str = (
-                loss_str + f"{eval_result.name}: {np.round(eval_result.results[-1],4)}"
+                loss_str
+                + f"{eval_result.name}: {np.round(eval_result.results[-1],4)}"
+                + "; "
             )
             if experiment_tracking == True:
                 mlflow.log_metric(eval_result.name, eval_result.results[-1], step=epoch)
@@ -208,7 +209,7 @@ def train(
 #    with open(filepath, "w") as fp:
 #        json.dump(d, indent=2, sort_keys=False, fp=fp)
 
-
+"""
 def experiment_tracking_train(
     MODEL_REGISTRY,
     EXPERIMENT_NAME,
@@ -252,3 +253,17 @@ def experiment_tracking_train(
 
 if __name__ == "__main__":
     experiment_tracking_train(MODEL_REGISTRY, EXPERIMENT_NAME)
+"""
+
+if __name__ == "__main__":
+    train(
+        batch_size,
+        f,
+        NUM_EPOCHS,
+        N_STEPS_MOSER,
+        N_RUNS_MOSER,
+        path,
+        img_path=False,
+        model_path=False,
+        experiment_tracking=False,
+    )
