@@ -1,30 +1,44 @@
 use pyo3::prelude::*;
+use rand::rngs::StdRng;
+use rand::seq::SliceRandom;
+use rand::SeedableRng;
 use rand::{rngs::ThreadRng, Rng};
+
 use std::env;
 use std::fs::read_to_string;
-use varisat::{dimacs::DimacsParser, CnfFormula, Lit};
+use varisat::{dimacs::DimacsParser, CnfFormula, Lit}; // 0.7.2
 
 fn clause_is_violated(clause: &[Lit], assignment: &Vec<bool>) -> bool {
-    for lit in clause {
-        let idx = lit.var().index();
-        if (lit.is_positive() && assignment[idx] == false)
-            || (lit.is_negative() && assignment[idx] == true)
-        {
-            return true;
-        }
-    }
-    return false;
+    return clause
+        .iter()
+        .map(|lit: &Lit| lit.is_positive() != assignment[lit.var().index()])
+        .all(|x| x);
 }
+
+// fn choose_next_clause(
+//     violated_clauses: &Vec<&[Lit]>,
+//     current: Option<&[Lit]>,
+//     rng: &mut ThreadRng,
+// ) -> Option<&[Lit]> {
+//     match current {
+//         Some(clause) => violated_clauses
+//             .iter()
+//             .filter(|&other| other.iter().any(|lit| current.unwrap().contains(&lit)))
+//             .collect::<Vec<&[Lit]>>()
+//             .choose(rng),
+//         _ => violated_clauses.choose(rng),
+//     }
+// }
 
 fn resample_clause(
     clause: &[Lit],
     assignment: &mut Vec<bool>,
-    rng: &mut ThreadRng,
+    rng: &mut StdRng,
     weights: &Vec<f64>,
 ) {
     for lit in clause {
         let idx = lit.var().index();
-        assignment[idx] = rng.gen_bool(weights[idx])
+        assignment[idx] = rng.gen_bool(weights[idx]);
     }
 }
 
@@ -34,7 +48,8 @@ fn run_moser_python(
     weights: Vec<f64>,
     nsteps: usize,
     nruns: usize,
-) -> PyResult<(bool, Vec<bool>, Vec<usize>)> {
+    seed: usize,
+) -> PyResult<(bool, Vec<bool>, usize)> {
     let input: String = read_to_string(path).expect("failed to read");
 
     let implements_read = &input.as_bytes()[..];
@@ -47,7 +62,8 @@ fn run_moser_python(
         formula.len()
     );
 
-    let (found_solution, assignment, final_energies) = run_moser(formula, weights, nsteps, nruns);
+    let (found_solution, assignment, final_energies) =
+        run_moser(formula, weights, nsteps, nruns, seed);
 
     return Ok((found_solution, assignment, final_energies));
 }
@@ -63,47 +79,59 @@ fn run_moser(
     weights: Vec<f64>,
     nsteps: usize,
     nruns: usize,
-) -> (bool, Vec<bool>, Vec<usize>) {
+    seed: usize,
+) -> (bool, Vec<bool>, usize) {
     // Auxiliary functions
     assert_eq!(weights.len(), formula.var_count());
 
-    let find_violated_clauses = |assignment: &Vec<bool>| -> Vec<&[Lit]> {
+    let find_violated_clauses = |assignment: &Vec<bool>| {
         formula
             .iter()
             .filter(|clause| clause_is_violated(clause, assignment))
             .collect()
     };
 
-    let mut rng = rand::thread_rng();
+    let mut rng = StdRng::seed_from_u64(seed as u64);
     let mut numtry: usize = 0;
     let mut found_solution = false;
-    let mut assignment: Vec<bool> = vec![];
-    let mut final_energies: Vec<usize> = vec![];
+    let mut best_energy: usize = formula.len();
+    let mut best_assignment = vec![];
+
     while !found_solution && numtry < nruns {
         numtry += 1;
 
-        assignment = (0..formula.var_count())
+        let mut assignment = (0..formula.var_count())
             .map(|_| rng.gen_bool(0.5))
             .collect();
 
         let mut numstep: usize = 0;
-
-        let mut violated_clauses = find_violated_clauses(&assignment);
+        let mut violated_clauses: Vec<&[Lit]> = find_violated_clauses(&assignment);
         let mut numfalse = violated_clauses.len();
+
+        if numfalse < best_energy {
+            best_energy = numfalse;
+            best_assignment = assignment.clone();
+        }
 
         while numfalse > 0 && numstep < nsteps {
             numstep += 1;
-            let next_clause: &[Lit] = violated_clauses[0];
+            let next_clause = violated_clauses.choose(&mut rng).unwrap();
             resample_clause(next_clause, &mut assignment, &mut rng, &weights);
             violated_clauses = find_violated_clauses(&assignment);
             numfalse = violated_clauses.len();
+
+            if numfalse < best_energy {
+                best_energy = numfalse;
+                best_assignment = assignment.clone();
+            }
+
             found_solution = numfalse == 0;
         }
-        final_energies.push(numfalse);
+
         println!("Round {} ending with {} violated clauses", numtry, numfalse);
     }
 
-    return (found_solution, assignment, final_energies);
+    return (found_solution, best_assignment, best_energy);
 }
 
 fn main() {
@@ -126,8 +154,10 @@ fn main() {
 
     let nsteps = 1000;
     let nruns = 10;
+    let seed = 0;
 
-    let (found_solution, assignment, _final_energies) = run_moser(formula, weights, nsteps, nruns);
+    let (found_solution, assignment, _final_energies) =
+        run_moser(formula, weights, nsteps, nruns, seed);
 
     println!(
         "last candidate: {:#?}, Found solution: {}",

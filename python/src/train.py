@@ -9,17 +9,20 @@ import time
 from torch.utils import data
 import matplotlib.pyplot as plt
 
+import pandas as pd
+
 from data_utils import SATTrainingDataset, JraphDataLoader
 from model import network_definition, get_model_probabilities
 from random_walk import moser_walk
 import moser_rust
 
-NUM_EPOCHS = 10  # 10
+NUM_EPOCHS = 300  # 10
 f = 0.1
-batch_size = 3
-path = "Data/blocksworld"
+batch_size = 1
+path = "Data/overfit"
 N_STEPS_MOSER = 10000
 N_RUNS_MOSER = 2
+SEED = 0
 
 # "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/ml_based_sat_solver/BroadcastTestSet_subset"
 # img_path = (
@@ -59,18 +62,22 @@ def evaluate_on_moser(
     keep_trajectory=False,
 ):
     model_probabilities = get_model_probabilities(network, params, problem)
-    output, energy, counter = moser_walk(
+    _, energy, _ = moser_walk(
         model_probabilities, problem, n_steps, seed=0, keep_trajectory=keep_trajectory
     )
-    n, _, _ = problem.params
-    return np.min(energy) / n
+    _, m, _ = problem.params
+    return np.min(energy) / m
 
 
 def plot_accuracy_fig(*eval_results):
+    ROLLING_WINDOW_SIZE = 10
     for eval_result in eval_results:
+        results = np.array(eval_result.results)
+        if eval_result.normalize:
+            results /= np.max(results)
         plt.plot(
-            np.arange(0, NUM_EPOCHS + 1, 1),
-            np.array(eval_result.results),
+            # np.arange(0, NUM_EPOCHS - ROLLING_WINDOW_SIZE, 1),
+            pd.Series(results).rolling(ROLLING_WINDOW_SIZE).mean(),
             "o--",
             label=eval_result.name,
             alpha=0.4,
@@ -83,7 +90,7 @@ def plot_accuracy_fig(*eval_results):
     plt.show()
 
 
-EvalResults = collections.namedtuple("EvalResult", ("name", "results"))
+EvalResults = collections.namedtuple("EvalResult", ("name", "results", "normalize"))
 
 
 def train(
@@ -96,8 +103,10 @@ def train(
 ):
     sat_data = SATTrainingDataset(path)
 
-    train_data, test_data = data.random_split(sat_data, [0.8, 0.2])
-    train_eval_data, _ = data.random_split(sat_data, [0.2, 0.8])
+    train_data, test_data = data.random_split(sat_data, [1, 0])
+    test_data, _ = data.random_split(sat_data, [1, 0])
+    # train_eval_data, _ = data.random_split(train_data, [0.2, 0.8])
+    train_eval_data = train_data
 
     train_loader = JraphDataLoader(train_data, batch_size=batch_size, shuffle=True)
     test_loader = JraphDataLoader(test_data, batch_size=batch_size)
@@ -117,7 +126,6 @@ def train(
         updates, opt_state = opt_update(g, opt_state)
         return optax.apply_updates(params, updates), opt_state
 
-    @jax.jit
     def prediction_loss(params, batch, f: float):
         (mask, graph), (candidates, energies) = batch
         decoded_nodes = network.apply(params, graph)  # (B*N, 2)
@@ -126,7 +134,8 @@ def train(
             decoded_nodes, mask, candidates
         )  # (B*N, K, 2)
         weights = jax.nn.softmax(-f * energies)  # (B*N, K)
-        loss = -jnp.sum(weights * jnp.sum(log_prob, axis=-1)) / jnp.sum(mask)  # ()
+        loss = -jnp.sum(weights * jnp.sum(log_prob, axis=-1))  # ()
+        # jax.debug.print("🤯 {x} 🤯", x=loss)
         return loss
 
     print("Entering training loop")
@@ -153,17 +162,22 @@ def train(
             problem = sat_data.get_unpadded_problem(idx)
             model_probabilities = get_model_probabilities(network, params, problem)
             _, _, final_energies = moser_rust.run_moser_python(
-                problem_path, model_probabilities.ravel(), N_STEPS_MOSER, N_RUNS_MOSER
+                problem_path,
+                model_probabilities.ravel(),
+                N_STEPS_MOSER,
+                N_RUNS_MOSER,
+                SEED,
             )
             _, m, _ = problem.params
             av_energies.append(np.mean(final_energies) / m)
 
         return np.mean(av_energies)
 
-    test_eval = EvalResults("Test loss", [evaluate(test_loader)])
-    train_eval = EvalResults("Train loss", [evaluate(train_eval_loader)])
-    test_moser_eval = EvalResults("Moser loss", [evaluate_moser_rust(test_data)])
-    eval_objects = [test_eval, train_eval, test_moser_eval]
+    test_eval = EvalResults("Test loss", [], True)
+    train_eval = EvalResults("Train loss", [], True)
+    test_moser_eval = EvalResults("Moser loss", [], True)
+    # test_moser_jax = EvalResults("Moser loss JAX", [], False)
+    eval_objects = [test_eval, train_eval, test_moser_eval]  # , test_moser_jax]
 
     for epoch in range(NUM_EPOCHS):
         start_time = time.time()
@@ -178,6 +192,7 @@ def train(
         test_eval.results.append(evaluate(test_loader))
         train_eval.results.append(evaluate(train_eval_loader))
         test_moser_eval.results.append(evaluate_moser_rust(test_data))
+        # test_moser_jax.results.append(evaluate_moser_jax(test_data))
 
         for eval_result in eval_objects:
             print(f"{eval_result.name}: {eval_result.results[-1]}")
