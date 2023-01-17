@@ -1,3 +1,7 @@
+import sys
+
+sys.path.append("../../")
+
 from collections import namedtuple
 from os.path import join, exists
 
