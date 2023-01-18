@@ -12,6 +12,7 @@ def network_definition(
       num_message_passing_steps: number of message passing steps.
     Returns:
       Decoded nodes.
+    number_message_passing_steps = number of layers
     """
     embedding = jraph.GraphMapFeatures(
         embed_edge_fn=jax.vmap(hk.Linear(output_size=16)),
