@@ -39,11 +39,21 @@ def network_definition(
         return net(features)
 
     for _ in range(num_message_passing_steps):
-        gn = jraph.InteractionNetwork(
-            update_edge_fn=update_fn,
+        # gn = jraph.InteractionNetwork(
+        #    update_edge_fn=update_fn,
+        #   update_node_fn=update_fn,
+        #    include_sent_messages_in_node_update=True,
+        # )
+        # graph = gn(graph)
+        gn = jraph.GraphConvolution(
             update_node_fn=update_fn,
-            include_sent_messages_in_node_update=True,
         )
+        graph = gn(graph)
+        graph = graph._replace(nodes=jax.nn.relu(graph.nodes))
+        gn = jraph.GraphConvolution(
+            update_node_fn=update_fn,
+        )
+
         graph = gn(graph)
 
     return hk.Linear(2)(graph.nodes)

@@ -22,7 +22,7 @@ from pathlib import Path
 import tempfile
 import joblib
 
-NUM_EPOCHS = 2  # 10
+NUM_EPOCHS = 500  # 10
 f = 0.1
 batch_size = 2
 path = "../Data/blocksworld"
@@ -177,8 +177,8 @@ def train(
 
     test_eval = EvalResults("Test loss", [], True)
     train_eval = EvalResults("Train loss", [], True)
-    test_moser_eval = EvalResults("Moser loss", [], True)
-    train_moser_eval = EvalResults("Moser loss (train)", [])
+    test_moser_eval = EvalResults("Moser loss (test)", [], True)
+    train_moser_eval = EvalResults("Moser loss (train)", [], True)
     eval_objects = [test_eval, train_eval, test_moser_eval, train_moser_eval]
 
     for epoch in range(NUM_EPOCHS):
@@ -205,9 +205,13 @@ def train(
             if experiment_tracking == True:
                 mlflow.log_metric(eval_result.name, eval_result.results[-1], step=epoch)
         print(loss_str)
+
     if img_path:
         plot_accuracy_fig(*eval_objects)
-        plt.savefig(img_path + "accuracy.jpg", dpi=300, format="jpg")
+        if img_path == "show":
+            plt.show()
+        else:
+            plt.savefig(img_path + "accuracy.jpg", dpi=300, format="jpg")
 
     if model_path:
         model_params = [params, batch_size, f, NUM_EPOCHS]
@@ -277,7 +281,7 @@ if __name__ == "__main__":
         N_STEPS_MOSER,
         N_RUNS_MOSER,
         path,
-        img_path=False,
+        img_path="show",
         model_path=False,
         experiment_tracking=False,
     )
