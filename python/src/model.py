@@ -14,6 +14,7 @@ def network_definition(
       Decoded nodes.
     number_message_passing_steps = number of layers
     """
+    network_type = "GCN"
     embedding = jraph.GraphMapFeatures(
         embed_edge_fn=jax.vmap(hk.Linear(output_size=16)),
         embed_node_fn=jax.vmap(hk.Linear(output_size=16)),
@@ -38,24 +39,42 @@ def network_definition(
         # net = mlp([40, 40, 40])
         return net(features)
 
-    for _ in range(num_message_passing_steps):
-        # gn = jraph.InteractionNetwork(
-        #    update_edge_fn=update_fn,
-        #   update_node_fn=update_fn,
-        #    include_sent_messages_in_node_update=True,
-        # )
-        # graph = gn(graph)
-        gn = jraph.GraphConvolution(
-            update_node_fn=update_fn,
-        )
-        graph = gn(graph)
-        graph = graph._replace(nodes=jax.nn.relu(graph.nodes))
-        gn = jraph.GraphConvolution(
-            update_node_fn=update_fn,
-        )
+    if network_type == "GCN":
+        for _ in range(num_message_passing_steps):
+            gn = jraph.GraphConvolution(
+                update_node_fn=update_fn,
+            )
+            # NOTE: implementation does not add an activation after aggregation; if we
+            # stack layers, we might want to add an activation between each layer
+            # update_node_fn: function used to update the nodes. In the paper a single
+            # layer MLP is used.
+            # aggregate_nodes_fn: function used to aggregates the sender nodes.
+            # add_self_edges: whether to add self edges to nodes in the graph as in the
+            # paper definition of GCN. Defaults to False.
+            # symmetric_normalization: whether to use symmetric normalization. Defaults
+            # to True. Note that to replicate the fomula of the linked paper, the
+            # adjacency matrix must be symmetric. If the adjacency matrix is not
+            # symmetric the data is prenormalised by the sender degree matrix and post
+            # normalised by the receiver degree matrix.
+            graph = gn(graph)
+            # graph = graph._replace(nodes=jax.nn.relu(graph.nodes))
+            # gn = jraph.GraphConvolution(
+            #    update_node_fn=update_fn,
+            # )
+            # graph = gn(graph)
 
-        graph = gn(graph)
-
+    if network_type == "interaction":
+        for _ in range(num_message_passing_steps):
+            gn = jraph.InteractionNetwork(
+                update_edge_fn=update_fn,
+                update_node_fn=update_fn,
+                include_sent_messages_in_node_update=True,
+            )
+            # update_edge_fn: a function mapping a single edge update inputs to a single edge feature.
+            # update_node_fn: a function mapping a single node update input to a single node feature.
+            # aggregate_edges_for_nodes_fn: function used to aggregate messages to each node.
+            # include_sent_messages_in_node_update: pass edge features for which a node is a sender to the node update function.
+            graph = gn(graph)
     return hk.Linear(2)(graph.nodes)
 
 
