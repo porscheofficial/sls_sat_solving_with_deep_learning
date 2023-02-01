@@ -29,17 +29,19 @@ from pathlib import Path
 import tempfile
 import joblib
 
-NUM_EPOCHS = 100  # 10
+NUM_EPOCHS = 80  # 10
 f = 0.1
 batch_size = 2
 path = "../Data/blocksworld"
-N_STEPS_MOSER = 1000
+# path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/generateSAT/samples_medium/"
+N_STEPS_MOSER = 500
 N_RUNS_MOSER = 2
 SEED = 0
-network_definition = network_definition_interaction
+network_definition = network_definition_GCN
 
-MODEL_REGISTRY = Path("experiment_tracking/experiments_storing")
-EXPERIMENT_NAME = "mlflow-demo2"
+MODEL_REGISTRY = Path("mlrun")
+EXPERIMENT_NAME = "mlflow-blocksat_GCN"
+# EXPERIMENT_NAME = "mlflow-random_3SAT-medium"
 
 
 #  AUXILIARY METHODS
@@ -200,10 +202,10 @@ def train(
 
     test_eval = EvalResults("Test loss", [], True)
     train_eval = EvalResults("Train loss", [], True)
-    test_moser_eval = EvalResults("Moser loss - test", [], True)
-    train_moser_eval = EvalResults("Moser loss - train", [], True)
-    test_baseline_moser_eval = EvalResults("uniform Moser loss - test", [], True)
-    train_baseline_moser_eval = EvalResults("uniform Moser loss - train", [], True)
+    test_moser_eval = EvalResults("Moser loss - test", [], False)
+    train_moser_eval = EvalResults("Moser loss - train", [], False)
+    test_baseline_moser_eval = EvalResults("uniform Moser loss - test", [], False)
+    train_baseline_moser_eval = EvalResults("uniform Moser loss - train", [], False)
     eval_objects = [
         test_eval,
         train_eval,
@@ -279,6 +281,18 @@ def experiment_tracking_train(
     mlflow.set_tracking_uri("file://" + str(MODEL_REGISTRY.absolute()))
     mlflow.set_experiment(EXPERIMENT_NAME)
     with mlflow.start_run():
+        # log key hyperparameters
+        mlflow.log_params(
+            {
+                "f": f,
+                "batch_size": batch_size,
+                "NUM_EPOCHS": NUM_EPOCHS,
+                "N_STEPS_MOSER": N_STEPS_MOSER,
+                "N_RUNS_MOSER": N_RUNS_MOSER,
+                "network_definition": network_definition.__name__,
+                "path_dataset": path,
+            }
+        )
         # train and evaluate
         artifacts = train(
             batch_size,
@@ -291,17 +305,6 @@ def experiment_tracking_train(
             model_path=model_path,
             experiment_tracking=True,
             network_definition=network_definition,
-        )
-        # log key hyperparameters
-        mlflow.log_params(
-            {
-                "f": f,
-                "batch_size": batch_size,
-                "NUM_EPOCHS": NUM_EPOCHS,
-                "N_STEPS_MOSER": N_STEPS_MOSER,
-                "N_RUNS_MOSER": N_RUNS_MOSER,
-                "network_definition": network_definition.__name__,
-            }
         )
         # log params which are a result of learning
         with tempfile.TemporaryDirectory() as dp:
@@ -323,19 +326,3 @@ if __name__ == "__main__":
         model_path=False,
         network_definition=network_definition,
     )
-"""
-
-if __name__ == "__main__":
-    train(
-        batch_size,
-        f,
-        NUM_EPOCHS,
-        N_STEPS_MOSER,
-        N_RUNS_MOSER,
-        path,
-        img_path="show",
-        model_path=False,
-        experiment_tracking=False,
-    )
-"""
-print("success")

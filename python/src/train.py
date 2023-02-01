@@ -1,6 +1,7 @@
-# import sys
-# sys.path.append('../../../')
-# print(sys.path)
+import sys
+
+sys.path.append("../../")
+print(sys.path)
 
 import collections
 
@@ -14,9 +15,13 @@ from torch.utils import data
 import matplotlib.pyplot as plt
 import pandas as pd
 import moser_rust
-from data_utils import SATTrainingDataset, JraphDataLoader
-from model import network_definition, get_model_probabilities
-from random_walk import moser_walk
+from python.src.data_utils import SATTrainingDataset, JraphDataLoader
+from python.src.model import (
+    network_definition_interaction,
+    network_definition_GCN,
+    get_model_probabilities,
+)
+from python.src.random_walk import moser_walk
 import mlflow
 from pathlib import Path
 import tempfile
@@ -105,6 +110,7 @@ def train(
     model_path=False,
     experiment_tracking=False,
 ):
+    network_definition = network_definition_interaction
     sat_data = SATTrainingDataset(path)
 
     train_data, test_data = data.random_split(sat_data, [0.8, 0.2])
@@ -177,8 +183,8 @@ def train(
 
     test_eval = EvalResults("Test loss", [], True)
     train_eval = EvalResults("Train loss", [], True)
-    test_moser_eval = EvalResults("Moser loss (test)", [], True)
-    train_moser_eval = EvalResults("Moser loss (train)", [], True)
+    test_moser_eval = EvalResults("Moser loss - test", [], True)
+    train_moser_eval = EvalResults("Moser loss - train", [], True)
     eval_objects = [test_eval, train_eval, test_moser_eval, train_moser_eval]
 
     for epoch in range(NUM_EPOCHS):

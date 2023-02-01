@@ -47,6 +47,9 @@ def experiment_tracking_train(
             model_path,
             experiment_tracking=True,
         )
+        print(f"artifact_uri={mlflow.get_artifact_uri()}")
+        print(f"tracking_uri={mlflow.get_tracking_uri()}")
+        print(f"registry_uri={mlflow.get_registry_uri()}")
         # log key hyperparameters
         mlflow.log_params(
             {
