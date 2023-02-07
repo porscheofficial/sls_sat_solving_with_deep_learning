@@ -70,10 +70,10 @@ def get_2sat_problem(min_n_literals: int, max_n_literals: int) -> LabeledProblem
     Returns:
     bipartite-graph, node labels and node mask.
     """
+
     n_literals = random.randint(min_n_literals, max_n_literals)
     n_literals_true = random.randint(1, n_literals - 1)
     n_constraints = n_literals * (n_literals - 1) // 2
-
     n_node = n_literals + n_constraints
     # 0 indicates a literal node
     # 1 indicates a constraint node.
@@ -160,60 +160,163 @@ def get_k_sat_problem(n, m, k):
 def get_problem_from_cnf(cnf: CNF, pad_nodes=0, pad_edges=0) -> HashableSATProblem:
     cnf.clauses = [c for c in cnf.clauses if len(c) > 0]
     n = cnf.nv
+    print("n=", n)
     m = len(cnf.clauses)
-    n_node = n + m
-    clause_lengths = [len(c) for c in cnf.clauses]
-    k = max(clause_lengths)
-    n_edge = sum(clause_lengths)
+    print("m=", m)
+    mode = "LCG"
 
-    # for sake of jitting, if the cnf isn't already strictly in k-cnf form, we introduce
-    # additional dummy variables and constraints. NB: While this in principles solves the problem,
-    # it actually is to be avoided, if possible: This is because it very easy to satisfy all constraint except one
-    # by just setting the dummy variables to True. This creates local minima and also breaks locality.
-    # if any([len(c) != k for c in cnf.clauses]):
-    #     m += 2 ** k - 1
-    #     n += k
-    #
-    #     dummy_vars = np.arange(n - k, n)
-    #     senders.extend(np.repeat(dummy_vars, 2 ** k - 1))
-    #
-    #     # we introduce additional constraints to force the dummy variables into the all zeros string
-    #     additional_constraints = all_bitstrings(k)[1:, :]
-    #
-    #     for j in range(2 ** k - 1):
-    #         edges.extend(additional_constraints[j, :])
-    #         receivers.extend(np.repeat(m - 2 ** k + 1, k))
+    if mode == "VCG":
+        print("mode VCG")
+        n_node = n + m
+        clause_lengths = [len(c) for c in cnf.clauses]
+        k = max(clause_lengths)
+        n_edge = sum(clause_lengths)
 
-    edges = []
-    senders = []
-    receivers = []
-    nodes = [0 if i < n else 1 for i in range(n_node)]
-    for j, c in enumerate(cnf.clauses):
-        support = [(abs(l) - 1) for l in c]
-        assert len(support) == len(
-            set(support)
-        ), "Multiple occurrences of single variable in constraint"
+        # for sake of jitting, if the cnf isn't already strictly in k-cnf form, we introduce
+        # additional dummy variables and constraints. NB: While this in principles solves the problem,
+        # it actually is to be avoided, if possible: This is because it very easy to satisfy all constraint except one
+        # by just setting the dummy variables to True. This creates local minima and also breaks locality.
+        # if any([len(c) != k for c in cnf.clauses]):
+        #     m += 2 ** k - 1
+        #     n += k
+        #
+        #     dummy_vars = np.arange(n - k, n)
+        #     senders.extend(np.repeat(dummy_vars, 2 ** k - 1))
+        #
+        #     # we introduce additional constraints to force the dummy variables into the all zeros string
+        #     additional_constraints = all_bitstrings(k)[1:, :]
+        #
+        #     for j in range(2 ** k - 1):
+        #         edges.extend(additional_constraints[j, :])
+        #         receivers.extend(np.repeat(m - 2 ** k + 1, k))
 
-        vals = ((np.sign(c) + 1) // 2).astype(np.int32)
+        edges = []
+        senders = []
+        receivers = []
+        nodes = [0 if i < n else 1 for i in range(n_node)]
+        for j, c in enumerate(cnf.clauses):
+            support = [(abs(l) - 1) for l in c]
+            assert len(support) == len(
+                set(support)
+            ), "Multiple occurrences of single variable in constraint"
 
-        senders.extend(support)
-        edges.extend(vals)
-        receivers.extend(np.repeat(j + n, len(c)))
+            vals = ((np.sign(c) + 1) // 2).astype(np.int32)
 
-    assert len(nodes) == n_node
-    assert len(receivers) == len(senders)
-    assert len(senders) == len(edges)
-    assert len(edges) == n_edge
+            senders.extend(support)
+            edges.extend(vals)
+            receivers.extend(np.repeat(j + n, len(c)))
 
-    graph = jraph.GraphsTuple(
-        n_node=np.asarray([n_node]),
-        n_edge=np.asarray([n_edge]),
-        edges=np.eye(2)[edges],
-        nodes=np.eye(2)[nodes],
-        globals=None,
-        senders=np.asarray(senders),
-        receivers=np.asarray(receivers),
-    )
+        assert len(nodes) == n_node
+        assert len(receivers) == len(senders)
+        assert len(senders) == len(edges)
+        assert len(edges) == n_edge
+
+        # For the loss calculation we create a mask for the nodes, which masks
+        # the constraint nodes and the padding nodes.
+        mask = (np.arange(n_node) < n).astype(np.int32)
+
+        graph = jraph.GraphsTuple(
+            n_node=np.asarray([n_node]),
+            n_edge=np.asarray([n_edge]),
+            edges=np.eye(2)[edges],
+            nodes=np.eye(2)[nodes],
+            globals=None,
+            senders=np.asarray(senders),
+            receivers=np.asarray(receivers),
+        )
+
+    if mode == "LCG":
+        print("mode LCG")
+        n_node = 2 * n + m
+        clause_lengths = [len(c) for c in cnf.clauses]
+        k = max(clause_lengths)
+        n_edge = sum(clause_lengths)
+
+        edges = []
+        senders = []
+        receivers = []
+
+        # 1 indicates a literal node.
+        # -1 indicated a negated literal node.
+        # 0 indicates a constraint node.
+        """
+        nodes = []
+        for i in range(n_node):
+            if i<2*n:
+                
+                if i%2 == 0:
+                    nodes.append(1)
+                if i%2 == 1:
+                    nodes.append(-1)
+            else:
+                nodes.append(0)
+        for j, c in enumerate(cnf.clauses):
+            support = [(abs(l) - 1) for l in c]
+            assert len(support) == len(
+                set(support)
+            ), "Multiple occurrences of single variable in constraint"
+
+            # vals = ((np.sign(c) + 1) // 2).astype(np.int32)
+            vals = ((np.sign(c))).astype(np.int32)
+            for ii in range(len(vals)):
+                if vals[ii] == 1:
+                    senders.append(int(2*support[ii]))
+                else:
+                    senders.append(int(2*support[ii]+1))
+            edges.extend(np.repeat(0,len(c)))
+            receivers.extend(np.repeat(j + n, len(c)))
+        """
+        nodes = []
+        for i in range(n_node):
+            if i < n:
+                nodes.append(1)
+            elif n <= i < int(2 * n):
+                nodes.append(-1)
+            else:
+                nodes.append(0)
+        for j, c in enumerate(cnf.clauses):
+            support = [(abs(l) - 1) for l in c]
+            assert len(support) == len(
+                set(support)
+            ), "Multiple occurrences of single variable in constraint"
+
+            # vals = ((np.sign(c) + 1) // 2).astype(np.int32)
+            vals = ((np.sign(c))).astype(np.int32)
+            for ii in range(len(vals)):
+                if vals[ii] == 1:
+                    senders.append(int(support[ii]))
+                else:
+                    senders.append(int(support[ii] + n))
+            edges.extend(np.repeat(0, len(c)))
+            receivers.extend(np.repeat(j + n, len(c)))
+        assert len(nodes) == n_node
+        assert len(receivers) == len(senders)
+        assert len(senders) == len(edges)
+        assert len(edges) == n_edge
+
+        # For the loss calculation we create a mask for the nodes, which masks
+        # the constraint nodes and the padding nodes.
+        mask = (np.arange(n_node) < 2 * n).astype(np.int32)
+        """
+        graph = jraph.GraphsTuple(
+            n_node=np.asarray([n_node]),
+            n_edge=np.asarray([n_edge]),
+            edges=np.eye(2)[edges],
+            nodes=np.asarray(nodes),
+            globals=None,
+            senders=np.asarray(senders),
+            receivers=np.asarray(receivers),
+        )
+        """
+        graph = jraph.GraphsTuple(
+            n_node=np.asarray([n_node]),
+            n_edge=np.asarray([n_edge]),
+            edges=np.eye(2)[edges],
+            nodes=np.eye(3)[nodes],
+            globals=None,
+            senders=np.asarray(senders),
+            receivers=np.asarray(receivers),
+        )
 
     # padding done in case we want to jit the graph, this is relevant mostly for training the gnn model, not for
     # executing moser's walk on single instances
@@ -225,8 +328,8 @@ def get_problem_from_cnf(cnf: CNF, pad_nodes=0, pad_edges=0) -> HashableSATProbl
 
     # For the loss calculation we create a mask for the nodes, which masks
     # the constraint nodes and the padding nodes.
-
-    mask = (np.arange(n_node) < n).astype(np.int32)
+    # ALREADY DONE ABOVE!
+    # mask = (np.arange(n_node) < 2*n).astype(np.int32)
 
     return HashableSATProblem(
         graph=graph, mask=mask, clause_lengths=clause_lengths, params=(n, m, k)

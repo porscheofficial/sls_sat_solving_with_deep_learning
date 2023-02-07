@@ -11,6 +11,7 @@ import jraph
 import nnf
 import numpy as np
 import pickle
+import jax.numpy as jnp
 from func_timeout import func_timeout, FunctionTimedOut
 from jax import vmap
 from pysat.formula import CNF
@@ -113,9 +114,13 @@ def collate_fn(batch):
     batched_masks = np.concatenate(masks)
     batched_graphs = jraph.batch(graphs)
     batched_candidates = np.vstack([c.T for c in candidates])
+    # batched_energies = np.vstack(
+    #     [np.repeat([e], len(m), axis=0) for (e, m) in zip(energies, masks)]
+    # )
     batched_energies = np.vstack(
-        [np.repeat([e], len(m), axis=0) for (e, m) in zip(energies, masks)]
+        [np.repeat([e], int(jnp.sum(m) / 2), axis=0) for (e, m) in zip(energies, masks)]
     )
+
     return (batched_masks, batched_graphs), (batched_candidates, batched_energies)
 
 

@@ -1,0 +1,6 @@
+artifact_location: file:///Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/GIT_SAT_ML/ml_based_sat_solver/mlrun/900011981694909930
+creation_time: 1675754643211
+experiment_id: '900011981694909930'
+last_update_time: 1675754643211
+lifecycle_stage: active
+name: mlflow-random_3SAT-medium-GCN-edges

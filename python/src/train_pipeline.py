@@ -30,18 +30,18 @@ import tempfile
 import joblib
 
 NUM_EPOCHS = 80  # 10
-f = 0.1
+f = 0.01
 batch_size = 2
-path = "../Data/blocksworld"
-# path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/generateSAT/samples_medium/"
-N_STEPS_MOSER = 500
+# path = "../Data/blocksworld"
+path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/generateSAT/samples_medium_subset/"
+N_STEPS_MOSER = 1000
 N_RUNS_MOSER = 2
 SEED = 0
 network_definition = network_definition_GCN
 
 MODEL_REGISTRY = Path("mlrun")
-EXPERIMENT_NAME = "mlflow-blocksat_GCN"
-# EXPERIMENT_NAME = "mlflow-random_3SAT-medium"
+# EXPERIMENT_NAME = "mlflow-blocksat_GCN_LCG"
+EXPERIMENT_NAME = "mlflow-random_3SAT-medium-GCN-LCG_subset"
 
 
 #  AUXILIARY METHODS
@@ -55,6 +55,15 @@ def one_hot(x, k, dtype=jnp.float32):
 vmap_one_hot = jax.vmap(one_hot, in_axes=(0, None), out_axes=0)
 
 
+def compute_log_probs(decoded_nodes, candidate):
+    a = jax.nn.log_softmax(decoded_nodes)  # * mask[:, None]
+    return candidate * a
+
+
+vmap_compute_log_probs = jax.vmap(compute_log_probs, in_axes=(None, 1), out_axes=1)
+
+
+"""
 def compute_log_probs(decoded_nodes, mask, candidate):
     a = jax.nn.log_softmax(decoded_nodes) * mask[:, None]
     return candidate * a
@@ -63,6 +72,7 @@ def compute_log_probs(decoded_nodes, mask, candidate):
 vmap_compute_log_probs = jax.vmap(
     compute_log_probs, in_axes=(None, None, 1), out_axes=1
 )
+"""
 
 
 def evaluate_on_moser(
@@ -117,14 +127,12 @@ def train(
     network_definition=network_definition_interaction,
 ):
     sat_data = SATTrainingDataset(path)
-
     train_data, test_data = data.random_split(
         sat_data, [0.8, 0.2], generator=Generator().manual_seed(0)
     )
     train_eval_data, _ = data.random_split(
         train_data, [0.2, 0.8], generator=Generator().manual_seed(0)
     )
-    print(test_data)
 
     train_loader = JraphDataLoader(train_data, batch_size=batch_size, shuffle=True)
     test_loader = JraphDataLoader(test_data, batch_size=batch_size)
@@ -144,6 +152,7 @@ def train(
         updates, opt_state = opt_update(g, opt_state)
         return optax.apply_updates(params, updates), opt_state
 
+    """
     def prediction_loss(params, batch, f: float):
         (mask, graph), (candidates, energies) = batch
         decoded_nodes = network.apply(params, graph)  # (B*N, 2)
@@ -153,6 +162,28 @@ def train(
         )  # (B*N, K, 2)
         weights = jax.nn.softmax(-f * energies)  # (B*N, K)
         loss = -jnp.sum(weights * jnp.sum(log_prob, axis=-1))  # ()
+        # jax.debug.print("🤯 {x} 🤯", x=loss)
+        return loss
+    """
+
+    def prediction_loss(params, batch, f: float):
+        (mask, graph), (candidates, energies) = batch
+        n = int(jnp.sum(mask) / 2)  # number of variables
+        decoded_nodes = network.apply(params, graph)  # (B*2*N, 1)
+        pos_nodes = decoded_nodes[0:n][:, 0]
+        neg_nodes = decoded_nodes[n : 2 * n][:, 0]
+        conc_decoded_nodes = jnp.vstack(
+            (pos_nodes, neg_nodes)
+        ).T  # (sum of variables in batch, n, 2)
+        candidates = candidates[
+            0:n, :
+        ]  # (sum of variables in batch, K) # so we do not need the mask anymore
+        candidates = vmap_one_hot(candidates, 2)  # (sum of variables in batch, K, 2))
+        log_prob = vmap_compute_log_probs(
+            conc_decoded_nodes, mask, candidates
+        )  # (sum of variables in batch, K, 2)
+        weights = jax.nn.softmax(-f * energies)  # (sum of variables in batch, K)
+        loss = -jnp.sum(weights * jnp.sum(log_prob, axis=-1)) / n  # ()
         # jax.debug.print("🤯 {x} 🤯", x=loss)
         return loss
 
@@ -218,7 +249,8 @@ def train(
     for epoch in range(NUM_EPOCHS):
         start_time = time.time()
         for counter, batch in enumerate(train_loader):
-            # print("batch_number", counter)
+            print("batch_number", counter)
+            print("success")
             params, opt_state = update(params, opt_state, batch, f)
 
         epoch_time = time.time() - start_time

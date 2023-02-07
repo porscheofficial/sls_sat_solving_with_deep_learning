@@ -1,0 +1,15 @@
+artifact_uri: file:///Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/GIT_SAT_ML/ml_based_sat_solver/mlrun/900011981694909930/bd4362f91a2e4b9f886fab0941a19495/artifacts
+end_time: null
+entry_point_name: ''
+experiment_id: '900011981694909930'
+lifecycle_stage: active
+run_id: bd4362f91a2e4b9f886fab0941a19495
+run_name: receptive-carp-845
+run_uuid: bd4362f91a2e4b9f886fab0941a19495
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1675755423008
+status: 1
+tags: []
+user_id: p403830
