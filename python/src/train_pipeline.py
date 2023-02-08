@@ -207,10 +207,13 @@ def train(
         log_prob = vmap_compute_log_probs(padded_conc_decoded_nodes, mask, candidates)
         weights = jax.nn.softmax(-f * energies)
         loss = -jnp.sum(weights * jnp.sum(log_prob, axis=-1)) / jnp.sum(mask)  # ()
-        a = jax.nn.softmax(padded_conc_decoded_nodes) * mask[:, None]
-        loss_prob = jnp.sum(abs(a[:, 0] - a[:, 1])) / jnp.sum(mask)
-        # jax.debug.print("🤯 {x} 🤯", x=loss)
-        return alpha * loss + beta * loss_prob
+        if beta != 0:
+            a = jax.nn.softmax(padded_conc_decoded_nodes) * mask[:, None]
+            loss_prob = jnp.sum(abs(a[:, 0] - a[:, 1])) / jnp.sum(mask)
+            # jax.debug.print("🤯 {x} 🤯", x=loss)
+            return alpha * loss + beta * loss_prob
+        else:
+            return alpha * loss
 
     def prediction_loss_VCG(params, batch, f: float):
         (mask, graph), (candidates, energies) = batch
