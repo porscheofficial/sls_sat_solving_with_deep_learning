@@ -101,7 +101,7 @@ def network_definition_interaction_single_output(
         # include_sent_messages_in_node_update: pass edge features for which a node is a sender to the node update function.
         graph = gn(graph)
     # return jnp.array([jnp.sum(hk.Linear(3)(graph.nodes),axis=1)]).T
-    return hk.Linear(3)(graph.nodes)
+    return hk.Linear(1)(graph.nodes)
 
 
 def network_definition_GCN(

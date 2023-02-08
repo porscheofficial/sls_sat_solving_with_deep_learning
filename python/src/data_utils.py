@@ -26,7 +26,9 @@ SATInstanceMeta = namedtuple("SATInstanceMeta", ("name", "n", "m", "n_edges"))
 
 
 class SATTrainingDataset(data.Dataset):
-    def __init__(self, data_dir, already_unzipped=True, return_candidates=True):
+    def __init__(
+        self, data_dir, already_unzipped=True, return_candidates=True, mode="LCG"
+    ):
         self.return_candidates = return_candidates
         self.data_dir = data_dir
         self.already_unzipped = already_unzipped
@@ -41,7 +43,10 @@ class SATTrainingDataset(data.Dataset):
                 name, cnf.nv, len(cnf.clauses), sum(len(c) for c in cnf.clauses)
             )
             self.instances.append(instance)
-        self.max_n_node = max(i.n + i.m for i in self.instances)
+        if mode == "LCG":
+            self.max_n_node = max(2 * i.n + i.m for i in self.instances)
+        if mode == "VCG":
+            self.max_n_node = max(i.n + i.m for i in self.instances)
         self.max_n_edge = max(i.n_edges for i in self.instances)
 
     def __len__(self):
@@ -114,12 +119,12 @@ def collate_fn(batch):
     batched_masks = np.concatenate(masks)
     batched_graphs = jraph.batch(graphs)
     batched_candidates = np.vstack([c.T for c in candidates])
-    # batched_energies = np.vstack(
-    #     [np.repeat([e], len(m), axis=0) for (e, m) in zip(energies, masks)]
-    # )
     batched_energies = np.vstack(
-        [np.repeat([e], int(jnp.sum(m) / 2), axis=0) for (e, m) in zip(energies, masks)]
+        [np.repeat([e], len(m), axis=0) for (e, m) in zip(energies, masks)]
     )
+    # batched_energies = np.vstack(
+    #    [np.repeat([e], int(jnp.sum(m) / 2), axis=0) for (e, m) in zip(energies, masks)]
+    # )
 
     return (batched_masks, batched_graphs), (batched_candidates, batched_energies)
 

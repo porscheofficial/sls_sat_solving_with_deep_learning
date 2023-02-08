@@ -160,13 +160,13 @@ def get_k_sat_problem(n, m, k):
 def get_problem_from_cnf(cnf: CNF, pad_nodes=0, pad_edges=0) -> HashableSATProblem:
     cnf.clauses = [c for c in cnf.clauses if len(c) > 0]
     n = cnf.nv
-    print("n=", n)
+    # print("n=", n)
     m = len(cnf.clauses)
-    print("m=", m)
+    # print("m=", m)
     mode = "LCG"
 
     if mode == "VCG":
-        print("mode VCG")
+        # print("mode VCG")
         n_node = n + m
         clause_lengths = [len(c) for c in cnf.clauses]
         k = max(clause_lengths)
@@ -226,7 +226,7 @@ def get_problem_from_cnf(cnf: CNF, pad_nodes=0, pad_edges=0) -> HashableSATProbl
         )
 
     if mode == "LCG":
-        print("mode LCG")
+        # print("mode LCG")
         n_node = 2 * n + m
         clause_lengths = [len(c) for c in cnf.clauses]
         k = max(clause_lengths)
@@ -239,14 +239,14 @@ def get_problem_from_cnf(cnf: CNF, pad_nodes=0, pad_edges=0) -> HashableSATProbl
         # 1 indicates a literal node.
         # -1 indicated a negated literal node.
         # 0 indicates a constraint node.
-        """
+
         nodes = []
         for i in range(n_node):
-            if i<2*n:
-                
-                if i%2 == 0:
+            if i < 2 * n:
+
+                if i % 2 == 0:
                     nodes.append(1)
-                if i%2 == 1:
+                if i % 2 == 1:
                     nodes.append(-1)
             else:
                 nodes.append(0)
@@ -260,10 +260,10 @@ def get_problem_from_cnf(cnf: CNF, pad_nodes=0, pad_edges=0) -> HashableSATProbl
             vals = ((np.sign(c))).astype(np.int32)
             for ii in range(len(vals)):
                 if vals[ii] == 1:
-                    senders.append(int(2*support[ii]))
+                    senders.append(int(2 * support[ii]))
                 else:
-                    senders.append(int(2*support[ii]+1))
-            edges.extend(np.repeat(0,len(c)))
+                    senders.append(int(2 * support[ii] + 1))
+            edges.extend(np.repeat(0, len(c)))
             receivers.extend(np.repeat(j + n, len(c)))
         """
         nodes = []
@@ -289,14 +289,12 @@ def get_problem_from_cnf(cnf: CNF, pad_nodes=0, pad_edges=0) -> HashableSATProbl
                     senders.append(int(support[ii] + n))
             edges.extend(np.repeat(0, len(c)))
             receivers.extend(np.repeat(j + n, len(c)))
+        """
         assert len(nodes) == n_node
         assert len(receivers) == len(senders)
         assert len(senders) == len(edges)
         assert len(edges) == n_edge
 
-        # For the loss calculation we create a mask for the nodes, which masks
-        # the constraint nodes and the padding nodes.
-        mask = (np.arange(n_node) < 2 * n).astype(np.int32)
         """
         graph = jraph.GraphsTuple(
             n_node=np.asarray([n_node]),
@@ -328,8 +326,14 @@ def get_problem_from_cnf(cnf: CNF, pad_nodes=0, pad_edges=0) -> HashableSATProbl
 
     # For the loss calculation we create a mask for the nodes, which masks
     # the constraint nodes and the padding nodes.
-    # ALREADY DONE ABOVE!
-    # mask = (np.arange(n_node) < 2*n).astype(np.int32)
+    if mode == "LCG":
+        mask = (np.arange(n_node) < n).astype(np.int32)
+        # mask = (np.arange(n_node) < 2*n).astype(np.int32)
+
+    elif mode == "VCG":
+        mask = (np.arange(n_node) < n).astype(np.int32)
+
+    assert len(mask) == n_node
 
     return HashableSATProblem(
         graph=graph, mask=mask, clause_lengths=clause_lengths, params=(n, m, k)

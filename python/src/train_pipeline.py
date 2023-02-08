@@ -20,7 +20,9 @@ import moser_rust
 from data_utils import SATTrainingDataset, JraphDataLoader
 from model import (
     network_definition_interaction,
+    network_definition_interaction_single_output,
     network_definition_GCN,
+    network_definition_GCN_single_output,
     get_model_probabilities,
 )
 from random_walk import moser_walk
@@ -29,19 +31,19 @@ from pathlib import Path
 import tempfile
 import joblib
 
-NUM_EPOCHS = 80  # 10
+NUM_EPOCHS = 20  # 10
 f = 0.01
 batch_size = 2
-# path = "../Data/blocksworld"
-path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/generateSAT/samples_medium_subset/"
+path = "../Data/blocksworld"
+# path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/generateSAT/samples_medium/"
 N_STEPS_MOSER = 1000
 N_RUNS_MOSER = 2
 SEED = 0
-network_definition = network_definition_GCN
+network_definition = network_definition_GCN_single_output
 
 MODEL_REGISTRY = Path("mlrun")
-# EXPERIMENT_NAME = "mlflow-blocksat_GCN_LCG"
-EXPERIMENT_NAME = "mlflow-random_3SAT-medium-GCN-LCG_subset"
+EXPERIMENT_NAME = "mlflow-blocksat_Interaction_LCG"
+# EXPERIMENT_NAME = "mlflow-random_3SAT-medium-Interaction-LCG_subset"
 
 
 #  AUXILIARY METHODS
@@ -55,12 +57,14 @@ def one_hot(x, k, dtype=jnp.float32):
 vmap_one_hot = jax.vmap(one_hot, in_axes=(0, None), out_axes=0)
 
 
-def compute_log_probs(decoded_nodes, candidate):
-    a = jax.nn.log_softmax(decoded_nodes)  # * mask[:, None]
+def compute_log_probs(decoded_nodes, mask, candidate):
+    a = jax.nn.log_softmax(decoded_nodes) * mask[:, None]
     return candidate * a
 
 
-vmap_compute_log_probs = jax.vmap(compute_log_probs, in_axes=(None, 1), out_axes=1)
+vmap_compute_log_probs = jax.vmap(
+    compute_log_probs, in_axes=(None, None, 1), out_axes=1
+)
 
 
 """
@@ -105,6 +109,7 @@ def plot_accuracy_fig(*eval_results):
         )
     plt.xlabel("epoch")
     plt.ylabel("accuracy of model / loss")
+    plt.yscale("log")
     plt.grid()
     plt.legend()
     plt.tight_layout()
@@ -168,22 +173,22 @@ def train(
 
     def prediction_loss(params, batch, f: float):
         (mask, graph), (candidates, energies) = batch
-        n = int(jnp.sum(mask) / 2)  # number of variables
         decoded_nodes = network.apply(params, graph)  # (B*2*N, 1)
-        pos_nodes = decoded_nodes[0:n][:, 0]
-        neg_nodes = decoded_nodes[n : 2 * n][:, 0]
-        conc_decoded_nodes = jnp.vstack(
-            (pos_nodes, neg_nodes)
-        ).T  # (sum of variables in batch, n, 2)
-        candidates = candidates[
-            0:n, :
-        ]  # (sum of variables in batch, K) # so we do not need the mask anymore
-        candidates = vmap_one_hot(candidates, 2)  # (sum of variables in batch, K, 2))
-        log_prob = vmap_compute_log_probs(
-            conc_decoded_nodes, mask, candidates
-        )  # (sum of variables in batch, K, 2)
-        weights = jax.nn.softmax(-f * energies)  # (sum of variables in batch, K)
-        loss = -jnp.sum(weights * jnp.sum(log_prob, axis=-1)) / n  # ()
+        if np.shape(decoded_nodes)[0] % 2 == 1:
+            decoded_nodes = np.vstack((decoded_nodes, [0]))
+            conc_decoded_nodes = jnp.reshape(decoded_nodes, (-1, 2))
+            padded_conc_decoded_nodes = jnp.concatenate(
+                (conc_decoded_nodes, conc_decoded_nodes)
+            )[:-1, :]
+        else:
+            conc_decoded_nodes = jnp.reshape(decoded_nodes, (-1, 2))
+            padded_conc_decoded_nodes = jnp.concatenate(
+                (conc_decoded_nodes, conc_decoded_nodes)
+            )
+        candidates = vmap_one_hot(candidates, 2)
+        log_prob = vmap_compute_log_probs(padded_conc_decoded_nodes, mask, candidates)
+        weights = jax.nn.softmax(-f * energies)
+        loss = -jnp.sum(weights * jnp.sum(log_prob, axis=-1)) / jnp.sum(mask)  # ()
         # jax.debug.print("🤯 {x} 🤯", x=loss)
         return loss
 
@@ -249,8 +254,7 @@ def train(
     for epoch in range(NUM_EPOCHS):
         start_time = time.time()
         for counter, batch in enumerate(train_loader):
-            print("batch_number", counter)
-            print("success")
+            # print("batch_number", counter)
             params, opt_state = update(params, opt_state, batch, f)
 
         epoch_time = time.time() - start_time
