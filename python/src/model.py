@@ -223,7 +223,7 @@ def network_definition_GCN_single_output(
     return hk.Linear(1)(graph.nodes)
 
 
-def get_model_probabilities(network, params, problem):
+def get_model_probabilities(network, params, problem, mode):
     """
     Helper method that returns, for each, problem variable, the Bernoulli parameter of the model for this variable.
     That is, the ith value of the returned array is the probability with which the model will assign 1 to the
@@ -237,7 +237,7 @@ def get_model_probabilities(network, params, problem):
     right column of the softmax of the model output equals the models likelihood for setting variables to 1, which is
     what we seek.
     """
-    mode = "LCG"
+    # mode = "LCG"
     n, _, _ = problem.params
     decoded_nodes = network.apply(params, problem.graph)
     if mode == "VCG":

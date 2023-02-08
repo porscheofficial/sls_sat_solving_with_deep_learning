@@ -17,7 +17,7 @@ from torch import Generator
 import matplotlib.pyplot as plt
 import pandas as pd
 import moser_rust
-from data_utils import SATTrainingDataset, JraphDataLoader
+from data_utils import SATTrainingDataset_LCG, SATTrainingDataset_VCG, JraphDataLoader
 from model import (
     network_definition_interaction,
     network_definition_interaction_single_output,
@@ -40,7 +40,8 @@ path = "../Data/blocksworld"
 N_STEPS_MOSER = 1000
 N_RUNS_MOSER = 2
 SEED = 0
-network_definition = network_definition_interaction_single_output
+network_definition = network_definition_interaction
+mode = "VCG"
 
 MODEL_REGISTRY = Path("mlrun")
 EXPERIMENT_NAME = "mlflow-blocksat_interaction_LCG"
@@ -87,7 +88,7 @@ def evaluate_on_moser(
     n_steps,
     keep_trajectory=False,
 ):
-    model_probabilities = get_model_probabilities(network, params, problem)
+    model_probabilities = get_model_probabilities(network, params, problem, mode)
     _, energy, _ = moser_walk(
         model_probabilities, problem, n_steps, seed=0, keep_trajectory=keep_trajectory
     )
@@ -131,8 +132,13 @@ def train(
     model_path=False,
     experiment_tracking=False,
     network_definition=network_definition_interaction,
+    mode="LCG",
 ):
-    sat_data = SATTrainingDataset(path)
+    if mode == "LCG":
+        sat_data = SATTrainingDataset_LCG(path)
+    if mode == "VCG":
+        sat_data = SATTrainingDataset_VCG(path)
+
     train_data, test_data = data.random_split(
         sat_data, [0.8, 0.2], generator=Generator().manual_seed(0)
     )
@@ -151,9 +157,17 @@ def train(
     opt_state = opt_init(params)
 
     @jax.jit
-    def update(params, opt_state, batch, f):
+    def update_LCG(params, opt_state, batch, f):
 
-        g = jax.grad(prediction_loss)(params, batch, f)
+        g = jax.grad(prediction_loss_LCG)(params, batch, f)
+
+        updates, opt_state = opt_update(g, opt_state)
+        return optax.apply_updates(params, updates), opt_state
+
+    @jax.jit
+    def update_VCG(params, opt_state, batch, f):
+
+        g = jax.grad(prediction_loss_VCG)(params, batch, f)
 
         updates, opt_state = opt_update(g, opt_state)
         return optax.apply_updates(params, updates), opt_state
@@ -172,7 +186,7 @@ def train(
         return loss
     """
 
-    def prediction_loss(params, batch, f: float, alpha=1, beta=0):
+    def prediction_loss_LCG(params, batch, f: float, alpha=1, beta=0):
         (mask, graph), (candidates, energies) = batch
         decoded_nodes = network.apply(params, graph)  # (B*2*N, 1)
         if np.shape(decoded_nodes)[0] % 2 == 1:
@@ -198,10 +212,25 @@ def train(
         # jax.debug.print("🤯 {x} 🤯", x=loss)
         return alpha * loss + beta * loss_prob
 
+    def prediction_loss_VCG(params, batch, f: float):
+        (mask, graph), (candidates, energies) = batch
+        decoded_nodes = network.apply(params, graph)  # (B*N, 2)
+        candidates = vmap_one_hot(candidates, 2)  # (B*N, K, 2))
+        log_prob = vmap_compute_log_probs(
+            decoded_nodes, mask, candidates
+        )  # (B*N, K, 2)
+        weights = jax.nn.softmax(-f * energies)  # (B*N, K)
+        loss = -jnp.sum(weights * jnp.sum(log_prob, axis=-1)) / jnp.sum(mask)  # ()
+        # jax.debug.print("🤯 {x} 🤯", x=loss)
+        return loss
+
     print("Entering training loop")
 
-    def evaluate(loader):
-        return np.mean([prediction_loss(params, b, f) for b in loader])
+    def evaluate(loader, mode):
+        if mode == "LCG":
+            return np.mean([prediction_loss_LCG(params, b, f) for b in loader])
+        if mode == "VCG":
+            return np.mean([prediction_loss_VCG(params, b, f) for b in loader])
 
     def evaluate_moser_jax(data_subset):
         return np.mean(
@@ -213,7 +242,7 @@ def train(
             ]
         )
 
-    def evaluate_moser_rust(data_subset, mode_probabilities="model"):
+    def evaluate_moser_rust(data_subset, mode_probabilities="model", mode="LCG"):
 
         av_energies = []
         av_entropies = []
@@ -221,17 +250,19 @@ def train(
         for idx in data_subset.indices:
             problem_path = sat_data.instances[idx].name + ".cnf"
             problem = sat_data.get_unpadded_problem(idx)
-            if mode_probabilities == "model":
-                model_probabilities = get_model_probabilities(network, params, problem)
-            elif mode_probabilities == "uniform":
+            if mode_probabilities == "uniform":
                 n, _, _ = problem.params
                 model_probabilities = np.ones(n) / 2
+            elif mode_probabilities == "model":
+                model_probabilities = get_model_probabilities(
+                    network, params, problem, mode
+                )
+            else:
+                print("not valid argument for mode_probabilities")
+            model_probabilities = model_probabilities.ravel()
+
             _, _, final_energies = moser_rust.run_moser_python(
-                problem_path,
-                model_probabilities.ravel(),
-                N_STEPS_MOSER,
-                N_RUNS_MOSER,
-                SEED,
+                problem_path, model_probabilities, N_STEPS_MOSER, N_RUNS_MOSER, SEED
             )
             _, m, _ = problem.params
             av_energies.append(np.mean(final_energies) / m)
@@ -247,13 +278,13 @@ def train(
             ]
             av_entropies.append(np.mean(entropies))
 
-        return np.mean(av_energies), np.mean(av_entropies)
+        return (np.mean(av_energies), np.mean(av_entropies))
 
-    moser_baseline_test = evaluate_moser_rust(test_data, mode_probabilities="uniform")[
-        0
-    ]
+    moser_baseline_test = evaluate_moser_rust(
+        test_data, mode_probabilities="uniform", mode=mode
+    )[0]
     moser_baseline_train = evaluate_moser_rust(
-        train_eval_data, mode_probabilities="uniform"
+        train_eval_data, mode_probabilities="uniform", mode=mode
     )[0]
 
     test_eval = EvalResults("Test loss", [], True)
@@ -279,15 +310,20 @@ def train(
         start_time = time.time()
         for counter, batch in enumerate(train_loader):
             # print("batch_number", counter)
-            params, opt_state = update(params, opt_state, batch, f)
+            if mode == "LCG":
+                params, opt_state = update_LCG(params, opt_state, batch, f)
+            if mode == "VCG:":
+                params, opt_state = update_VCG(params, opt_state, batch, f)
 
         epoch_time = time.time() - start_time
 
         # print("Epoch {} in {:0.2f} sec".format(epoch, epoch_time))
-        test_moser_energies, test_entropies = evaluate_moser_rust(test_data)
-        train_moser_energies, train_entropies = evaluate_moser_rust(train_eval_data)
-        test_eval.results.append(evaluate(test_loader))
-        train_eval.results.append(evaluate(train_eval_loader))
+        test_moser_energies, test_entropies = evaluate_moser_rust(test_data, mode=mode)
+        train_moser_energies, train_entropies = evaluate_moser_rust(
+            train_eval_data, mode=mode
+        )
+        test_eval.results.append(evaluate(test_loader, mode))
+        train_eval.results.append(evaluate(train_eval_loader, mode))
         test_moser_eval.results.append(test_moser_energies)
         train_moser_eval.results.append(train_moser_energies)
         train_baseline_moser_eval.results.append(moser_baseline_train)
@@ -340,6 +376,7 @@ def experiment_tracking_train(
     img_path=False,
     model_path=False,
     network_definition=network_definition_interaction,
+    mode="LCG",
 ):
     Path(MODEL_REGISTRY).mkdir(exist_ok=True)  # create experiments dir
     mlflow.set_tracking_uri("file://" + str(MODEL_REGISTRY.absolute()))
@@ -355,6 +392,7 @@ def experiment_tracking_train(
                 "N_RUNS_MOSER": N_RUNS_MOSER,
                 "network_definition": network_definition.__name__,
                 "path_dataset": path,
+                "mode": mode,
             }
         )
         # train and evaluate
@@ -369,6 +407,7 @@ def experiment_tracking_train(
             model_path=model_path,
             experiment_tracking=True,
             network_definition=network_definition,
+            mode=mode,
         )
         # log params which are a result of learning
         with tempfile.TemporaryDirectory() as dp:
@@ -389,4 +428,5 @@ if __name__ == "__main__":
         img_path="show",
         model_path=False,
         network_definition=network_definition,
+        mode=mode,
     )

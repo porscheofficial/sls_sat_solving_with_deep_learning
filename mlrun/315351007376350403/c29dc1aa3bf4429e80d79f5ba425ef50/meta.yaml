@@ -1,0 +1,15 @@
+artifact_uri: file:///Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/GIT_SAT_ML/ml_based_sat_solver/mlrun/315351007376350403/c29dc1aa3bf4429e80d79f5ba425ef50/artifacts
+end_time: 1675859337818
+entry_point_name: ''
+experiment_id: '315351007376350403'
+lifecycle_stage: active
+run_id: c29dc1aa3bf4429e80d79f5ba425ef50
+run_name: learned-mare-685
+run_uuid: c29dc1aa3bf4429e80d79f5ba425ef50
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1675859237364
+status: 4
+tags: []
+user_id: p403830
