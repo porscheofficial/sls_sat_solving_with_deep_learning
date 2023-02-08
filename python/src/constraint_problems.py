@@ -260,9 +260,9 @@ def get_problem_from_cnf(cnf: CNF, pad_nodes=0, pad_edges=0) -> HashableSATProbl
             vals = ((np.sign(c))).astype(np.int32)
             for ii in range(len(vals)):
                 if vals[ii] == 1:
-                    senders.append(int(2 * support[ii]))
-                else:
                     senders.append(int(2 * support[ii] + 1))
+                else:
+                    senders.append(int(2 * support[ii]))
             edges.extend(np.repeat(0, len(c)))
             receivers.extend(np.repeat(j + n, len(c)))
         """

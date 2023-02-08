@@ -34,16 +34,16 @@ import joblib
 NUM_EPOCHS = 20  # 10
 f = 0.01
 batch_size = 2
-path = "../Data/blocksworld"
-# path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/generateSAT/samples_medium/"
+# path = "../Data/blocksworld"
+path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/generateSAT/samples_medium/"
 N_STEPS_MOSER = 1000
 N_RUNS_MOSER = 2
 SEED = 0
 network_definition = network_definition_GCN_single_output
 
 MODEL_REGISTRY = Path("mlrun")
-EXPERIMENT_NAME = "mlflow-blocksat_Interaction_LCG"
-# EXPERIMENT_NAME = "mlflow-random_3SAT-medium-Interaction-LCG_subset"
+# EXPERIMENT_NAME = "mlflow-blocksat_Interaction_LCG"
+EXPERIMENT_NAME = "mlflow-random_3SAT-medium-Interaction-LCG_subset"
 
 
 #  AUXILIARY METHODS
