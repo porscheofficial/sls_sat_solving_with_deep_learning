@@ -33,7 +33,7 @@ import joblib
 
 NUM_EPOCHS = 20  # 10
 f = 0.01
-batch_size = 2
+batch_size = 4
 # path = "../Data/blocksworld"
 path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/generateSAT/samples_medium/"
 N_STEPS_MOSER = 1000
@@ -175,11 +175,21 @@ def train(
         (mask, graph), (candidates, energies) = batch
         decoded_nodes = network.apply(params, graph)  # (B*2*N, 1)
         if np.shape(decoded_nodes)[0] % 2 == 1:
-            decoded_nodes = np.vstack((decoded_nodes, [0]))
+            # print(np.shape(decoded_nodes))
+            # print(type(decoded_nodes))
+            decoded_nodes = jnp.vstack((jnp.asarray(decoded_nodes), [[0]]))
+            # decoded_nodes = jnp.concatenate((jnp.asarray(decoded_nodes), [[0]]))
+            # print(np.shape(decoded_nodes))
             conc_decoded_nodes = jnp.reshape(decoded_nodes, (-1, 2))
             padded_conc_decoded_nodes = jnp.concatenate(
-                (conc_decoded_nodes, conc_decoded_nodes)
+                (
+                    jnp.asarray(conc_decoded_nodes),
+                    np.zeros(np.shape(conc_decoded_nodes)),
+                )
             )[:-1, :]
+            # padded_conc_decoded_nodes = jnp.concatenate(
+            #    (jnp.asarray(conc_decoded_nodes), jnp.asarray(conc_decoded_nodes))
+            # )[:-1, :]
         else:
             conc_decoded_nodes = jnp.reshape(decoded_nodes, (-1, 2))
             padded_conc_decoded_nodes = jnp.concatenate(
