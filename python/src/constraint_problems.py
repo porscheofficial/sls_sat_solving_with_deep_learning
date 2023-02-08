@@ -230,7 +230,7 @@ def get_problem_from_cnf(cnf: CNF, pad_nodes=0, pad_edges=0) -> HashableSATProbl
         n_node = 2 * n + m
         clause_lengths = [len(c) for c in cnf.clauses]
         k = max(clause_lengths)
-        n_edge = sum(clause_lengths)
+        n_edge = sum(clause_lengths) + n
 
         edges = []
         senders = []
@@ -265,6 +265,12 @@ def get_problem_from_cnf(cnf: CNF, pad_nodes=0, pad_edges=0) -> HashableSATProbl
                     senders.append(int(2 * support[ii]))
             edges.extend(np.repeat(0, len(c)))
             receivers.extend(np.repeat(j + n, len(c)))
+
+        for jj in range(n):
+            senders.append(int(2 * jj + 1))
+            receivers.append(int(2 * jj))
+            edges.append(1)
+
         """
         nodes = []
         for i in range(n_node):

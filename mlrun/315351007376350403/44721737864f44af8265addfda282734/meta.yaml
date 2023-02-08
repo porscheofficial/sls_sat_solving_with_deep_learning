@@ -1,0 +1,15 @@
+artifact_uri: file:///Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/GIT_SAT_ML/ml_based_sat_solver/mlrun/315351007376350403/44721737864f44af8265addfda282734/artifacts
+end_time: 1675850626969
+entry_point_name: ''
+experiment_id: '315351007376350403'
+lifecycle_stage: active
+run_id: 44721737864f44af8265addfda282734
+run_name: dashing-ray-133
+run_uuid: 44721737864f44af8265addfda282734
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1675850614741
+status: 4
+tags: []
+user_id: p403830

@@ -1,0 +1,15 @@
+artifact_uri: file:///Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/GIT_SAT_ML/ml_based_sat_solver/mlrun/872138274865442125/cd8561ef95b64451a58310c3803ad170/artifacts
+end_time: null
+entry_point_name: ''
+experiment_id: '872138274865442125'
+lifecycle_stage: active
+run_id: cd8561ef95b64451a58310c3803ad170
+run_name: casual-dog-15
+run_uuid: cd8561ef95b64451a58310c3803ad170
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1675845015374
+status: 1
+tags: []
+user_id: p403830

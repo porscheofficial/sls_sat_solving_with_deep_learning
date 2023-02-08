@@ -30,20 +30,21 @@ import mlflow
 from pathlib import Path
 import tempfile
 import joblib
+from scipy.stats import entropy
 
-NUM_EPOCHS = 20  # 10
+NUM_EPOCHS = 80  # 10
 f = 0.01
-batch_size = 4
-# path = "../Data/blocksworld"
-path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/generateSAT/samples_medium/"
+batch_size = 2
+path = "../Data/blocksworld"
+# path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/generateSAT/samples_medium/"
 N_STEPS_MOSER = 1000
 N_RUNS_MOSER = 2
 SEED = 0
-network_definition = network_definition_GCN_single_output
+network_definition = network_definition_interaction_single_output
 
 MODEL_REGISTRY = Path("mlrun")
-# EXPERIMENT_NAME = "mlflow-blocksat_Interaction_LCG"
-EXPERIMENT_NAME = "mlflow-random_3SAT-medium-Interaction-LCG_subset"
+EXPERIMENT_NAME = "mlflow-blocksat_interaction_LCG"
+# EXPERIMENT_NAME = "mlflow-random_3SAT-medium-GCN-LCG"
 
 
 #  AUXILIARY METHODS
@@ -171,15 +172,11 @@ def train(
         return loss
     """
 
-    def prediction_loss(params, batch, f: float):
+    def prediction_loss(params, batch, f: float, alpha=1, beta=0):
         (mask, graph), (candidates, energies) = batch
         decoded_nodes = network.apply(params, graph)  # (B*2*N, 1)
         if np.shape(decoded_nodes)[0] % 2 == 1:
-            # print(np.shape(decoded_nodes))
-            # print(type(decoded_nodes))
             decoded_nodes = jnp.vstack((jnp.asarray(decoded_nodes), [[0]]))
-            # decoded_nodes = jnp.concatenate((jnp.asarray(decoded_nodes), [[0]]))
-            # print(np.shape(decoded_nodes))
             conc_decoded_nodes = jnp.reshape(decoded_nodes, (-1, 2))
             padded_conc_decoded_nodes = jnp.concatenate(
                 (
@@ -187,9 +184,6 @@ def train(
                     np.zeros(np.shape(conc_decoded_nodes)),
                 )
             )[:-1, :]
-            # padded_conc_decoded_nodes = jnp.concatenate(
-            #    (jnp.asarray(conc_decoded_nodes), jnp.asarray(conc_decoded_nodes))
-            # )[:-1, :]
         else:
             conc_decoded_nodes = jnp.reshape(decoded_nodes, (-1, 2))
             padded_conc_decoded_nodes = jnp.concatenate(
@@ -199,8 +193,10 @@ def train(
         log_prob = vmap_compute_log_probs(padded_conc_decoded_nodes, mask, candidates)
         weights = jax.nn.softmax(-f * energies)
         loss = -jnp.sum(weights * jnp.sum(log_prob, axis=-1)) / jnp.sum(mask)  # ()
+        a = jax.nn.softmax(padded_conc_decoded_nodes) * mask[:, None]
+        loss_prob = jnp.sum(abs(a[:, 0] - a[:, 1])) / jnp.sum(mask)
         # jax.debug.print("🤯 {x} 🤯", x=loss)
-        return loss
+        return alpha * loss + beta * loss_prob
 
     print("Entering training loop")
 
@@ -220,6 +216,7 @@ def train(
     def evaluate_moser_rust(data_subset, mode_probabilities="model"):
 
         av_energies = []
+        av_entropies = []
 
         for idx in data_subset.indices:
             problem_path = sat_data.instances[idx].name + ".cnf"
@@ -238,13 +235,26 @@ def train(
             )
             _, m, _ = problem.params
             av_energies.append(np.mean(final_energies) / m)
+            prob = np.vstack(
+                (
+                    np.ones(model_probabilities.shape[0]) - model_probabilities,
+                    model_probabilities,
+                )
+            )
+            entropies = [
+                entropy(prob[:, i], qk=None, base=2, axis=0)
+                for i in range(np.shape(prob)[1])
+            ]
+            av_entropies.append(np.mean(entropies))
 
-        return np.mean(av_energies)
+        return np.mean(av_energies), np.mean(av_entropies)
 
-    moser_baseline_test = evaluate_moser_rust(test_data, mode_probabilities="uniform")
+    moser_baseline_test = evaluate_moser_rust(test_data, mode_probabilities="uniform")[
+        0
+    ]
     moser_baseline_train = evaluate_moser_rust(
         train_eval_data, mode_probabilities="uniform"
-    )
+    )[0]
 
     test_eval = EvalResults("Test loss", [], True)
     train_eval = EvalResults("Train loss", [], True)
@@ -252,6 +262,8 @@ def train(
     train_moser_eval = EvalResults("Moser loss - train", [], False)
     test_baseline_moser_eval = EvalResults("uniform Moser loss - test", [], False)
     train_baseline_moser_eval = EvalResults("uniform Moser loss - train", [], False)
+    test_entropy_eval = EvalResults("mean entropy - test", [], False)
+    train_entropy_eval = EvalResults("mean entropy - train", [], False)
     eval_objects = [
         test_eval,
         train_eval,
@@ -259,6 +271,8 @@ def train(
         train_moser_eval,
         test_baseline_moser_eval,
         train_baseline_moser_eval,
+        test_entropy_eval,
+        train_entropy_eval,
     ]
 
     for epoch in range(NUM_EPOCHS):
@@ -270,13 +284,17 @@ def train(
         epoch_time = time.time() - start_time
 
         # print("Epoch {} in {:0.2f} sec".format(epoch, epoch_time))
-
+        test_moser_energies, test_entropies = evaluate_moser_rust(test_data)
+        train_moser_energies, train_entropies = evaluate_moser_rust(train_eval_data)
         test_eval.results.append(evaluate(test_loader))
         train_eval.results.append(evaluate(train_eval_loader))
-        test_moser_eval.results.append(evaluate_moser_rust(test_data))
-        train_moser_eval.results.append(evaluate_moser_rust(train_eval_data))
+        test_moser_eval.results.append(test_moser_energies)
+        train_moser_eval.results.append(train_moser_energies)
         train_baseline_moser_eval.results.append(moser_baseline_train)
         test_baseline_moser_eval.results.append(moser_baseline_test)
+        test_entropy_eval.results.append(test_entropies)
+        train_entropy_eval.results.append(train_entropies)
+
         loss_str = "Epoch {} in {:0.2f} sec".format(epoch, epoch_time) + ";  "
         for eval_result in eval_objects:
             loss_str = (

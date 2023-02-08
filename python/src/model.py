@@ -9,6 +9,7 @@ from typing import Callable
 import jax
 import jax.numpy as jnp
 import jax.tree_util as tree
+import numpy as np
 
 
 def network_definition_interaction(
@@ -236,6 +237,15 @@ def get_model_probabilities(network, params, problem):
     right column of the softmax of the model output equals the models likelihood for setting variables to 1, which is
     what we seek.
     """
+    mode = "LCG"
     n, _, _ = problem.params
     decoded_nodes = network.apply(params, problem.graph)
-    return jax.nn.softmax(decoded_nodes)[:n, 1]
+    if mode == "VCG":
+        return jax.nn.softmax(decoded_nodes)[:n, 1]
+    if mode == "LCG":
+        if np.shape(decoded_nodes)[0] % 2 == 1:
+            decoded_nodes = jnp.vstack((jnp.asarray(decoded_nodes), [[0]]))
+            conc_decoded_nodes = jnp.reshape(decoded_nodes, (-1, 2))
+        else:
+            conc_decoded_nodes = jnp.reshape(decoded_nodes, (-1, 2))
+        return jax.nn.softmax(conc_decoded_nodes)[:n, 1]
