@@ -1,6 +1,7 @@
-# import sys
-# sys.path.append('../../../')
-# print(sys.path)
+import sys
+
+sys.path.append("../../")
+print(sys.path)
 
 import collections
 
@@ -14,15 +15,22 @@ from torch.utils import data
 import matplotlib.pyplot as plt
 import pandas as pd
 import moser_rust
-from data_utils import SATTrainingDataset, JraphDataLoader
-from model import network_definition, get_model_probabilities
-from random_walk import moser_walk
+from python.src.data_utils import SATTrainingDataset, JraphDataLoader
+from python.src.model import (
+    network_definition_interaction,
+    network_definition_GCN,
+    get_model_probabilities,
+)
+from python.src.random_walk import moser_walk
 import mlflow
 from pathlib import Path
 import tempfile
 import joblib
+from jraph._src import utils
+import jraph
+from jax.experimental.sparse import BCOO
 
-NUM_EPOCHS = 2  # 10
+NUM_EPOCHS = 500  # 10
 f = 0.1
 batch_size = 2
 path = "../Data/blocksworld"
@@ -105,6 +113,7 @@ def train(
     model_path=False,
     experiment_tracking=False,
 ):
+    network_definition = network_definition_interaction
     sat_data = SATTrainingDataset(path)
 
     train_data, test_data = data.random_split(sat_data, [0.8, 0.2])
@@ -127,6 +136,73 @@ def train(
 
         updates, opt_state = opt_update(g, opt_state)
         return optax.apply_updates(params, updates), opt_state
+
+    def local_lovasz_loss(params, batch):
+        """
+        This assumes that the output of the graph at this point is 2 dimensional
+        """
+        (mask, graph), (candidates, energies) = batch
+        decoded_nodes = network.apply(params, graph)  # (B*N, 2)
+        log_probs = jax.nn.log_softmax(
+            decoded_nodes
+        )  # the log probs for each node (variable and constraint) # (B*N, 2)
+        # TODO: Check that there is no problem with graph padding and the mask for the constraints
+
+        receivers = graph.receivers
+        senders = graph.senders
+        edges = graph.edges
+        nodes = graph.nodes
+
+        # calculate the probability of a constraint being violated by summing the varaible node probs according to the violated string
+        relevant_log_probs = log_probs[graph.senders][graph.edges]
+        constraint_log_probs = utils.segment_sum(
+            relevant_log_probs, graph.receivers, num_segments=m
+        )
+
+        # calculate RHS of inequalities:
+
+        # First calculate the two hop edge information
+        e = len(edges)
+        n = graph.n_node
+        adjacency_matrix = BCOO(
+            (
+                np.ones(e),
+                np.column_stack((graph.senders, graph.receivers)),
+            ),
+            shape=(n, n),
+        )
+        # two hop adjacency matrix with values indicating number of paths.
+        adj_squared = adjacency_matrix @ adjacency_matrix
+        induced_indices = adj_squared.indices
+        constraint_senders, constraint_receivers = zip(*induced_indices)
+
+        rhs_sums = utils.segment_sum(
+            nodes[constraint_senders], constraint_receivers, num_segments=n
+        )
+
+        rhs_values = rhs_sums[:1] + log_probs[nodes]
+
+        def RelativeEntropy(A, B):
+            return jnp.sum(jnp.where(B != 0, A * jnp.log(A / B), 0))
+
+        # TODO: probably we'll have to do some masking at this last stage
+        # TODO: Dealing with batching
+
+        return RelativeEntropy(lhs, rhs)
+
+        # for this we need to find out which constraints share a variable
+        constraint_senders = []  # a list of the length of edges in the constraint graph
+        constraint_receivers = (
+            []
+        )  # a list of the length of edges in the constraint graph
+
+        # (for every receiver in the original,
+
+        receivers[senders]  # the ith element here is th
+
+        constraint_graph = jraph.GraphsTuple(n_node=m, senders=[])
+        # then, we want to sum the relevant bits.
+        utils.segment_sum()
 
     def prediction_loss(params, batch, f: float):
         (mask, graph), (candidates, energies) = batch
@@ -177,8 +253,8 @@ def train(
 
     test_eval = EvalResults("Test loss", [], True)
     train_eval = EvalResults("Train loss", [], True)
-    test_moser_eval = EvalResults("Moser loss", [], True)
-    train_moser_eval = EvalResults("Moser loss (train)", [])
+    test_moser_eval = EvalResults("Moser loss - test", [], True)
+    train_moser_eval = EvalResults("Moser loss - train", [], True)
     eval_objects = [test_eval, train_eval, test_moser_eval, train_moser_eval]
 
     for epoch in range(NUM_EPOCHS):
@@ -205,9 +281,13 @@ def train(
             if experiment_tracking == True:
                 mlflow.log_metric(eval_result.name, eval_result.results[-1], step=epoch)
         print(loss_str)
+
     if img_path:
         plot_accuracy_fig(*eval_objects)
-        plt.savefig(img_path + "accuracy.jpg", dpi=300, format="jpg")
+        if img_path == "show":
+            plt.show()
+        else:
+            plt.savefig(img_path + "accuracy.jpg", dpi=300, format="jpg")
 
     if model_path:
         model_params = [params, batch_size, f, NUM_EPOCHS]
@@ -277,7 +357,7 @@ if __name__ == "__main__":
         N_STEPS_MOSER,
         N_RUNS_MOSER,
         path,
-        img_path=False,
+        img_path="show",
         model_path=False,
         experiment_tracking=False,
     )
