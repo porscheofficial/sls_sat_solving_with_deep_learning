@@ -19,12 +19,18 @@ import pandas as pd
 import moser_rust
 from data_utils import SATTrainingDataset_LCG, SATTrainingDataset_VCG, JraphDataLoader
 from model import (
+    get_network_definition,
+    get_model_probabilities,
+)
+
+"""   
     network_definition_interaction,
     network_definition_interaction_single_output,
     network_definition_GCN,
     network_definition_GCN_single_output,
-    get_model_probabilities,
-)
+    network_definition_interaction_new,
+"""
+
 from random_walk import moser_walk
 import mlflow
 from pathlib import Path
@@ -40,8 +46,10 @@ path = "../Data/blocksworld"
 N_STEPS_MOSER = 1000
 N_RUNS_MOSER = 2
 SEED = 0
-network_definition = network_definition_GCN_single_output
-mode = "VCG"
+graph_representation = "VCG"
+network_type = "interaction"
+# network_definition = get_network_definition(network_type = network_type, graph_representation = graph_representation) #network_definition_interaction_new
+
 
 MODEL_REGISTRY = Path("mlrun")
 EXPERIMENT_NAME = "mlflow-blocksat_interaction_LCG"
@@ -69,18 +77,6 @@ vmap_compute_log_probs = jax.vmap(
 )
 
 
-"""
-def compute_log_probs(decoded_nodes, mask, candidate):
-    a = jax.nn.log_softmax(decoded_nodes) * mask[:, None]
-    return candidate * a
-
-
-vmap_compute_log_probs = jax.vmap(
-    compute_log_probs, in_axes=(None, None, 1), out_axes=1
-)
-"""
-
-
 def evaluate_on_moser(
     network,
     params,
@@ -88,7 +84,9 @@ def evaluate_on_moser(
     n_steps,
     keep_trajectory=False,
 ):
-    model_probabilities = get_model_probabilities(network, params, problem, mode)
+    model_probabilities = get_model_probabilities(
+        network, params, problem, graph_representation
+    )
     _, energy, _ = moser_walk(
         model_probabilities, problem, n_steps, seed=0, keep_trajectory=keep_trajectory
     )
@@ -131,12 +129,13 @@ def train(
     img_path=False,
     model_path=False,
     experiment_tracking=False,
-    network_definition=network_definition_interaction,
-    mode="LCG",
+    graph_representation="LCG",
+    network_type="interaction",
 ):
-    if mode == "LCG":
+
+    if graph_representation == "LCG":
         sat_data = SATTrainingDataset_LCG(path)
-    if mode == "VCG":
+    if graph_representation == "VCG":
         sat_data = SATTrainingDataset_VCG(path)
 
     train_data, test_data = data.random_split(
@@ -150,6 +149,9 @@ def train(
     test_loader = JraphDataLoader(test_data, batch_size=batch_size)
     train_eval_loader = JraphDataLoader(train_eval_data, batch_size=batch_size)
 
+    network_definition = get_network_definition(
+        network_type=network_type, graph_representation=graph_representation
+    )
     network = hk.without_apply_rng(hk.transform(network_definition))
     params = network.init(jax.random.PRNGKey(42), sat_data[0][0].graph)
 
@@ -157,83 +159,54 @@ def train(
     opt_state = opt_init(params)
 
     @jax.jit
-    def update_LCG(params, opt_state, batch, f):
-
-        g = jax.grad(prediction_loss_LCG)(params, batch, f)
-
+    def update(params, opt_state, batch, f):
+        g = jax.grad(prediction_loss)(params, batch, f)
         updates, opt_state = opt_update(g, opt_state)
         return optax.apply_updates(params, updates), opt_state
 
-    @jax.jit
-    def update_VCG(params, opt_state, batch, f):
-
-        g = jax.grad(prediction_loss_VCG)(params, batch, f)
-
-        updates, opt_state = opt_update(g, opt_state)
-        return optax.apply_updates(params, updates), opt_state
-
-    """
     def prediction_loss(params, batch, f: float):
         (mask, graph), (candidates, energies) = batch
-        decoded_nodes = network.apply(params, graph)  # (B*N, 2)
-        candidates = vmap_one_hot(candidates, 2)  # (B*N, K, 2))
-        log_prob = vmap_compute_log_probs(
-            decoded_nodes, mask, candidates
-        )  # (B*N, K, 2)
-        weights = jax.nn.softmax(-f * energies)  # (B*N, K)
-        loss = -jnp.sum(weights * jnp.sum(log_prob, axis=-1))  # ()
-        # jax.debug.print("🤯 {x} 🤯", x=loss)
-        return loss
-    """
-
-    def prediction_loss_LCG(params, batch, f: float, alpha=1, beta=0):
-        (mask, graph), (candidates, energies) = batch
         decoded_nodes = network.apply(params, graph)  # (B*2*N, 1)
-        if np.shape(decoded_nodes)[0] % 2 == 1:
-            decoded_nodes = jnp.vstack((jnp.asarray(decoded_nodes), [[0]]))
-            conc_decoded_nodes = jnp.reshape(decoded_nodes, (-1, 2))
-            padded_conc_decoded_nodes = jnp.concatenate(
-                (
-                    jnp.asarray(conc_decoded_nodes),
-                    np.zeros(np.shape(conc_decoded_nodes)),
-                )
-            )[:-1, :]
-        else:
-            conc_decoded_nodes = jnp.reshape(decoded_nodes, (-1, 2))
-            padded_conc_decoded_nodes = jnp.concatenate(
-                (conc_decoded_nodes, conc_decoded_nodes)
-            )
-        candidates = vmap_one_hot(candidates, 2)
-        log_prob = vmap_compute_log_probs(padded_conc_decoded_nodes, mask, candidates)
-        weights = jax.nn.softmax(-f * energies)
-        loss = -jnp.sum(weights * jnp.sum(log_prob, axis=-1)) / jnp.sum(mask)  # ()
-        if beta != 0:
-            a = jax.nn.softmax(padded_conc_decoded_nodes) * mask[:, None]
-            loss_prob = jnp.sum(abs(a[:, 0] - a[:, 1])) / jnp.sum(mask)
-            # jax.debug.print("🤯 {x} 🤯", x=loss)
-            return alpha * loss + beta * loss_prob
-        else:
-            return alpha * loss
 
-    def prediction_loss_VCG(params, batch, f: float):
-        (mask, graph), (candidates, energies) = batch
-        decoded_nodes = network.apply(params, graph)  # (B*N, 2)
-        candidates = vmap_one_hot(candidates, 2)  # (B*N, K, 2))
+        if graph_representation == "LCG":
+            if np.shape(decoded_nodes)[0] % 2 == 1:
+                decoded_nodes = jnp.vstack((jnp.asarray(decoded_nodes), [[0]]))
+                conc_decoded_nodes = jnp.reshape(decoded_nodes, (-1, 2))
+                padded_conc_decoded_nodes = jnp.concatenate(
+                    (
+                        jnp.asarray(conc_decoded_nodes),
+                        np.zeros(np.shape(conc_decoded_nodes)),
+                    )
+                )[:-1, :]
+            else:
+                conc_decoded_nodes = jnp.reshape(decoded_nodes, (-1, 2))
+                padded_conc_decoded_nodes = jnp.concatenate(
+                    (conc_decoded_nodes, conc_decoded_nodes)
+                )
+            decoded_nodes = padded_conc_decoded_nodes
+            candidates = vmap_one_hot(candidates, 2)
+
+        elif graph_representation == "VCG":
+            candidates = vmap_one_hot(candidates, 2)  # (B*N, K, 2))
+
+        else:
+            print("please use a alid graph representation")
+
         log_prob = vmap_compute_log_probs(
             decoded_nodes, mask, candidates
         )  # (B*N, K, 2)
         weights = jax.nn.softmax(-f * energies)  # (B*N, K)
         loss = -jnp.sum(weights * jnp.sum(log_prob, axis=-1)) / jnp.sum(mask)  # ()
-        # jax.debug.print("🤯 {x} 🤯", x=loss)
         return loss
 
     print("Entering training loop")
 
-    def evaluate(loader, mode):
-        if mode == "LCG":
-            return np.mean([prediction_loss_LCG(params, b, f) for b in loader])
-        if mode == "VCG":
-            return np.mean([prediction_loss_VCG(params, b, f) for b in loader])
+    def evaluate(loader, graph_representation):
+        # if mode == "LCG":
+        #    return np.mean([prediction_loss(params, b, f, graph_representation) for b in loader])
+        # if mode == "VCG":
+        #    return np.mean([prediction_loss(params, b, f, graph_representation) for b in loader])
+        return np.mean([prediction_loss(params, b, f) for b in loader])
 
     def evaluate_moser_jax(data_subset):
         return np.mean(
@@ -284,10 +257,10 @@ def train(
         return (np.mean(av_energies), np.mean(av_entropies))
 
     moser_baseline_test = evaluate_moser_rust(
-        test_data, mode_probabilities="uniform", mode=mode
+        test_data, mode_probabilities="uniform", mode=graph_representation
     )[0]
     moser_baseline_train = evaluate_moser_rust(
-        train_eval_data, mode_probabilities="uniform", mode=mode
+        train_eval_data, mode_probabilities="uniform", mode=graph_representation
     )[0]
 
     test_eval = EvalResults("Test loss", [], True)
@@ -313,20 +286,23 @@ def train(
         start_time = time.time()
         for counter, batch in enumerate(train_loader):
             # print("batch_number", counter)
-            if mode == "LCG":
-                params, opt_state = update_LCG(params, opt_state, batch, f)
-            if mode == "VCG:":
-                params, opt_state = update_VCG(params, opt_state, batch, f)
+            # if graph_representation == "LCG":
+            #    params, opt_state = update_LCG(params, opt_state, batch, f)
+            # if graph_representation == "VCG:":
+            #   params, opt_state = update_VCG(params, opt_state, batch, f)
+            params, opt_state = update(params, opt_state, batch, f)
 
         epoch_time = time.time() - start_time
 
         # print("Epoch {} in {:0.2f} sec".format(epoch, epoch_time))
-        test_moser_energies, test_entropies = evaluate_moser_rust(test_data, mode=mode)
-        train_moser_energies, train_entropies = evaluate_moser_rust(
-            train_eval_data, mode=mode
+        test_moser_energies, test_entropies = evaluate_moser_rust(
+            test_data, mode=graph_representation
         )
-        test_eval.results.append(evaluate(test_loader, mode))
-        train_eval.results.append(evaluate(train_eval_loader, mode))
+        train_moser_energies, train_entropies = evaluate_moser_rust(
+            train_eval_data, mode=graph_representation
+        )
+        test_eval.results.append(evaluate(test_loader, graph_representation))
+        train_eval.results.append(evaluate(train_eval_loader, graph_representation))
         test_moser_eval.results.append(test_moser_energies)
         train_moser_eval.results.append(train_moser_energies)
         train_baseline_moser_eval.results.append(moser_baseline_train)
@@ -378,9 +354,12 @@ def experiment_tracking_train(
     path,
     img_path=False,
     model_path=False,
-    network_definition=network_definition_interaction,
-    mode="LCG",
+    graph_representation="LCG",
+    network_type="interaction",
 ):
+    network_definition = get_network_definition(
+        network_type=network_type, graph_representation=graph_representation
+    )
     Path(MODEL_REGISTRY).mkdir(exist_ok=True)  # create experiments dir
     mlflow.set_tracking_uri("file://" + str(MODEL_REGISTRY.absolute()))
     mlflow.set_experiment(EXPERIMENT_NAME)
@@ -395,7 +374,8 @@ def experiment_tracking_train(
                 "N_RUNS_MOSER": N_RUNS_MOSER,
                 "network_definition": network_definition.__name__,
                 "path_dataset": path,
-                "mode": mode,
+                "graph_representation": graph_representation,
+                "network_type": network_type,
             }
         )
         # train and evaluate
@@ -409,8 +389,8 @@ def experiment_tracking_train(
             img_path=img_path,
             model_path=model_path,
             experiment_tracking=True,
-            network_definition=network_definition,
-            mode=mode,
+            graph_representation=graph_representation,
+            network_type=network_type,
         )
         # log params which are a result of learning
         with tempfile.TemporaryDirectory() as dp:
@@ -430,6 +410,78 @@ if __name__ == "__main__":
         path,
         img_path="show",
         model_path=False,
-        network_definition=network_definition,
-        mode=mode,
+        graph_representation=graph_representation,
+        network_type=network_type,
     )
+
+
+"""
+    @jax.jit
+    def update_LCG(params, opt_state, batch, f):
+
+        g = jax.grad(prediction_loss_LCG)(params, batch, f)
+
+        updates, opt_state = opt_update(g, opt_state)
+        return optax.apply_updates(params, updates), opt_state
+
+    @jax.jit
+    def update_VCG(params, opt_state, batch, f):
+
+        g = jax.grad(prediction_loss_VCG)(params, batch, f)
+
+        updates, opt_state = opt_update(g, opt_state)
+        return optax.apply_updates(params, updates), opt_state
+
+    def prediction_loss(params, batch, f: float):
+        (mask, graph), (candidates, energies) = batch
+        decoded_nodes = network.apply(params, graph)  # (B*N, 2)
+        candidates = vmap_one_hot(candidates, 2)  # (B*N, K, 2))
+        log_prob = vmap_compute_log_probs(
+            decoded_nodes, mask, candidates
+        )  # (B*N, K, 2)
+        weights = jax.nn.softmax(-f * energies)  # (B*N, K)
+        loss = -jnp.sum(weights * jnp.sum(log_prob, axis=-1))  # ()
+        # jax.debug.print("🤯 {x} 🤯", x=loss)
+        return loss
+
+    def prediction_loss_LCG(params, batch, f: float, alpha=1, beta=0):
+        (mask, graph), (candidates, energies) = batch
+        decoded_nodes = network.apply(params, graph)  # (B*2*N, 1)
+        if np.shape(decoded_nodes)[0] % 2 == 1:
+            decoded_nodes = jnp.vstack((jnp.asarray(decoded_nodes), [[0]]))
+            conc_decoded_nodes = jnp.reshape(decoded_nodes, (-1, 2))
+            padded_conc_decoded_nodes = jnp.concatenate(
+                (
+                    jnp.asarray(conc_decoded_nodes),
+                    np.zeros(np.shape(conc_decoded_nodes)),
+                )
+            )[:-1, :]
+        else:
+            conc_decoded_nodes = jnp.reshape(decoded_nodes, (-1, 2))
+            padded_conc_decoded_nodes = jnp.concatenate(
+                (conc_decoded_nodes, conc_decoded_nodes)
+            )
+        candidates = vmap_one_hot(candidates, 2)
+        log_prob = vmap_compute_log_probs(padded_conc_decoded_nodes, mask, candidates)
+        weights = jax.nn.softmax(-f * energies)
+        loss = -jnp.sum(weights * jnp.sum(log_prob, axis=-1)) / jnp.sum(mask)  # ()
+        if beta != 0:
+            a = jax.nn.softmax(padded_conc_decoded_nodes) * mask[:, None]
+            loss_prob = jnp.sum(abs(a[:, 0] - a[:, 1])) / jnp.sum(mask)
+            # jax.debug.print("🤯 {x} 🤯", x=loss)
+            return alpha * loss + beta * loss_prob
+        else:
+            return alpha * loss
+
+    def prediction_loss_VCG(params, batch, f: float):
+        (mask, graph), (candidates, energies) = batch
+        decoded_nodes = network.apply(params, graph)  # (B*N, 2)
+        candidates = vmap_one_hot(candidates, 2)  # (B*N, K, 2))
+        log_prob = vmap_compute_log_probs(
+            decoded_nodes, mask, candidates
+        )  # (B*N, K, 2)
+        weights = jax.nn.softmax(-f * energies)  # (B*N, K)
+        loss = -jnp.sum(weights * jnp.sum(log_prob, axis=-1)) / jnp.sum(mask)  # ()
+        # jax.debug.print("🤯 {x} 🤯", x=loss)
+        return loss
+"""

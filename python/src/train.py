@@ -110,7 +110,7 @@ def train(
     model_path=False,
     experiment_tracking=False,
 ):
-    network_definition = network_definition_interaction(mode="test")
+    network_definition = network_definition_interaction
     sat_data = SATTrainingDataset(path)
 
     train_data, test_data = data.random_split(sat_data, [0.8, 0.2])
