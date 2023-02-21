@@ -40,7 +40,7 @@ path = "../Data/blocksworld"
 N_STEPS_MOSER = 1000
 N_RUNS_MOSER = 2
 SEED = 0
-network_definition = network_definition_interaction
+network_definition = network_definition_GCN_single_output
 mode = "VCG"
 
 MODEL_REGISTRY = Path("mlrun")
