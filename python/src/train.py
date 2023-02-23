@@ -15,13 +15,13 @@ from torch.utils import data
 import matplotlib.pyplot as plt
 import pandas as pd
 import moser_rust
-from python.src.data_utils import SATTrainingDataset, JraphDataLoader
-from python.src.model import (
+from data_utils import SATTrainingDataset, JraphDataLoader
+from model import (
     network_definition_interaction,
     network_definition_GCN,
     get_model_probabilities,
 )
-from python.src.random_walk import moser_walk
+from random_walk import moser_walk
 import mlflow
 from pathlib import Path
 import tempfile
@@ -132,7 +132,7 @@ def train(
     @jax.jit
     def update(params, opt_state, batch, f):
 
-        g = jax.grad(prediction_loss)(params, batch, f)
+        g = jax.grad(combined_loss)(params, batch, f)
 
         updates, opt_state = opt_update(g, opt_state)
         return optax.apply_updates(params, updates), opt_state
@@ -141,29 +141,27 @@ def train(
         """
         This assumes that the output of the graph at this point is 2 dimensional
         """
-        (mask, graph), (candidates, energies) = batch
+        (mask, graph), _ = batch
         decoded_nodes = network.apply(params, graph)  # (B*N, 2)
         log_probs = jax.nn.log_softmax(
             decoded_nodes
         )  # the log probs for each node (variable and constraint) # (B*N, 2)
-        # TODO: Check that there is no problem with graph padding and the mask for the constraints
+        e = len(graph.edges)
+        n = graph.n_node
 
-        receivers = graph.receivers
-        senders = graph.senders
-        edges = graph.edges
-        nodes = graph.nodes
+        constraint_node_mask = jnp.logical_not(mask)
 
         # calculate the probability of a constraint being violated by summing the varaible node probs according to the violated string
-        relevant_log_probs = log_probs[graph.senders][graph.edges]
-        constraint_log_probs = utils.segment_sum(
-            relevant_log_probs, graph.receivers, num_segments=m
+        relevant_log_probs = log_probs[graph.senders][jnp.arange(n), graph.edges]
+        convolved_log_probs = utils.segment_sum(
+            relevant_log_probs, graph.receivers, num_segments=n
         )
+
+        lhs_values = convolved_log_probs * constraint_node_mask
 
         # calculate RHS of inequalities:
 
         # First calculate the two hop edge information
-        e = len(edges)
-        n = graph.n_node
         adjacency_matrix = BCOO(
             (
                 np.ones(e),
@@ -171,38 +169,27 @@ def train(
             ),
             shape=(n, n),
         )
-        # two hop adjacency matrix with values indicating number of paths.
+        # two hop adjacency matrix with values indicating number of shared two hop paths.
         adj_squared = adjacency_matrix @ adjacency_matrix
         induced_indices = adj_squared.indices
-        constraint_senders, constraint_receivers = zip(*induced_indices)
+        constraint_senders = induced_indices[:, 0]
+        constraint_receivers = induced_indices[:, 1]
 
         rhs_sums = utils.segment_sum(
-            nodes[constraint_senders], constraint_receivers, num_segments=n
+            log_probs[constraint_senders], constraint_receivers, num_segments=n
         )
 
-        rhs_values = rhs_sums[:1] + log_probs[nodes]
+        rhs_values = rhs_sums[:, 1] + log_probs[:, 0]
+        rhs_values = rhs_values * constraint_node_mask
 
+        # using the relative entropy as proxy for max relative entropy for sake of differentiability
+        # (could move to 2-renyi divergence later or higher)
         def RelativeEntropy(A, B):
             return jnp.sum(jnp.where(B != 0, A * jnp.log(A / B), 0))
 
         # TODO: probably we'll have to do some masking at this last stage
         # TODO: Dealing with batching
-
-        return RelativeEntropy(lhs, rhs)
-
-        # for this we need to find out which constraints share a variable
-        constraint_senders = []  # a list of the length of edges in the constraint graph
-        constraint_receivers = (
-            []
-        )  # a list of the length of edges in the constraint graph
-
-        # (for every receiver in the original,
-
-        receivers[senders]  # the ith element here is th
-
-        constraint_graph = jraph.GraphsTuple(n_node=m, senders=[])
-        # then, we want to sum the relevant bits.
-        utils.segment_sum()
+        return RelativeEntropy(lhs_values, rhs_values)
 
     def prediction_loss(params, batch, f: float):
         (mask, graph), (candidates, energies) = batch
@@ -215,6 +202,11 @@ def train(
         loss = -jnp.sum(weights * jnp.sum(log_prob, axis=-1))  # ()
         # jax.debug.print("🤯 {x} 🤯", x=loss)
         return loss
+
+    def combined_loss(params, batch, f: float):
+        return local_lovasz_loss(
+            params, batch
+        )  # + prediction_loss(params, batch, f: float)
 
     print("Entering training loop")
 
