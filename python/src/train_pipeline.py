@@ -51,7 +51,7 @@ network_type = "interaction"
 # network_definition = get_network_definition(network_type = network_type, graph_representation = graph_representation) #network_definition_interaction_new
 
 
-MODEL_REGISTRY = Path("mlrun")
+MODEL_REGISTRY = Path("../mlrun")
 EXPERIMENT_NAME = "mlflow-blocksat_interaction_LCG"
 # EXPERIMENT_NAME = "mlflow-random_3SAT-medium-GCN-LCG"
 
