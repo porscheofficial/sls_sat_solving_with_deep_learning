@@ -147,31 +147,43 @@ def train(
             decoded_nodes
         )  # the log probs for each node (variable and constraint) # (B*N, 2)
         e = len(graph.edges)
-        n = graph.n_node
+        # n = graph.n_node
+        n = jnp.shape(decoded_nodes)[0]
 
-        constraint_node_mask = jnp.logical_not(mask)
+        constraint_node_mask = jnp.array(jnp.logical_not(mask), dtype=int)
 
         # calculate the probability of a constraint being violated by summing the varaible node probs according to the violated string
-        relevant_log_probs = log_probs[graph.senders][jnp.arange(n), graph.edges]
+        relevant_log_probs = jnp.sum(log_probs[graph.senders] * graph.edges, axis=1)
+        # relevant_log_probs = log_probs[graph.senders][jnp.arange(int(n)).astype(int), graph.edges[:, 1].astype(int)]
         convolved_log_probs = utils.segment_sum(
             relevant_log_probs, graph.receivers, num_segments=n
         )
 
         lhs_values = convolved_log_probs * constraint_node_mask
-
+        print(np.shape(lhs_values))
         # calculate RHS of inequalities:
 
         # First calculate the two hop edge information
+        print(np.shape(graph.senders))
         adjacency_matrix = BCOO(
             (
-                np.ones(e),
-                np.column_stack((graph.senders, graph.receivers)),
+                jnp.ones(e),
+                jnp.column_stack((graph.senders, graph.receivers)),
             ),
             shape=(n, n),
         )
+        print(adjacency_matrix.indices)
         # two hop adjacency matrix with values indicating number of shared two hop paths.
-        adj_squared = adjacency_matrix @ adjacency_matrix
+        # adj_squared = jnp.matmul(adjacency_matrix, adjacency_matrix)
+        adj_squared = jax.experimental.sparse.bcoo_multiply_sparse(
+            adjacency_matrix, adjacency_matrix
+        )
+
+        # TODO: Has to be continued! CUrrently super strange result!
+        print("adj**2", adj_squared.shape)
+        print("shape**2", adj_squared.shape[0] ** 2)
         induced_indices = adj_squared.indices
+        print(induced_indices.shape)
         constraint_senders = induced_indices[:, 0]
         constraint_receivers = induced_indices[:, 1]
 
@@ -189,6 +201,7 @@ def train(
 
         # TODO: probably we'll have to do some masking at this last stage
         # TODO: Dealing with batching
+
         return RelativeEntropy(lhs_values, rhs_values)
 
     def prediction_loss(params, batch, f: float):
