@@ -33,7 +33,8 @@ from jax.experimental.sparse import BCOO
 NUM_EPOCHS = 500  # 10
 f = 0.1
 batch_size = 2
-path = "../Data/blocksworld"
+# path = "../Data/blocksworld"
+path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/generateSAT/samples_small"
 N_STEPS_MOSER = 1000
 N_RUNS_MOSER = 2
 SEED = 0
@@ -129,9 +130,9 @@ def train(
     opt_init, opt_update = optax.adam(1e-3)
     opt_state = opt_init(params)
 
-    @jax.jit
+    # @jax.jit
     def update(params, opt_state, batch, f):
-
+        # g = jax.grad(local_lovasz_loss)(params, batch)
         g = jax.grad(combined_loss)(params, batch, f)
 
         updates, opt_state = opt_update(g, opt_state)
@@ -160,37 +161,29 @@ def train(
         )
 
         lhs_values = convolved_log_probs * constraint_node_mask
-        print(np.shape(lhs_values))
         # calculate RHS of inequalities:
 
         # First calculate the two hop edge information
-        print(np.shape(graph.senders))
         adjacency_matrix = BCOO(
             (
                 jnp.ones(e),
                 jnp.column_stack((graph.senders, graph.receivers)),
             ),
             shape=(n, n),
+            unique_indices=True,
         )
-        print(adjacency_matrix.indices)
         # two hop adjacency matrix with values indicating number of shared two hop paths.
         # adj_squared = jnp.matmul(adjacency_matrix, adjacency_matrix)
         adj_squared = jax.experimental.sparse.bcoo_multiply_sparse(
             adjacency_matrix, adjacency_matrix
         )
-
-        # TODO: Has to be continued! CUrrently super strange result!
-        print("adj**2", adj_squared.shape)
-        print("shape**2", adj_squared.shape[0] ** 2)
-        induced_indices = adj_squared.indices
-        print(induced_indices.shape)
+        induced_indices = adj_squared.indices[adj_squared.data != 0]
         constraint_senders = induced_indices[:, 0]
         constraint_receivers = induced_indices[:, 1]
 
         rhs_sums = utils.segment_sum(
             log_probs[constraint_senders], constraint_receivers, num_segments=n
         )
-
         rhs_values = rhs_sums[:, 1] + log_probs[:, 0]
         rhs_values = rhs_values * constraint_node_mask
 
@@ -202,6 +195,7 @@ def train(
         # TODO: probably we'll have to do some masking at this last stage
         # TODO: Dealing with batching
 
+        # return RelativeEntropy(np.exp(lhs_values), np.exp(rhs_values))
         return RelativeEntropy(lhs_values, rhs_values)
 
     def prediction_loss(params, batch, f: float):
@@ -217,9 +211,7 @@ def train(
         return loss
 
     def combined_loss(params, batch, f: float):
-        return local_lovasz_loss(
-            params, batch
-        )  # + prediction_loss(params, batch, f: float)
+        return prediction_loss(params, batch, f) + local_lovasz_loss(params, batch)
 
     print("Entering training loop")
 

@@ -230,7 +230,7 @@ def network_definition_GCN_single_output(
     return hk.Linear(1)(graph.nodes)
 
 
-def get_model_probabilities(network, params, problem, mode):
+def get_model_probabilities(network, params, problem):
     """
     Helper method that returns, for each, problem variable, the Bernoulli parameter of the model for this variable.
     That is, the ith value of the returned array is the probability with which the model will assign 1 to the
@@ -244,15 +244,13 @@ def get_model_probabilities(network, params, problem, mode):
     right column of the softmax of the model output equals the models likelihood for setting variables to 1, which is
     what we seek.
     """
-    # mode = "LCG"
     n, _, _ = problem.params
     decoded_nodes = network.apply(params, problem.graph)
-    if mode == "VCG":
-        return jax.nn.softmax(decoded_nodes)[:n, 1]
-    if mode == "LCG":
-        if np.shape(decoded_nodes)[0] % 2 == 1:
-            decoded_nodes = jnp.vstack((jnp.asarray(decoded_nodes), [[0]]))
-            conc_decoded_nodes = jnp.reshape(decoded_nodes, (-1, 2))
-        else:
-            conc_decoded_nodes = jnp.reshape(decoded_nodes, (-1, 2))
-        return jax.nn.softmax(conc_decoded_nodes)[:n, 1]
+    # if mode == "LCG":
+    #    if np.shape(decoded_nodes)[0] % 2 == 1:
+    #        decoded_nodes = jnp.vstack((jnp.asarray(decoded_nodes), [[0]]))
+    #        conc_decoded_nodes = jnp.reshape(decoded_nodes, (-1, 2))
+    #      conc_decoded_nodes = jnp.reshape(decoded_nodes, (-1, 2))
+    #    return jax.nn.softmax(conc_decoded_nodes)[:n, 1]
+    # if mode == "VCG":
+    return jax.nn.softmax(decoded_nodes)[:n, 1]
