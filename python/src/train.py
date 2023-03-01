@@ -29,6 +29,7 @@ import joblib
 from jraph._src import utils
 import jraph
 from jax.experimental.sparse import BCOO
+from pysat.formula import CNF
 
 NUM_EPOCHS = 500  # 10
 f = 0.1
@@ -211,7 +212,7 @@ def train(
         return loss
 
     def combined_loss(params, batch, f: float):
-        return prediction_loss(params, batch, f) + local_lovasz_loss(params, batch)
+        return prediction_loss(params, batch, f)  # + local_lovasz_loss(params, batch)
 
     print("Entering training loop")
 
