@@ -1,7 +1,6 @@
 import sys
 
 sys.path.append("../../")
-print(sys.path)
 
 import collections
 
@@ -34,8 +33,8 @@ from pysat.formula import CNF
 NUM_EPOCHS = 500  # 10
 f = 0.1
 batch_size = 2
-# path = "../Data/blocksworld"
-path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/generateSAT/samples_small"
+path = "../Data/blocksworld"
+# path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/generateSAT/samples_small"
 N_STEPS_MOSER = 1000
 N_RUNS_MOSER = 2
 SEED = 0
@@ -133,8 +132,8 @@ def train(
 
     # @jax.jit
     def update(params, opt_state, batch, f):
-        # g = jax.grad(local_lovasz_loss)(params, batch)
-        g = jax.grad(combined_loss)(params, batch, f)
+        g = jax.grad(local_lovasz_loss)(params, batch)
+        # {[“g = jax.grad(combined_loss)(params, batch, f)
 
         updates, opt_state = opt_update(g, opt_state)
         return optax.apply_updates(params, updates), opt_state
@@ -165,6 +164,7 @@ def train(
         # calculate RHS of inequalities:
 
         # First calculate the two hop edge information
+        """
         adjacency_matrix = BCOO(
             (
                 jnp.ones(e),
@@ -173,6 +173,7 @@ def train(
             shape=(n, n),
             unique_indices=True,
         )
+
         # two hop adjacency matrix with values indicating number of shared two hop paths.
         # adj_squared = jnp.matmul(adjacency_matrix, adjacency_matrix)
         adj_squared = jax.experimental.sparse.bcoo_multiply_sparse(
@@ -187,7 +188,101 @@ def train(
         )
         rhs_values = rhs_sums[:, 1] + log_probs[:, 0]
         rhs_values = rhs_values * constraint_node_mask
+        """
+        edges = graph.edges[:, 0] - graph.edges[:, 1]
+        adjacency_matrix = BCOO(
+            (
+                edges,
+                jnp.column_stack((graph.receivers, graph.senders)),
+            ),
+            shape=(n, n),
+            unique_indices=True,
+        )
+        adjacency_matrix = adjacency_matrix.todense()
 
+        def get_neighborhood(matrix, conflicting_only=False):
+            occurencies_matrix = abs(matrix)
+            neighbors_indices_list = []
+
+            for i in range(jnp.shape(occurencies_matrix)[1]):
+                target = matrix[:, i][:, None]
+
+                if conflicting_only == False:
+                    a = jnp.where(
+                        jnp.sum(occurencies_matrix[:, 0:i] * abs(target), axis=0) != 0,
+                        1,
+                        0,
+                    )
+                    b = jnp.where(
+                        jnp.sum(
+                            occurencies_matrix[
+                                :, i + 1 : jnp.shape(occurencies_matrix)[1]
+                            ]
+                            * abs(target),
+                            axis=0,
+                        )
+                        != 0,
+                        1,
+                        0,
+                    )
+                if conflicting_only == True:
+                    a = jnp.where(
+                        jnp.sum(
+                            (
+                                (occurencies_matrix[:, 0:i] * abs(target))
+                                - (matrix[:, 0:i] * target)
+                            )
+                            / 2,
+                            axis=0,
+                        )
+                        != 0,
+                        1,
+                        0,
+                    )
+                    b = jnp.where(
+                        jnp.sum(
+                            (
+                                (
+                                    occurencies_matrix[
+                                        :, i + 1 : jnp.shape(occurencies_matrix)[1]
+                                    ]
+                                    * abs(target)
+                                )
+                                - (
+                                    matrix[:, i + 1 : jnp.shape(occurencies_matrix)[1]]
+                                    * target
+                                )
+                            )
+                            / 2,
+                            axis=0,
+                        )
+                        != 0,
+                        1,
+                        0,
+                    )
+
+                a = jnp.hstack((a, [0]))
+                remainder = jnp.hstack((a, b))
+                neighbors_indices = jnp.argwhere(remainder != 0).transpose()[0]
+                # if len(neighbors_indices) != 0:
+                neighbors_indices_list.append(neighbors_indices)
+            return neighbors_indices_list
+
+        neighbors_list = get_neighborhood(
+            adjacency_matrix, conflicting_only=False
+        )  # this could be pre-computed and loaded for every problem / graph...
+
+        def get_rhs_for_neighborhood(neighbors):
+            rhs_single = jnp.sum(
+                jnp.array([log_probs[neighbor, 1] for neighbor in neighbors]), axis=0
+            )
+            return rhs_single
+
+        rhs_values = jnp.array(get_rhs_for_neighborhood(neighbors_list[0]))[None]
+        for i in range(1, len(neighbors_list)):
+            a = jnp.array(get_rhs_for_neighborhood(neighbors_list[i]))[None]
+            rhs_values = jnp.append(rhs_values, a)
+        rhs_values += log_probs[:, 0]
         # using the relative entropy as proxy for max relative entropy for sake of differentiability
         # (could move to 2-renyi divergence later or higher)
         def RelativeEntropy(A, B):
@@ -212,7 +307,7 @@ def train(
         return loss
 
     def combined_loss(params, batch, f: float):
-        return prediction_loss(params, batch, f)  # + local_lovasz_loss(params, batch)
+        return prediction_loss(params, batch, f) + local_lovasz_loss(params, batch)
 
     print("Entering training loop")
 
