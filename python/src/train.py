@@ -33,7 +33,7 @@ from pysat.formula import CNF
 NUM_EPOCHS = 500  # 10
 f = 0.1
 batch_size = 2
-path = "../Data/blocksworld"
+path = "../../../Data/blocksworld"
 # path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/generateSAT/samples_small"
 N_STEPS_MOSER = 1000
 N_RUNS_MOSER = 2
@@ -116,7 +116,7 @@ def train(
 ):
     network_definition = network_definition_interaction
     sat_data = SATTrainingDataset(path)
-
+    print(sat_data[0][0])
     train_data, test_data = data.random_split(sat_data, [0.8, 0.2])
     train_eval_data, _ = data.random_split(train_data, [0.2, 0.8])
 
@@ -164,7 +164,7 @@ def train(
         # calculate RHS of inequalities:
 
         # First calculate the two hop edge information
-
+        """
         adjacency_matrix = BCOO(
             (
                 jnp.ones(e),
@@ -173,9 +173,10 @@ def train(
             shape=(n, n),
             unique_indices=True,
         )
-
+        
         # two hop adjacency matrix with values indicating number of shared two hop paths.
         # adj_squared = jnp.matmul(adjacency_matrix, adjacency_matrix)
+        
         adj_squared = jax.experimental.sparse.bcoo_multiply_sparse(
             adjacency_matrix, adjacency_matrix
         )
@@ -189,6 +190,28 @@ def train(
         rhs_values = rhs_sums[:, 1] + log_probs[:, 0]
         rhs_values = rhs_values * constraint_node_mask
         """
+        # PAUL'S IDEA:
+
+        # mask for all possible two hop paths between constraint nodes
+        shared_path_mask = jnp.tile(graph.senders, e) == jnp.repeat(graph.receivers, e)
+        print(shared_path_mask.shape)
+        # for each node, we sum the log probs for all shared incoming paths
+        # TODO: Still have to deal with double counting here
+        rhs_sums = utils.segment_sum(
+            data=jnp.where(
+                shared_path_mask,
+                log_probs[jnp.tile(graph.receivers, e)][:, 1],
+                0,
+            ),
+            segment_ids=jnp.repeat(graph.receivers, e),
+            num_segments=n,
+        )
+        print("rhs_sums", rhs_sums.shape)
+        rhs_values = rhs_sums[:, 1] + log_probs[:, 0]
+        rhs_values = rhs_values * constraint_node_mask
+        print(rhs_values.shape)
+        """
+        # IDEA MAX: no double-counting
         edges = graph.edges[:, 0] - graph.edges[:, 1]
         adjacency_matrix = BCOO(
             (
@@ -308,7 +331,7 @@ def train(
         return loss
 
     def combined_loss(params, batch, f: float):
-        return prediction_loss(params, batch, f) + local_lovasz_loss(params, batch)
+        return prediction_loss(params, batch, f)  # + local_lovasz_loss(params, batch)
 
     print("Entering training loop")
 
