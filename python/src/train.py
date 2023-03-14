@@ -164,7 +164,7 @@ def train(
         # calculate RHS of inequalities:
 
         # First calculate the two hop edge information
-        """
+
         adjacency_matrix = BCOO(
             (
                 jnp.ones(e),
@@ -283,6 +283,7 @@ def train(
             a = jnp.array(get_rhs_for_neighborhood(neighbors_list[i]))[None]
             rhs_values = jnp.append(rhs_values, a)
         rhs_values += log_probs[:, 0]
+        """
         # using the relative entropy as proxy for max relative entropy for sake of differentiability
         # (could move to 2-renyi divergence later or higher)
         def RelativeEntropy(A, B):
