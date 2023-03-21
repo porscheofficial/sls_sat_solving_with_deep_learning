@@ -29,9 +29,12 @@ from jraph._src import utils
 import jraph
 from jax.experimental.sparse import BCOO
 from pysat.formula import CNF
+from scipy.stats import entropy
 
-NUM_EPOCHS = 20  # 10
+NUM_EPOCHS = 10  # 10
 f = 0.01
+alpha = 0.05
+beta = 1
 batch_size = 1
 # path = "../Data/blocksworld"
 path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/generateSAT/samples_medium"
@@ -39,8 +42,8 @@ N_STEPS_MOSER = 100
 N_RUNS_MOSER = 2
 SEED = 0
 
-MODEL_REGISTRY = Path("experiment_tracking/experiments_storing")
-EXPERIMENT_NAME = "mlflow-demo2"
+MODEL_REGISTRY = Path("../../mlrun_save")
+EXPERIMENT_NAME = "samples_medium_interaction"
 
 
 #  AUXILIARY METHODS
@@ -134,9 +137,7 @@ def train(
 
     @jax.jit
     def update(params, opt_state, batch, f):
-        # g = jax.grad(local_lovasz_loss)(params, batch)
         g = jax.grad(combined_loss)(params, batch, f, alpha, beta)
-
         updates, opt_state = opt_update(g, opt_state)
         return optax.apply_updates(params, updates), opt_state
 
@@ -341,9 +342,9 @@ def train(
             decoded_nodes, mask, candidates
         )  # (B*N, K, 2)
         weights = jax.nn.softmax(-f * energies)  # (B*N, K)
-        loss = -jnp.sum(weights * jnp.sum(log_prob, axis=-1))  # ()
+        loss = -jnp.sum(weights * jnp.sum(log_prob, axis=-1)) / jnp.sum(mask)  # ()
         # jax.debug.print("🤯 {x} 🤯", x=loss)
-        return beta * loss
+        return alpha * loss
 
     def combined_loss(params, batch, f: float, alpha=1, beta=1):
         return alpha * prediction_loss(params, batch, f) + beta * local_lovasz_loss(
@@ -365,38 +366,70 @@ def train(
             ]
         )
 
-    def evaluate_moser_rust(data_subset):
+    def evaluate_moser_rust(data_subset, mode_probabilities="model"):
         av_energies = []
+        av_entropies = []
 
         for idx in data_subset.indices:
             problem_path = sat_data.instances[idx].name + ".cnf"
             problem = sat_data.get_unpadded_problem(idx)
-            model_probabilities = get_model_probabilities(network, params, problem)
+            if mode_probabilities == "uniform":
+                n, _, _ = problem.params
+                model_probabilities = np.ones(n) / 2
+            elif mode_probabilities == "model":
+                model_probabilities = get_model_probabilities(network, params, problem)
+            else:
+                print("not valid argument for mode_probabilities")
+            model_probabilities = model_probabilities.ravel()
+
             _, _, final_energies = moser_rust.run_moser_python(
-                problem_path,
-                model_probabilities.ravel(),
-                N_STEPS_MOSER,
-                N_RUNS_MOSER,
-                SEED,
+                problem_path, model_probabilities, N_STEPS_MOSER, N_RUNS_MOSER, SEED
             )
             _, m, _ = problem.params
             av_energies.append(np.mean(final_energies) / m)
+            prob = np.vstack(
+                (
+                    np.ones(model_probabilities.shape[0]) - model_probabilities,
+                    model_probabilities,
+                )
+            )
+            entropies = [
+                entropy(prob[:, i], qk=None, base=2, axis=0)
+                for i in range(np.shape(prob)[1])
+            ]
+            av_entropies.append(np.mean(entropies))
 
-        return np.mean(av_energies)
+        return (np.mean(av_energies), np.mean(av_entropies))
+
+    moser_baseline_test = evaluate_moser_rust(test_data, mode_probabilities="uniform")[
+        0
+    ]
+    moser_baseline_train = evaluate_moser_rust(
+        train_eval_data, mode_probabilities="uniform"
+    )[0]
 
     test_eval = EvalResults("Test loss", [], True)
     train_eval = EvalResults("Train loss", [], True)
     test_moser_eval = EvalResults("Moser loss - test", [], False)
     train_moser_eval = EvalResults("Moser loss - train", [], False)
+    test_moser_baseline = EvalResults("Moser loss uniform baseline - test", [], False)
+    train_moser_baseline = EvalResults("Moser loss uniform baseline - train", [], False)
+    test_entropy_eval = EvalResults("entropy of output prob distr - test", [], False)
+    train_entropy_eval = EvalResults("entropy of output prob distr - train", [], False)
     test_eval_lll = EvalResults("Test loss LLL", [], True)
     train_eval_lll = EvalResults("Train loss LLL", [], True)
     test_eval_dm = EvalResults("Test loss Deepmind", [], True)
     train_eval_dm = EvalResults("Train loss Deepmind", [], True)
+
     eval_objects = [
         test_eval,
         train_eval,
         test_moser_eval,
         train_moser_eval,
+        test_entropy_eval,
+        train_moser_baseline,
+        test_moser_baseline,
+        train_entropy_eval,
         test_eval_lll,
         train_eval_lll,
         test_eval_dm,
@@ -411,16 +444,32 @@ def train(
 
         epoch_time = time.time() - start_time
 
-        # print("Epoch {} in {:0.2f} sec".format(epoch, epoch_time))
+        test_LLL_loss = evaluate(test_loader, local_lovasz_loss)
+        train_LLL_loss = evaluate(train_eval_loader, local_lovasz_loss)
+        test_pred_loss = evaluate(test_loader, prediction_loss)
+        train_pred_loss = evaluate(train_eval_loader, prediction_loss)
 
-        test_eval.results.append(evaluate(test_loader, combined_loss))
-        train_eval.results.append(evaluate(train_eval_loader, combined_loss))
-        test_eval_lll.results.append(evaluate(test_loader, local_lovasz_loss))
-        train_eval_lll.results.append(evaluate(train_eval_loader, local_lovasz_loss))
-        test_eval_dm.results.append(evaluate(test_loader, prediction_loss))
-        train_eval_dm.results.append(evaluate(train_eval_loader, prediction_loss))
-        test_moser_eval.results.append(evaluate_moser_rust(test_data))
-        train_moser_eval.results.append(evaluate_moser_rust(train_eval_data))
+        test_eval.results.append(test_LLL_loss + test_pred_loss)
+        train_eval.results.append(train_LLL_loss + train_pred_loss)
+        test_eval_lll.results.append(test_LLL_loss)
+        train_eval_lll.results.append(train_LLL_loss)
+        test_eval_dm.results.append(test_pred_loss)
+        train_eval_dm.results.append(train_pred_loss)
+
+        test_moser_energies, test_entropies = evaluate_moser_rust(
+            test_data,
+        )
+        train_moser_energies, train_entropies = evaluate_moser_rust(
+            train_eval_data,
+        )
+
+        test_moser_eval.results.append(test_moser_energies)
+        train_moser_eval.results.append(train_moser_energies)
+        test_entropy_eval.results.append(test_entropies)
+        train_entropy_eval.results.append(train_entropies)
+        test_moser_baseline.results.append(moser_baseline_test)
+        train_moser_baseline.results.append(moser_baseline_train)
+
         loss_str = "Epoch {} in {:0.2f} sec".format(epoch, epoch_time) + ";  "
         for eval_result in eval_objects:
             loss_str = (
@@ -434,7 +483,7 @@ def train(
 
     if img_path:
         plot_accuracy_fig(*eval_objects)
-        if img_path == "show":
+        if img_path == False:
             plt.show()
         else:
             plt.savefig(img_path + "accuracy.jpg", dpi=300, format="jpg")
@@ -453,41 +502,54 @@ def train(
 #    with open(filepath, "w") as fp:
 #        json.dump(d, indent=2, sort_keys=False, fp=fp)
 
-"""
+
 def experiment_tracking_train(
     MODEL_REGISTRY,
     EXPERIMENT_NAME,
     batch_size,
     f,
+    alpha,
+    beta,
     NUM_EPOCHS,
     N_STEPS_MOSER,
+    N_RUNS_MOSER,
     path,
     img_path=False,
     model_path=False,
 ):
+    network_definition = network_definition_interaction
+
     Path(MODEL_REGISTRY).mkdir(exist_ok=True)  # create experiments dir
     mlflow.set_tracking_uri("file://" + str(MODEL_REGISTRY.absolute()))
     mlflow.set_experiment(EXPERIMENT_NAME)
     with mlflow.start_run():
-        # train and evaluate
-        artifacts = train(
-            batch_size,
-            f,
-            NUM_EPOCHS,
-            N_STEPS_MOSER,
-            path,
-            img_path,
-            model_path,
-            experiment_tracking=True,
-        )
         # log key hyperparameters
         mlflow.log_params(
             {
                 "f": f,
+                "alpha": alpha,
+                "beta": beta,
                 "batch_size": batch_size,
                 "NUM_EPOCHS": NUM_EPOCHS,
                 "N_STEPS_MOSER": N_STEPS_MOSER,
+                "N_RUNS_MOSER": N_RUNS_MOSER,
+                "network_definition": network_definition.__name__,
+                "path_dataset": path,
             }
+        )
+        # train and evaluate
+        artifacts = train(
+            batch_size,
+            f,
+            alpha,
+            beta,
+            NUM_EPOCHS,
+            N_STEPS_MOSER,
+            N_RUNS_MOSER,
+            path,
+            img_path=img_path,
+            model_path=model_path,
+            experiment_tracking=True,
         )
         # log params which are a result of learning
         with tempfile.TemporaryDirectory() as dp:
@@ -496,7 +558,20 @@ def experiment_tracking_train(
 
 
 if __name__ == "__main__":
-    experiment_tracking_train(MODEL_REGISTRY, EXPERIMENT_NAME)
+    experiment_tracking_train(
+        MODEL_REGISTRY,
+        EXPERIMENT_NAME,
+        batch_size,
+        f,
+        alpha,
+        beta,
+        NUM_EPOCHS,
+        N_STEPS_MOSER,
+        N_RUNS_MOSER,
+        path,
+        img_path=False,
+        model_path=False,
+    )
 """
 
 if __name__ == "__main__":
@@ -511,3 +586,4 @@ if __name__ == "__main__":
         model_path=False,
         experiment_tracking=False,
     )
+"""
