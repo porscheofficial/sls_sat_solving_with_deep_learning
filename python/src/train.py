@@ -30,12 +30,12 @@ import jraph
 from jax.experimental.sparse import BCOO
 from pysat.formula import CNF
 
-NUM_EPOCHS = 500  # 10
-f = 0.1
-batch_size = 2
-path = "../Data/blocksworld"
-# path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/generateSAT/samples_small"
-N_STEPS_MOSER = 1000
+NUM_EPOCHS = 20  # 10
+f = 0.01
+batch_size = 1
+# path = "../Data/blocksworld"
+path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/generateSAT/samples_medium"
+N_STEPS_MOSER = 100
 N_RUNS_MOSER = 2
 SEED = 0
 
@@ -116,6 +116,7 @@ def train(
 ):
     network_definition = network_definition_interaction
     sat_data = SATTrainingDataset(path)
+    # print(sat_data[0][0].graph.edges)
     train_data, test_data = data.random_split(sat_data, [0.8, 0.2])
     train_eval_data, _ = data.random_split(train_data, [0.2, 0.8])
 
@@ -129,15 +130,15 @@ def train(
     opt_init, opt_update = optax.adam(1e-3)
     opt_state = opt_init(params)
 
-    # @jax.jit
+    @jax.jit
     def update(params, opt_state, batch, f):
-        g = jax.grad(local_lovasz_loss)(params, batch)
-        # g = jax.grad(combined_loss)(params, batch, f)
+        # g = jax.grad(local_lovasz_loss)(params, batch)
+        g = jax.grad(combined_loss)(params, batch, f)
 
         updates, opt_state = opt_update(g, opt_state)
         return optax.apply_updates(params, updates), opt_state
 
-    def local_lovasz_loss(params, batch):
+    def local_lovasz_loss(params, batch, f=False):
         """
         This assumes that the output of the graph at this point is 2 dimensional
         """
@@ -158,10 +159,19 @@ def train(
         convolved_log_probs = utils.segment_sum(
             relevant_log_probs, graph.receivers, num_segments=n
         )
-
         lhs_values = convolved_log_probs * constraint_node_mask
+        # print("lhs_values", lhs_values.shape)
         # calculate RHS of inequalities:
-
+        rhs_sums = utils.segment_sum(
+            data=log_probs[graph.receivers]
+            * constraint_node_mask[graph.receivers][:, None],
+            segment_ids=graph.senders,
+            num_segments=n,
+        )
+        rhs_values = rhs_sums[:, 1] + log_probs[:, 0]
+        rhs_values = rhs_values * constraint_node_mask
+        # print("rhs_values", rhs_values.shape)
+        """
         # First calculate the two hop edge information
 
         adjacency_matrix = BCOO(
@@ -188,7 +198,7 @@ def train(
         )
         rhs_values = rhs_sums[:, 1] + log_probs[:, 0]
         rhs_values = rhs_values * constraint_node_mask
-
+        """
         # PAUL'S IDEA:
         """
         # mask for all possible two hop paths between constraint nodes
@@ -309,14 +319,17 @@ def train(
         """
         # using the relative entropy as proxy for max relative entropy for sake of differentiability
         # (could move to 2-renyi divergence later or higher)
-        def RelativeEntropy(A, B):
-            return jnp.sum(jnp.where(B != 0, A * jnp.log(A / B), 0))
+        # def RelativeEntropy(A, B):
+        #    return jnp.sum(jnp.where(B != 0, A * jnp.log(A / B), 0))
 
         # TODO: probably we'll have to do some masking at this last stage
         # TODO: Dealing with batching
 
-        # return RelativeEntropy(np.exp(lhs_values), np.exp(rhs_values))
-        return RelativeEntropy(lhs_values, rhs_values)
+        # loss = RelativeEntropy(np.exp(lhs_values), np.exp(rhs_values))
+        # loss = RelativeEntropy(lhs_values, rhs_values)
+        difference = lhs_values - rhs_values
+        loss = jnp.maximum(difference, np.zeros(len(rhs_values)))
+        return jnp.sum(loss, axis=0)
 
     def prediction_loss(params, batch, f: float):
         (mask, graph), (candidates, energies) = batch
@@ -331,12 +344,14 @@ def train(
         return loss
 
     def combined_loss(params, batch, f: float):
-        return prediction_loss(params, batch, f)  # + local_lovasz_loss(params, batch)
+        return 0.05 * prediction_loss(params, batch, f) + local_lovasz_loss(
+            params, batch
+        )
 
     print("Entering training loop")
 
-    def evaluate(loader):
-        return np.mean([prediction_loss(params, b, f) for b in loader])
+    def evaluate(loader, loss):
+        return np.mean([loss(params, b, f) for b in loader])
 
     def evaluate_moser_jax(data_subset):
         return np.mean(
@@ -349,7 +364,6 @@ def train(
         )
 
     def evaluate_moser_rust(data_subset):
-
         av_energies = []
 
         for idx in data_subset.indices:
@@ -370,9 +384,22 @@ def train(
 
     test_eval = EvalResults("Test loss", [], True)
     train_eval = EvalResults("Train loss", [], True)
-    test_moser_eval = EvalResults("Moser loss - test", [], True)
-    train_moser_eval = EvalResults("Moser loss - train", [], True)
-    eval_objects = [test_eval, train_eval, test_moser_eval, train_moser_eval]
+    test_moser_eval = EvalResults("Moser loss - test", [], False)
+    train_moser_eval = EvalResults("Moser loss - train", [], False)
+    test_eval_lll = EvalResults("Test loss LLL", [], True)
+    train_eval_lll = EvalResults("Train loss LLL", [], True)
+    test_eval_dm = EvalResults("Test loss Deepmind", [], True)
+    train_eval_dm = EvalResults("Train loss Deepmind", [], True)
+    eval_objects = [
+        test_eval,
+        train_eval,
+        test_moser_eval,
+        train_moser_eval,
+        test_eval_lll,
+        train_eval_lll,
+        test_eval_dm,
+        train_eval_dm,
+    ]
 
     for epoch in range(NUM_EPOCHS):
         start_time = time.time()
@@ -384,8 +411,12 @@ def train(
 
         # print("Epoch {} in {:0.2f} sec".format(epoch, epoch_time))
 
-        test_eval.results.append(evaluate(test_loader))
-        train_eval.results.append(evaluate(train_eval_loader))
+        test_eval.results.append(evaluate(test_loader, combined_loss))
+        train_eval.results.append(evaluate(train_eval_loader, combined_loss))
+        test_eval_lll.results.append(evaluate(test_loader, local_lovasz_loss))
+        train_eval_lll.results.append(evaluate(train_eval_loader, local_lovasz_loss))
+        test_eval_dm.results.append(evaluate(test_loader, prediction_loss))
+        train_eval_dm.results.append(evaluate(train_eval_loader, prediction_loss))
         test_moser_eval.results.append(evaluate_moser_rust(test_data))
         train_moser_eval.results.append(evaluate_moser_rust(train_eval_data))
         loss_str = "Epoch {} in {:0.2f} sec".format(epoch, epoch_time) + ";  "

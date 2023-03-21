@@ -9,6 +9,7 @@ import numpy as np
 Helper functions
 """
 
+
 # MLP definition of fully connected Linear layer with relu activation in between
 def mlp(dims):
     net = []

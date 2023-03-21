@@ -83,7 +83,6 @@ def get_running_mean(arr, window_size):
 
 def plot_accuracy_fig(*eval_results):
     for eval_result in eval_results:
-
         plt.plot(
             np.arange(0, NUM_EPOCHS + 1, 1),
             np.array(eval_result.results),
@@ -142,7 +141,6 @@ def train2(
 
     @jax.jit
     def update(params, opt_state, batch, f):
-
         g = jax.grad(prediction_loss)(params, batch, f)
 
         updates, opt_state = opt_update(g, opt_state)
@@ -176,7 +174,6 @@ def train2(
         )
 
     def evaluate_moser_rust(data_subset):
-
         av_energies = []
 
         for idx in data_subset.indices:
