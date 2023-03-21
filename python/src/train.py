@@ -106,6 +106,8 @@ EvalResults = collections.namedtuple("EvalResult", ("name", "results", "normaliz
 def train(
     batch_size,
     f,
+    alpha,
+    beta,
     NUM_EPOCHS,
     N_STEPS_MOSER,
     N_RUNS_MOSER,
@@ -133,12 +135,12 @@ def train(
     @jax.jit
     def update(params, opt_state, batch, f):
         # g = jax.grad(local_lovasz_loss)(params, batch)
-        g = jax.grad(combined_loss)(params, batch, f)
+        g = jax.grad(combined_loss)(params, batch, f, alpha, beta)
 
         updates, opt_state = opt_update(g, opt_state)
         return optax.apply_updates(params, updates), opt_state
 
-    def local_lovasz_loss(params, batch, f=False):
+    def local_lovasz_loss(params, batch, f=False, alpha=False, beta=1):
         """
         This assumes that the output of the graph at this point is 2 dimensional
         """
@@ -329,9 +331,9 @@ def train(
         # loss = RelativeEntropy(lhs_values, rhs_values)
         difference = lhs_values - rhs_values
         loss = jnp.maximum(difference, np.zeros(len(rhs_values)))
-        return jnp.sum(loss, axis=0)
+        return beta * jnp.sum(loss, axis=0)
 
-    def prediction_loss(params, batch, f: float):
+    def prediction_loss(params, batch, f: float, alpha=1, beta=False):
         (mask, graph), (candidates, energies) = batch
         decoded_nodes = network.apply(params, graph)  # (B*N, 2)
         candidates = vmap_one_hot(candidates, 2)  # (B*N, K, 2))
@@ -341,17 +343,17 @@ def train(
         weights = jax.nn.softmax(-f * energies)  # (B*N, K)
         loss = -jnp.sum(weights * jnp.sum(log_prob, axis=-1))  # ()
         # jax.debug.print("🤯 {x} 🤯", x=loss)
-        return loss
+        return beta * loss
 
-    def combined_loss(params, batch, f: float):
-        return 0.05 * prediction_loss(params, batch, f) + local_lovasz_loss(
+    def combined_loss(params, batch, f: float, alpha=1, beta=1):
+        return alpha * prediction_loss(params, batch, f) + beta * local_lovasz_loss(
             params, batch
         )
 
     print("Entering training loop")
 
     def evaluate(loader, loss):
-        return np.mean([loss(params, b, f) for b in loader])
+        return np.mean([loss(params, b, f, alpha, beta) for b in loader])
 
     def evaluate_moser_jax(data_subset):
         return np.mean(
