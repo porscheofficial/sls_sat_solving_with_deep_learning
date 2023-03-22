@@ -52,7 +52,7 @@ network_type = "interaction"
 
 
 MODEL_REGISTRY = Path("../mlrun")
-EXPERIMENT_NAME = "mlflow-blocksat_interaction_LCG"
+EXPERIMENT_NAME = "mlflow-blocksat_interaction_VCG"
 # EXPERIMENT_NAME = "mlflow-random_3SAT-medium-GCN-LCG"
 
 
@@ -132,7 +132,6 @@ def train(
     graph_representation="LCG",
     network_type="interaction",
 ):
-
     if graph_representation == "LCG":
         sat_data = SATTrainingDataset_LCG(path)
     if graph_representation == "VCG":
@@ -219,7 +218,6 @@ def train(
         )
 
     def evaluate_moser_rust(data_subset, mode_probabilities="model", mode="LCG"):
-
         av_energies = []
         av_entropies = []
 

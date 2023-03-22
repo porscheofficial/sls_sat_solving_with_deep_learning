@@ -27,7 +27,8 @@ import jraph
 import numpy as np
 import random
 from pysat.formula import CNF
-from pysat.solvers import Cadical
+
+# from pysat.solvers import Cadical
 
 LabeledProblem = collections.namedtuple("Problem", ("graph", "labels", "mask", "meta"))
 
@@ -245,7 +246,6 @@ def get_problem_from_cnf(
         nodes = []
         for i in range(n_node):
             if i < 2 * n:
-
                 if i % 2 == 0:
                     nodes.append(1)
                 if i % 2 == 1:
@@ -348,6 +348,7 @@ def get_problem_from_cnf(
     )
 
 
+""""
 def get_solved_problem_from_cnf(cnf: CNF, solver=Cadical()):
     solver.append_formula(cnf.clauses)
     solution_found = solver.solve()
@@ -355,3 +356,4 @@ def get_solved_problem_from_cnf(cnf: CNF, solver=Cadical()):
     if solution_found:
         solution = solver.get_model()
     return get_problem_from_cnf(cnf, solution)
+"""

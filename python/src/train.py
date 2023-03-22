@@ -128,7 +128,6 @@ def train(
 
     @jax.jit
     def update(params, opt_state, batch, f):
-
         g = jax.grad(prediction_loss)(params, batch, f)
 
         updates, opt_state = opt_update(g, opt_state)
@@ -162,7 +161,6 @@ def train(
         )
 
     def evaluate_moser_rust(data_subset):
-
         av_energies = []
 
         for idx in data_subset.indices:
