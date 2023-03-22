@@ -160,8 +160,6 @@ def get_k_sat_problem(n, m, k):
 
 
 def get_problem_from_cnf(cnf: CNF, pad_nodes=0, pad_edges=0) -> HashableSATProblem:
-    lopsi = True  # option to decide about lopsidependency neighborhood or usual neighborhood
-
     cnf.clauses = [c for c in cnf.clauses if len(c) > 0]
     n = cnf.nv
     m = len(cnf.clauses)
@@ -213,26 +211,15 @@ def get_problem_from_cnf(cnf: CNF, pad_nodes=0, pad_edges=0) -> HashableSATProbl
 
     for j1, c1 in enumerate(cnf.clauses):
         for j2, c2 in enumerate(cnf.clauses):
-            if lopsi == True:
-                variables1 = [
-                    np.sign(l1) * (abs(l1)) for l1 in c1
-                ]  # gives the support qubits for clause c1
-                neg_variables2 = [
-                    -np.sign(l2) * (abs(l2)) for l2 in c2
-                ]  # gives the support qubits for clause c2
-                intersection = list(
-                    set(variables1) & set(neg_variables2)
-                )  # if this is non-empty, c1 and c2 are conflicting neighbors
-            else:
-                variables1 = [
-                    (abs(l1)) for l1 in c1
-                ]  # gives the support qubits for clause c1
-                variables2 = [
-                    (abs(l2)) for l2 in c2
-                ]  # gives the support qubits for clause c2
-                intersection = list(
-                    set(variables1) & set(variables2)
-                )  # if this is non-empty, c1 and c2 are neighbors
+            variables1 = [
+                (abs(l1)) for l1 in c1
+            ]  # gives the support qubits for clause c1
+            variables2 = [
+                (abs(l2)) for l2 in c2
+            ]  # gives the support qubits for clause c2
+            intersection = list(
+                set(variables1) & set(variables2)
+            )  # if this is non-empty, c1 and c2 are neighbors
 
             if len(intersection) != 0:
                 senders.extend([j1 + n])
