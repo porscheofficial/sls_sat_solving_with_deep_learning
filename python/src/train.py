@@ -31,19 +31,20 @@ from jax.experimental.sparse import BCOO
 from pysat.formula import CNF
 from scipy.stats import entropy
 
-NUM_EPOCHS = 10  # 10
+NUM_EPOCHS = 100  # 10
 f = 0.01
 alpha = 0.05
 beta = 1
+gamma = 1
 batch_size = 1
 # path = "../Data/blocksworld"
-path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/generateSAT/samples_medium"
+path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/generateSAT/samples_medium_subset"
 N_STEPS_MOSER = 100
 N_RUNS_MOSER = 2
 SEED = 0
 
 MODEL_REGISTRY = Path("../../mlrun_save")
-EXPERIMENT_NAME = "samples_medium_interaction"
+EXPERIMENT_NAME = "samples_medium_subset_interaction"
 
 
 #  AUXILIARY METHODS
@@ -111,6 +112,7 @@ def train(
     f,
     alpha,
     beta,
+    gamma,
     NUM_EPOCHS,
     N_STEPS_MOSER,
     N_RUNS_MOSER,
@@ -137,11 +139,11 @@ def train(
 
     @jax.jit
     def update(params, opt_state, batch, f):
-        g = jax.grad(combined_loss)(params, batch, f, alpha, beta)
+        g = jax.grad(combined_loss)(params, batch, f, alpha, beta, gamma)
         updates, opt_state = opt_update(g, opt_state)
         return optax.apply_updates(params, updates), opt_state
 
-    def local_lovasz_loss(params, batch, f=False, alpha=False, beta=1):
+    def local_lovasz_loss(params, batch, f=False, alpha=False, beta=1, gamma=False):
         """
         This assumes that the output of the graph at this point is 2 dimensional
         """
@@ -331,10 +333,29 @@ def train(
         # loss = RelativeEntropy(np.exp(lhs_values), np.exp(rhs_values))
         # loss = RelativeEntropy(lhs_values, rhs_values)
         difference = lhs_values - rhs_values
-        loss = jnp.maximum(difference, np.zeros(len(rhs_values)))
+        loss = jnp.maximum(difference, jnp.zeros(len(rhs_values))) / jnp.sum(
+            constraint_node_mask
+        )
         return beta * jnp.sum(loss, axis=0)
 
-    def prediction_loss(params, batch, f: float, alpha=1, beta=False):
+    def entropy_loss(params, batch, f=False, alpha=False, beta=False, gamma=1):
+        (mask, graph), _ = batch
+        decoded_nodes = network.apply(params, graph)
+        constraint_node_mask = jnp.array(jnp.logical_not(mask), dtype=int)
+        prob = jax.nn.softmax(decoded_nodes) * mask[:, None]
+        constraint_prob = jnp.ones(jnp.shape(prob)) / 2 * constraint_node_mask[:, None]
+        new_prob = prob + constraint_prob
+        # entropies = entropy(jnp.asarray(new_prob),qk=None, base=2, axis = 1)
+
+        entropies = jnp.sum(jax.scipy.special.entr(new_prob), axis=1) / jnp.log(2)
+        # entropies = [
+        #        entropy(new_prob[:, i], qk=None, base=2, axis=0)
+        #        for i in range(np.shape(new_prob)[1])
+        #    ]
+        loss = -jnp.sum(jnp.log(entropies), axis=0) / jnp.sum(mask)
+        return gamma * loss
+
+    def prediction_loss(params, batch, f: float, alpha=1, beta=False, gamma=False):
         (mask, graph), (candidates, energies) = batch
         decoded_nodes = network.apply(params, graph)  # (B*N, 2)
         candidates = vmap_one_hot(candidates, 2)  # (B*N, K, 2))
@@ -346,15 +367,17 @@ def train(
         # jax.debug.print("🤯 {x} 🤯", x=loss)
         return alpha * loss
 
-    def combined_loss(params, batch, f: float, alpha=1, beta=1):
-        return alpha * prediction_loss(params, batch, f) + beta * local_lovasz_loss(
-            params, batch
+    def combined_loss(params, batch, f: float, alpha=1, beta=1, gamma=1):
+        return (
+            prediction_loss(params, batch, f, alpha=alpha)
+            + local_lovasz_loss(params, batch, beta=beta)
+            + entropy_loss(params, batch, gamma=gamma)
         )
 
     print("Entering training loop")
 
     def evaluate(loader, loss):
-        return np.mean([loss(params, b, f, alpha, beta) for b in loader])
+        return np.mean([loss(params, b, f, alpha, beta, gamma) for b in loader])
 
     def evaluate_moser_jax(data_subset):
         return np.mean(
@@ -381,7 +404,7 @@ def train(
             else:
                 print("not valid argument for mode_probabilities")
             model_probabilities = model_probabilities.ravel()
-
+            print(model_probabilities)
             _, _, final_energies = moser_rust.run_moser_python(
                 problem_path, model_probabilities, N_STEPS_MOSER, N_RUNS_MOSER, SEED
             )
@@ -414,8 +437,8 @@ def train(
     train_moser_eval = EvalResults("Moser loss - train", [], False)
     test_moser_baseline = EvalResults("Moser loss uniform baseline - test", [], False)
     train_moser_baseline = EvalResults("Moser loss uniform baseline - train", [], False)
-    test_entropy_eval = EvalResults("entropy of output prob distr - test", [], False)
-    train_entropy_eval = EvalResults("entropy of output prob distr - train", [], False)
+    test_entropy_eval = EvalResults("Test loss entropy", [], False)
+    train_entropy_eval = EvalResults("Train loss entropy", [], False)
     test_eval_lll = EvalResults("Test loss LLL", [], True)
     train_eval_lll = EvalResults("Train loss LLL", [], True)
     test_eval_dm = EvalResults("Test loss Deepmind", [], True)
@@ -448,25 +471,27 @@ def train(
         train_LLL_loss = evaluate(train_eval_loader, local_lovasz_loss)
         test_pred_loss = evaluate(test_loader, prediction_loss)
         train_pred_loss = evaluate(train_eval_loader, prediction_loss)
+        test_entropy_loss = evaluate(test_loader, entropy_loss)
+        train_entropy_loss = evaluate(train_eval_loader, entropy_loss)
 
-        test_eval.results.append(test_LLL_loss + test_pred_loss)
-        train_eval.results.append(train_LLL_loss + train_pred_loss)
+        test_eval.results.append(test_LLL_loss + test_pred_loss + test_entropy_loss)
+        train_eval.results.append(train_LLL_loss + train_pred_loss + train_entropy_loss)
         test_eval_lll.results.append(test_LLL_loss)
         train_eval_lll.results.append(train_LLL_loss)
         test_eval_dm.results.append(test_pred_loss)
         train_eval_dm.results.append(train_pred_loss)
 
-        test_moser_energies, test_entropies = evaluate_moser_rust(
+        test_moser_energies, _ = evaluate_moser_rust(
             test_data,
         )
-        train_moser_energies, train_entropies = evaluate_moser_rust(
+        train_moser_energies, _ = evaluate_moser_rust(
             train_eval_data,
         )
 
         test_moser_eval.results.append(test_moser_energies)
         train_moser_eval.results.append(train_moser_energies)
-        test_entropy_eval.results.append(test_entropies)
-        train_entropy_eval.results.append(train_entropies)
+        test_entropy_eval.results.append(test_entropy_loss)
+        train_entropy_eval.results.append(train_entropy_loss)
         test_moser_baseline.results.append(moser_baseline_test)
         train_moser_baseline.results.append(moser_baseline_train)
 
@@ -510,6 +535,7 @@ def experiment_tracking_train(
     f,
     alpha,
     beta,
+    gamma,
     NUM_EPOCHS,
     N_STEPS_MOSER,
     N_RUNS_MOSER,
@@ -529,6 +555,7 @@ def experiment_tracking_train(
                 "f": f,
                 "alpha": alpha,
                 "beta": beta,
+                "gamma": gamma,
                 "batch_size": batch_size,
                 "NUM_EPOCHS": NUM_EPOCHS,
                 "N_STEPS_MOSER": N_STEPS_MOSER,
@@ -543,6 +570,7 @@ def experiment_tracking_train(
             f,
             alpha,
             beta,
+            gamma,
             NUM_EPOCHS,
             N_STEPS_MOSER,
             N_RUNS_MOSER,
@@ -565,6 +593,7 @@ if __name__ == "__main__":
         f,
         alpha,
         beta,
+        gamma,
         NUM_EPOCHS,
         N_STEPS_MOSER,
         N_RUNS_MOSER,
