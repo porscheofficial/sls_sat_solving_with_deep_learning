@@ -15,8 +15,8 @@ from torch.utils import data
 import matplotlib.pyplot as plt
 import pandas as pd
 import moser_rust
-from python.src.data_utils import SATTrainingDataset, JraphDataLoader
-from python.src.model import (
+from data_utils import SATTrainingDataset, JraphDataLoader
+from model import (
     network_definition_interaction,
     network_definition_GCN,
     get_model_probabilities,

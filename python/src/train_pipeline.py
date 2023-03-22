@@ -46,7 +46,7 @@ path = "../Data/blocksworld"
 N_STEPS_MOSER = 1000
 N_RUNS_MOSER = 2
 SEED = 0
-graph_representation = "VCG"
+graph_representation = "LCG"
 network_type = "interaction"
 # network_definition = get_network_definition(network_type = network_type, graph_representation = graph_representation) #network_definition_interaction_new
 
@@ -234,7 +234,11 @@ def train(
             else:
                 print("not valid argument for mode_probabilities")
             model_probabilities = model_probabilities.ravel()
-
+            print(
+                "min, max of model probs",
+                np.min(model_probabilities),
+                np.max(model_probabilities),
+            )
             _, _, final_energies = moser_rust.run_moser_python(
                 problem_path, model_probabilities, N_STEPS_MOSER, N_RUNS_MOSER, SEED
             )
