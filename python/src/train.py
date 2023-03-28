@@ -20,7 +20,7 @@ from model import (
     network_definition_GCN,
     get_model_probabilities,
 )
-from random_walk import moser_walk
+from python.src.random_walk import moser_walk
 import mlflow
 from pathlib import Path
 import tempfile

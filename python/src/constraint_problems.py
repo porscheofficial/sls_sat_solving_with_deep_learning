@@ -72,10 +72,10 @@ def get_2sat_problem(min_n_literals: int, max_n_literals: int) -> LabeledProblem
     Returns:
     bipartite-graph, node labels and node mask.
     """
+
     n_literals = random.randint(min_n_literals, max_n_literals)
     n_literals_true = random.randint(1, n_literals - 1)
     n_constraints = n_literals * (n_literals - 1) // 2
-
     n_node = n_literals + n_constraints
     # 0 indicates a literal node
     # 1 indicates a constraint node.
@@ -164,6 +164,7 @@ def get_problem_from_cnf(
 ) -> HashableSATProblem:
     cnf.clauses = [c for c in cnf.clauses if len(c) > 0]
     n = cnf.nv
+    # print("n=", n)
     m = len(cnf.clauses)
     n_node = n + m
     clause_lengths = [len(c) for c in cnf.clauses]
@@ -637,8 +638,14 @@ def get_problem_from_cnf(
 
     # For the loss calculation we create a mask for the nodes, which masks
     # the constraint nodes and the padding nodes.
+    if mode == "LCG":
+        mask = (np.arange(n_node) < n).astype(np.int32)
+        # mask = (np.arange(n_node) < 2*n).astype(np.int32)
 
-    mask = (np.arange(n_node) < n).astype(np.int32)
+    elif mode == "VCG":
+        mask = (np.arange(n_node) < n).astype(np.int32)
+
+    assert len(mask) == n_node
 
     return HashableSATProblem(
         graph=graph, mask=mask, clause_lengths=clause_lengths, params=(n, m, k)
