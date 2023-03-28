@@ -189,7 +189,7 @@ def train(
             candidates = vmap_one_hot(candidates, 2)  # (B*N, K, 2))
 
         else:
-            print("please use a alid graph representation")
+            print("please use a valid graph representation")
 
         log_prob = vmap_compute_log_probs(
             decoded_nodes, mask, candidates
