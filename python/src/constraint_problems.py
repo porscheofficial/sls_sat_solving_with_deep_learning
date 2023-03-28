@@ -549,7 +549,7 @@ def get_problem_from_cnf(
         assert len(senders) == len(edges)
         assert len(edges) == n_edge
 
-        edges = (np.eye(2)[edges],)
+        edges = np.eye(2)[edges]
         nodes = np.eye(3)[nodes]
 
     # for sake of jitting, if the cnf isn't already strictly in k-cnf form, we introduce
