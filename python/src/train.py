@@ -26,19 +26,17 @@ from pathlib import Path
 import tempfile
 import joblib
 from jraph._src import utils
-import jraph
-from jax.experimental.sparse import BCOO
-from pysat.formula import CNF
 from scipy.stats import entropy
 
-NUM_EPOCHS = 100  # 10
-f = 0.01
-alpha = 0.05
-beta = 0
-gamma = 0.05
+NUM_EPOCHS = 50  # 10
+f = 0.0001
+alpha = 1
+beta = 1
+gamma = 100
 batch_size = 1
-# path = "../Data/LLL_sample_one"
-path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/generateSAT/samples_medium_subset"
+path = "../Data/LLL_sample_one"
+# path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/generateSAT/samples_LLL_k6/combined"
+# path = "../Data/blocksworld"
 N_STEPS_MOSER = 100
 N_RUNS_MOSER = 2
 SEED = 0
@@ -47,7 +45,7 @@ network_type = "interaction"
 # network_definition = get_network_definition(network_type = network_type, graph_representation = graph_representation) #network_definition_interaction_new
 
 MODEL_REGISTRY = Path("../../mlrun_save")
-EXPERIMENT_NAME = "medium_subset_LCG_interaction_NEW"
+EXPERIMENT_NAME = "blocksworld_LCG_interaction_NEW"
 
 
 #  AUXILIARY METHODS
@@ -131,6 +129,10 @@ def train(
 ):
     if graph_representation == "LCG":
         sat_data = SATTrainingDataset_LCG(path)
+        if batch_size != 1:
+            sys.exit(
+                "Gives wrong result -> how to get correct probabilities? how to get correct energies? Need to fix this!"
+            )
     if graph_representation == "VCG":
         sat_data = SATTrainingDataset_VCG(path)
 
@@ -236,6 +238,7 @@ def train(
         loss = jnp.sum(jnp.maximum(difference, jnp.zeros(len(rhs_values)))) / jnp.sum(
             constraint_node_mask
         )
+        # print("lll-loss shape", loss.shape)
         return beta * loss
 
     def entropy_loss(
@@ -270,6 +273,7 @@ def train(
             #    constraint_prob = jnp.reshape(constraint_prob, (-1, 2))
         # new_prob = prob + constraint_prob
         entropies = jnp.sum(jax.scipy.special.entr(prob), axis=1) / jnp.log(2)
+        # print(entropies)
         # prob = jax.nn.softmax(decoded_nodes) * mask[:, None]
         # constraint_prob = jnp.ones(jnp.shape(prob)) / 2 * constraint_node_mask[:, None]
         # new_prob = prob + constraint_prob
@@ -280,7 +284,8 @@ def train(
         #        entropy(new_prob[:, i], qk=None, base=2, axis=0)
         #        for i in range(np.shape(new_prob)[1])
         #    ]
-        loss = -jnp.sum(jnp.log(entropies), axis=0) / jnp.sum(mask)
+        loss = -jnp.sum(jnp.log(entropies), axis=0) / jnp.sum(mask) / 2
+        # print("entropy loss", loss.shape)
         return gamma * loss
 
     def prediction_loss(
@@ -306,33 +311,27 @@ def train(
         decoded_nodes = network.apply(params, graph)  # (B*2*N, 1)
         if graph_representation == "LCG":
             if np.shape(decoded_nodes)[0] % 2 == 1:
-                conc_decoded_nodes = jnp.vstack((jnp.asarray(decoded_nodes), [[0]]))
-                conc_decoded_nodes = jnp.reshape(decoded_nodes, (-1, 2))
+                conc_decoded_nodes = jnp.vstack((jnp.asarray(decoded_nodes), [0]))
+                conc_decoded_nodes = jnp.reshape(conc_decoded_nodes, (-1, 2))
                 # padded_conc_decoded_nodes = jnp.concatenate(
                 #    (
                 #        jnp.asarray(conc_decoded_nodes),
                 #        np.zeros(np.shape(conc_decoded_nodes)),
                 #    )
                 # )[:-1, :]
-                new_mask = jnp.vstack((jnp.asarray(mask), [[0]]))
+                new_mask = jnp.hstack((jnp.asarray(mask), [0]))
                 new_mask = jnp.reshape(new_mask, (-1, 2))
-                print("total", np.shape(new_mask))
                 new_mask = new_mask[:, 0]
-                print("padded_cand", decoded_nodes.shape)
-                print("new_mask", new_mask.shape)
             else:
                 conc_decoded_nodes = jnp.reshape(decoded_nodes, (-1, 2))
                 # padded_conc_decoded_nodes = jnp.concatenate(
                 #    (conc_decoded_nodes, conc_decoded_nodes)
                 # )
                 new_mask = jnp.reshape(mask, (-1, 2))
-                print("total", np.shape(new_mask))
                 new_mask = new_mask[:, 0]
-                print("padded_cand", decoded_nodes.shape)
-                print("new_mask", new_mask.shape)
             decoded_nodes = conc_decoded_nodes
             candidates = vmap_one_hot(candidates, 2)
-
+            energies = energies[: len(new_mask), :]
         elif graph_representation == "VCG":
             candidates = vmap_one_hot(candidates, 2)  # (B*N, K, 2))
             new_mask = mask
@@ -343,7 +342,8 @@ def train(
             decoded_nodes, new_mask, candidates
         )  # (B*N, K, 2)
         weights = jax.nn.softmax(-f * energies)  # (B*N, K)
-        loss = -jnp.sum(weights * jnp.sum(log_prob, axis=-1)) / jnp.sum(mask)  # ()
+        loss = -jnp.sum(weights * jnp.sum(log_prob, axis=-1)) / jnp.sum(mask) / 2  # ()
+        # print("prediction_loss", loss.shape)
         return alpha * loss
 
     def combined_loss(
@@ -403,10 +403,11 @@ def train(
                 model_probabilities = get_model_probabilities(
                     network, params, problem, mode
                 )
+                # print(model_probabilities)
             else:
                 print("not valid argument for mode_probabilities")
             model_probabilities = model_probabilities.ravel()
-            print(model_probabilities)
+            print(np.max(model_probabilities), np.min(model_probabilities))
             _, _, final_energies = moser_rust.run_moser_python(
                 problem_path, model_probabilities, N_STEPS_MOSER, N_RUNS_MOSER, SEED
             )

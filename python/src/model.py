@@ -168,6 +168,7 @@ def get_model_probabilities(network, params, problem, mode):
             conc_decoded_nodes = jnp.reshape(decoded_nodes, (-1, 2))
         else:
             conc_decoded_nodes = jnp.reshape(decoded_nodes, (-1, 2))
+        # print(conc_decoded_nodes)
         return jax.nn.softmax(conc_decoded_nodes)[:n, 1]
 
 

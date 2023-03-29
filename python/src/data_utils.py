@@ -51,7 +51,7 @@ class SATTrainingDataset_LCG(data.Dataset):
     def solution_dict_to_array(self, solution_dict):
         return np.pad(
             np.array(list(solution_dict.values()), dtype=int),
-            (0, self.max_n_node - len(solution_dict)),
+            (0, int(np.ceil(self.max_n_node / 2)) - len(solution_dict)),
         )
 
     def _get_problem_file(self, name):
@@ -85,10 +85,9 @@ class SATTrainingDataset_LCG(data.Dataset):
             candidates = np.load(
                 target_name
             )  # np.array which stores candidates and solution to problem
-
             padded_candidates = np.pad(
                 candidates,
-                pad_width=((0, 0), (0, N - n)),
+                pad_width=((0, 0), (0, int(np.ceil(N / 2)) - n)),
             )
             energies = vmap(
                 number_of_violated_constraints, in_axes=(None, 0), out_axes=0
@@ -104,7 +103,7 @@ class SATTrainingDataset_LCG(data.Dataset):
             # candidates already padded inside solution_dict_to_array but repeated here for transparency
             padded_candidates = np.pad(
                 candidates,
-                pad_width=(0, N - n),
+                pad_width=(0, int(np.ceil(N / 2)) - n),
             )
             return problem, (padded_candidates, energies)
 
