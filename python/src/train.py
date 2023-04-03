@@ -33,8 +33,8 @@ from jax.experimental.sparse import BCOO
 NUM_EPOCHS = 500  # 10
 f = 0.1
 batch_size = 2
-# path = "../Data/blocksworld"
-path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/generateSAT/samples_small"
+path = "../../Data/blocksworld"
+# path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/generateSAT/samples_small"
 N_STEPS_MOSER = 1000
 N_RUNS_MOSER = 2
 SEED = 0
@@ -161,30 +161,47 @@ def train(
         )
 
         lhs_values = convolved_log_probs * constraint_node_mask
+
         # calculate RHS of inequalities:
 
         # First calculate the two hop edge information
-        adjacency_matrix = BCOO(
-            (
-                jnp.ones(e),
-                jnp.column_stack((graph.senders, graph.receivers)),
+        # adjacency_matrix = BCOO(
+        #     (
+        #         jnp.ones(e),
+        #         jnp.column_stack((graph.senders, graph.receivers)),
+        #     ),
+        #     shape=(n, n),
+        #     unique_indices=True,
+        # )
+
+        #  mask for all possible two hop paths between constraint nodes
+        shared_path_mask = jnp.tile(graph.senders, e) == jnp.repeat(graph.senders, e)
+        # for each node, we sum the log probs for all shared incoming paths
+        # TODO: Still have to deal with double counting here
+        rhs_sums = utils.segment_sum(
+            data=jnp.where(
+                shared_path_mask,
+                log_probs[jnp.tile(graph.receivers, e)][:, 1],
+                0,
             ),
-            shape=(n, n),
-            unique_indices=True,
+            segment_ids=jnp.repeat(graph.receivers, e),
+            num_segments=n,
         )
+
         # two hop adjacency matrix with values indicating number of shared two hop paths.
         # adj_squared = jnp.matmul(adjacency_matrix, adjacency_matrix)
-        adj_squared = jax.experimental.sparse.bcoo_multiply_sparse(
-            adjacency_matrix, adjacency_matrix
-        )
-        induced_indices = adj_squared.indices[adj_squared.data != 0]
-        constraint_senders = induced_indices[:, 0]
-        constraint_receivers = induced_indices[:, 1]
+        # adj_squared = jax.experimental.sparse.bcoo_multiply_sparse(
+        #     adjacency_matrix, adjacency_matrix
+        # )
+        # induced_indices = adj_squared.indices[adj_squared.data != 0]
+        # constraint_senders = induced_indices[:, 0]
+        # constraint_receivers = induced_indices[:, 1]
 
-        rhs_sums = utils.segment_sum(
-            log_probs[constraint_senders], constraint_receivers, num_segments=n
-        )
-        rhs_values = rhs_sums[:, 1] + log_probs[:, 0]
+        # # Then sum the corresponding x values ("log_probs") across the induced two hop graph.
+        # rhs_sums = utils.segment_sum(
+        #     log_probs[constraint_senders], constraint_receivers, num_segments=n
+        # )
+        rhs_values = rhs_sums[:, 1] + log_probs[:, 0] - log_probs[:, 1]
         rhs_values = rhs_values * constraint_node_mask
 
         # using the relative entropy as proxy for max relative entropy for sake of differentiability
