@@ -205,7 +205,7 @@ def train(
 
         if graph_representation == "LCG":
             n = jnp.shape(decoded_nodes)[0]
-            if np.shape(decoded_nodes)[0] % 2 == 1:
+            if jnp.shape(decoded_nodes)[0] % 2 == 1:
                 new_decoded_nodes = jnp.vstack((jnp.asarray(decoded_nodes), [[0]]))
                 new_decoded_nodes = jnp.reshape(new_decoded_nodes, (-1, 2))
                 log_probs = jax.nn.softmax(new_decoded_nodes)
