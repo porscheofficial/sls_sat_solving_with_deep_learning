@@ -42,6 +42,11 @@ fn resample_clause(
     }
 }
 
+fn flip_literal(clause: &[Lit], assignment: &mut Vec<bool>, rng: &mut StdRng) {
+    let idx = clause.choose(rng).unwrap().var().index();
+    assignment[idx] = !assignment[idx];
+}
+
 #[pyfunction]
 fn run_moser_python(
     path: String,
@@ -49,28 +54,54 @@ fn run_moser_python(
     nsteps: usize,
     nruns: usize,
     seed: usize,
-) -> PyResult<(bool, Vec<bool>, usize)> {
+) -> PyResult<(bool, Vec<bool>, usize, usize, usize)> {
     let input: String = read_to_string(path).expect("failed to read");
 
     let implements_read = &input.as_bytes()[..];
 
     let formula = DimacsParser::parse(implements_read).expect("parse error");
 
-    println!(
-        "Loading problem with {} variables and {} clauses",
-        formula.var_count(),
-        formula.len()
-    );
+    // println!(
+    //     "Loading problem with {} variables and {} clauses",
+    //     formula.var_count(),
+    //     formula.len()
+    // );
 
-    let (found_solution, assignment, final_energies) =
+    let (found_solution, assignment, final_energies, numtry, numstep) =
         run_moser(formula, weights, nsteps, nruns, seed);
 
-    return Ok((found_solution, assignment, final_energies));
+    return Ok((found_solution, assignment, final_energies, numtry, numstep));
+}
+
+#[pyfunction]
+fn run_schoening_python(
+    path: String,
+    nsteps: usize,
+    nruns: usize,
+    seed: usize,
+) -> PyResult<(bool, Vec<bool>, usize, usize, usize)> {
+    let input: String = read_to_string(path).expect("failed to read");
+
+    let implements_read = &input.as_bytes()[..];
+
+    let formula = DimacsParser::parse(implements_read).expect("parse error");
+
+    // println!(
+    //     "Loading problem with {} variables and {} clauses",
+    //     formula.var_count(),
+    //     formula.len()
+    // );
+
+    let (found_solution, assignment, final_energies, numtry, numstep) =
+        run_schoening(formula, nsteps, nruns, seed);
+
+    return Ok((found_solution, assignment, final_energies, numtry, numstep));
 }
 
 #[pymodule]
 fn moser_rust(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(run_moser_python, m)?)?;
+    m.add_function(wrap_pyfunction!(run_schoening_python, m)?)?;
     Ok(())
 }
 
@@ -80,7 +111,7 @@ fn run_moser(
     nsteps: usize,
     nruns: usize,
     seed: usize,
-) -> (bool, Vec<bool>, usize) {
+) -> (bool, Vec<bool>, usize, usize, usize) {
     // Auxiliary functions
     assert_eq!(weights.len(), formula.var_count());
 
@@ -131,7 +162,13 @@ fn run_moser(
         println!("Round {} ending with {} violated clauses", numtry, numfalse);
     }
 
-    return (found_solution, best_assignment, best_energy);
+    return (
+        found_solution,
+        best_assignment,
+        best_energy,
+        numtry,
+        numstep,
+    );
 }
 
 fn main() {
@@ -156,7 +193,7 @@ fn main() {
     let nruns = 10;
     let seed = 0;
 
-    let (found_solution, assignment, _final_energies) =
+    let (found_solution, assignment, _final_energies, _numtry, _numstep) =
         run_moser(formula, weights, nsteps, nruns, seed);
 
     println!(
