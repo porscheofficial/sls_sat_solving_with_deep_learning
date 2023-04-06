@@ -76,7 +76,7 @@ class SATTrainingDataset_LCG(data.Dataset):
             pad_edges=self.max_n_edge,
             mode="LCG",
         )
-        N = len(problem.mask)  # total number of nodes in (padded) graph
+        N = len(problem.mask[0])  # total number of nodes in (padded) graph
         n, _, _ = problem.params  # number of variables nodes in instance
 
         if self.return_candidates:
@@ -159,7 +159,7 @@ class SATTrainingDataset_VCG(data.Dataset):
             pad_edges=self.max_n_edge,
             mode="VCG",
         )
-        N = len(problem.mask)  # total number of nodes in (padded) graph
+        N = len(problem.mask[0])  # total number of nodes in (padded) graph
         n, _, _ = problem.params  # number of variables nodes in instance
 
         if self.return_candidates:
@@ -195,8 +195,11 @@ class SATTrainingDataset_VCG(data.Dataset):
 def collate_fn(batch):
     problems, tuples = zip(*batch)
     candidates, energies = zip(*tuples)
-    masks, graphs = zip(*((p.mask, p.graph) for p in problems))
+    masks, graphs, neighbors_list = zip(
+        *((p.mask[0], p.graph, p.mask[1]) for p in problems)
+    )
     batched_masks = np.concatenate(masks)
+    batched_neighbors_list = np.concatenate(neighbors_list)
     batched_graphs = jraph.batch(graphs)
     batched_candidates = np.vstack([c.T for c in candidates])
     batched_energies = np.vstack(
@@ -206,7 +209,10 @@ def collate_fn(batch):
     #    [np.repeat([e], int(jnp.sum(m) / 2), axis=0) for (e, m) in zip(energies, masks)]
     # )
 
-    return (batched_masks, batched_graphs), (batched_candidates, batched_energies)
+    return (batched_masks, batched_graphs, batched_neighbors_list), (
+        batched_candidates,
+        batched_energies,
+    )
 
 
 class JraphDataLoader(data.DataLoader):

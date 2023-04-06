@@ -27,6 +27,7 @@ import jraph
 import numpy as np
 import random
 from pysat.formula import CNF
+import scipy
 
 # from pysat.solvers import Cadical
 
@@ -272,7 +273,7 @@ def get_problem_from_cnf(
         assert len(edges) == n_edge
 
         edges = np.eye(2)[edges]
-        nodes = np.eye(3)[nodes]
+        nodes = np.eye(2)[nodes]
 
     # for sake of jitting, if the cnf isn't already strictly in k-cnf form, we introduce
     # additional dummy variables and constraints. NB: While this in principles solves the problem,
@@ -315,6 +316,8 @@ def get_problem_from_cnf(
 
     edges = np.eye(2)[edges]
     """
+    # this encodes edges between neighboring clauses
+    """
     for j1, c1 in enumerate(cnf.clauses):
         for j2, c2 in enumerate(cnf.clauses):
             variables1 = [
@@ -342,7 +345,8 @@ def get_problem_from_cnf(
 
     assert len(receivers) == len(senders)
     assert len(senders) == len(edges)
-
+    """
+    # print("n,m", n, m)
     graph = jraph.GraphsTuple(
         n_node=np.asarray([n_node]),
         n_edge=np.asarray([n_edge]),
@@ -352,7 +356,139 @@ def get_problem_from_cnf(
         senders=np.asarray(senders),
         receivers=np.asarray(receivers),
     )
+    if mode == "LCG":
+        sender_clauses = []
+        receiver_clauses = []
+        for j1, c1 in enumerate(cnf.clauses):
+            for j2, c2 in enumerate(cnf.clauses):
+                variables1 = [
+                    (abs(l1)) for l1 in c1
+                ]  # gives the support qubits for clause c1
+                variables2 = [
+                    (abs(l2)) for l2 in c2
+                ]  # gives the support qubits for clause c2
+                intersection = list(
+                    set(variables1) & set(variables2)
+                )  # if this is non-empty, c1 and c2 are neighbors
 
+                if len(intersection) != 0:
+                    if mode == "LCG":
+                        sender_clauses.extend([j1 + 2 * n])
+                        receiver_clauses.extend([j2 + 2 * n])
+                    if mode == "VCG":
+                        sender_clauses.extend([j1 + n])
+                        receiver_clauses.extend([j2 + n])
+            neighbors_list = np.vstack(
+                (np.array(sender_clauses), np.array(receiver_clauses))
+            )
+
+    if mode == "VCG":
+        e = len(senders)
+        data = np.where(np.tile(senders, e) == np.repeat(senders, e), 1, 0)
+        x = data * np.tile(receivers, e)
+        y = data * np.repeat(receivers, e)
+        x, y = np.array(np.where(x - y != 0, [x, y], 0))
+        x, y = np.unique(np.vstack((x, y)), axis=1)
+        x = x[x != 0]
+        y = y[y != 0]
+        neighbors_list = np.stack((x, y))
+    if mode == "LCG":
+        """
+        # returns the wrong result
+        new_senders = (np.array(senders)+1)%2* np.array(senders) + (np.array(senders))%2*(np.array(senders)-1)
+        print(new_senders)
+        e = len(new_senders)
+        data = np.where(np.tile(new_senders, e) == np.repeat(new_senders, e),1, 0)
+        x = data * np.tile(receivers, e)
+        y = data * np.repeat(receivers, e)
+        x,y = np.array(np.where(x-y!=0, [x,y],0))
+        x,y = np.unique(np.vstack((x,y)),axis=1)
+        x = x[x!=0]
+        y = y[y!=0]
+        neighbors_list = np.stack((x,y))
+        """
+        sender_clauses = []
+        receiver_clauses = []
+        for j1, c1 in enumerate(cnf.clauses):
+            for j2, c2 in enumerate(cnf.clauses):
+                variables1 = [
+                    (abs(l1)) for l1 in c1
+                ]  # gives the support qubits for clause c1
+                variables2 = [
+                    (abs(l2)) for l2 in c2
+                ]  # gives the support qubits for clause c2
+                intersection = list(
+                    set(variables1) & set(variables2)
+                )  # if this is non-empty, c1 and c2 are neighbors
+
+                if len(intersection) != 0:
+                    # if mode == "LCG":
+                    sender_clauses.extend([j1 + 2 * n])
+                    receiver_clauses.extend([j2 + 2 * n])
+                    # if mode == "VCG":
+                    #    sender_clauses.extend([j1 + n])
+                    #    receiver_clauses.extend([j2 + n])
+        neighbors_list = np.vstack(
+            (np.array(sender_clauses), np.array(receiver_clauses))
+        )
+
+        # print("difference", neighbors_list - neighbors_list2)
+
+    # alternative methods for computing the neighbors_list
+    """
+    if mode == "LCG":
+        sender_clauses = []
+        receiver_clauses = []
+        for j1, c1 in enumerate(cnf.clauses):
+            for j2, c2 in enumerate(cnf.clauses):
+                variables1 = [
+                    (abs(l1)) for l1 in c1
+                ]  # gives the support qubits for clause c1
+                variables2 = [
+                    (abs(l2)) for l2 in c2
+                ]  # gives the support qubits for clause c2
+                intersection = list(
+                    set(variables1) & set(variables2)
+                )  # if this is non-empty, c1 and c2 are neighbors
+
+                if len(intersection) != 0:
+                    if mode == "LCG":
+                        sender_clauses.extend([j1 + 2 * n])
+                        receiver_clauses.extend([j2 + 2 * n])
+                    if mode == "VCG":
+                        sender_clauses.extend([j1 + n])
+                        receiver_clauses.extend([j2 + n])
+        neighbors_list = np.vstack((np.array(sender_clauses), np.array(receiver_clauses)))
+    elif mode == "VCG":
+        edges_matrix = np.sum(edges, axis = 1)
+        adjacency_matrix = scipy.sparse.coo_matrix(
+                        (
+                            edges_matrix,
+                            np.column_stack((np.asarray(receivers), np.asarray(senders))).T,
+                        ),
+                        shape=(n_node, n_node),
+                    )
+        adjacency_matrix = adjacency_matrix.todense()
+        def get_neighborhood(matrix):
+            sender_clauses = []
+            receiver_clauses = []
+            for i in range(np.shape(matrix)[1]):
+                target = np.ravel(matrix[i,:])
+                a = np.multiply(matrix, target)
+                a = np.ravel(np.sum(a, axis = 1))
+                a[i] = 0
+                b = np.argwhere(a != 0)
+                sender_clauses.extend(np.ones(len(b))*i)
+                receiver_clauses.extend(b)
+                # neighbors_indices = np.argwhere(b != 0).transpose()[0]
+                # neighbors_indices_list.append(neighbors_indices)
+            neighbors_indices_list = np.vstack((np.array(sender_clauses), np.ravel(np.array(receiver_clauses))))
+            return neighbors_indices_list
+
+        neighbors_list = get_neighborhood(
+                        adjacency_matrix
+                    )
+    """
     # padding done in case we want to jit the graph, this is relevant mostly for training the gnn model, not for
     # executing moser's walk on single instances
 
@@ -360,6 +496,7 @@ def get_problem_from_cnf(
         n_node = max(pad_nodes, n_node)
         n_edge = max(pad_edges, n_edge)
         graph = jraph.pad_with_graphs(graph, n_node, n_edge)
+        # neighbors_list =  np.pad(neighbors_list, ((0,n_node - np.shape(neighbors_list)[0]),(0,np.shape(neighbors_list)[0])))
 
     # For the loss calculation we create a mask for the nodes, which masks
     # the constraint nodes and the padding nodes.
@@ -373,7 +510,10 @@ def get_problem_from_cnf(
     assert len(mask) == n_node
 
     return HashableSATProblem(
-        graph=graph, mask=mask, clause_lengths=clause_lengths, params=(n, m, k)
+        graph=graph,
+        mask=[mask, neighbors_list],
+        clause_lengths=clause_lengths,
+        params=(n, m, k),
     )
 
 
