@@ -42,47 +42,65 @@ fn resample_clause(
     }
 }
 
+fn flip_literal(clause: &[Lit], assignment: &mut Vec<bool>, rng: &mut StdRng) {
+    let idx = clause.choose(rng).unwrap().var().index();
+    assignment[idx] = !assignment[idx];
+}
+
 #[pyfunction]
-fn run_moser_python(
+fn run_sls_python(
+    algo_type_as_str: String,
     path: String,
     weights: Vec<f64>,
     nsteps: usize,
     nruns: usize,
     seed: usize,
-) -> PyResult<(bool, Vec<bool>, usize)> {
+) -> PyResult<(bool, Vec<bool>, usize, usize, usize)> {
     let input: String = read_to_string(path).expect("failed to read");
 
     let implements_read = &input.as_bytes()[..];
 
     let formula = DimacsParser::parse(implements_read).expect("parse error");
 
-    println!(
-        "Loading problem with {} variables and {} clauses",
-        formula.var_count(),
-        formula.len()
-    );
+    // println!(
+    //     "Loading problem with {} variables and {} clauses",
+    //     formula.var_count(),
+    //     formula.len()
+    // );
 
-    let (found_solution, assignment, final_energies) =
-        run_moser(formula, weights, nsteps, nruns, seed);
+    let algo_type = match algo_type_as_str.as_str() {
+        "moser" => AlgoType::Moser,
+        "schoening" => AlgoType::Schoening,
+        _ => panic!("Unknown algorithm type"),
+    };
 
-    return Ok((found_solution, assignment, final_energies));
+    let (found_solution, assignment, final_energies, numtry, numstep) =
+        run_sls(algo_type, formula, weights, nsteps, nruns, seed);
+
+    return Ok((found_solution, assignment, final_energies, numtry, numstep));
 }
 
 #[pymodule]
 fn moser_rust(_py: Python, m: &PyModule) -> PyResult<()> {
-    m.add_function(wrap_pyfunction!(run_moser_python, m)?)?;
+    m.add_function(wrap_pyfunction!(run_sls_python, m)?)?;
     Ok(())
 }
 
-fn run_moser(
+enum AlgoType {
+    Moser,
+    Schoening,
+}
+
+fn run_sls(
+    algo_type: AlgoType,
     formula: CnfFormula,
     weights: Vec<f64>,
     nsteps: usize,
     nruns: usize,
     seed: usize,
-) -> (bool, Vec<bool>, usize) {
+) -> (bool, Vec<bool>, usize, usize, usize) {
     // Auxiliary functions
-    assert_eq!(weights.len(), formula.var_count());
+    // assert_eq!(weights.len(), formula.var_count());
 
     let find_violated_clauses = |assignment: &Vec<bool>| {
         formula
@@ -93,6 +111,7 @@ fn run_moser(
 
     let mut rng = StdRng::seed_from_u64(seed as u64);
     let mut numtry: usize = 0;
+    let mut numstep: usize = 0;
     let mut found_solution = false;
     let mut best_energy: usize = formula.len();
     let mut best_assignment = vec![];
@@ -104,7 +123,7 @@ fn run_moser(
             .map(|_| rng.gen_bool(0.5))
             .collect();
 
-        let mut numstep: usize = 0;
+        numstep = 0;
         let mut violated_clauses: Vec<&[Lit]> = find_violated_clauses(&assignment);
         let mut numfalse = violated_clauses.len();
 
@@ -116,6 +135,12 @@ fn run_moser(
         while numfalse > 0 && numstep < nsteps {
             numstep += 1;
             let next_clause = violated_clauses.choose(&mut rng).unwrap();
+            match algo_type {
+                AlgoType::Moser => {
+                    resample_clause(next_clause, &mut assignment, &mut rng, &weights)
+                }
+                AlgoType::Schoening => flip_literal(next_clause, &mut assignment, &mut rng),
+            }
             resample_clause(next_clause, &mut assignment, &mut rng, &weights);
             violated_clauses = find_violated_clauses(&assignment);
             numfalse = violated_clauses.len();
@@ -131,7 +156,13 @@ fn run_moser(
         println!("Round {} ending with {} violated clauses", numtry, numfalse);
     }
 
-    return (found_solution, best_assignment, best_energy);
+    return (
+        found_solution,
+        best_assignment,
+        best_energy,
+        numtry,
+        numstep,
+    );
 }
 
 fn main() {
@@ -156,8 +187,8 @@ fn main() {
     let nruns = 10;
     let seed = 0;
 
-    let (found_solution, assignment, _final_energies) =
-        run_moser(formula, weights, nsteps, nruns, seed);
+    let (found_solution, assignment, _final_energies, _numtry, _numstep) =
+        run_sls(AlgoType::Moser, formula, weights, nsteps, nruns, seed);
 
     println!(
         "last candidate: {:#?}, Found solution: {}",
