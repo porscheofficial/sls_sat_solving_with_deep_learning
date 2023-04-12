@@ -20,7 +20,7 @@ from model import (
     get_network_definition,
     get_model_probabilities,
 )
-from random_walk import moser_walk
+from random_walk import moser_walk, run_sls_python
 import mlflow
 from pathlib import Path
 import tempfile
@@ -37,10 +37,10 @@ alpha = 1
 beta = 1
 gamma = 20
 batch_size = 1
-# path = "../Data/LLL_sample_one"
+path = "../Data/LLL_sample_one"
 # path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/generateSAT/samples_medium_subset"
 # path = "../Data/blocksworld"
-path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/ml_based_sat_solver/BroadcastTestSet_subset"
+# path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/ml_based_sat_solver/BroadcastTestSet_subset"
 # path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/generateSAT/samples_LLL_n80/"
 N_STEPS_MOSER = 1000
 N_RUNS_MOSER = 5
@@ -50,7 +50,7 @@ network_type = "interaction"
 # network_definition = get_network_definition(network_type = network_type, graph_representation = graph_representation) #network_definition_interaction_new
 
 MODEL_REGISTRY = Path("../../mlrun_save")
-EXPERIMENT_NAME = "Broadcast_VCG"
+EXPERIMENT_NAME = "trash"
 
 print(glob.glob(path + "/*"))
 #  AUXILIARY METHODS
@@ -79,13 +79,22 @@ def evaluate_on_moser(
     params,
     problem,
     n_steps,
+    n_runs,
     keep_trajectory=False,
 ):
     model_probabilities = get_model_probabilities(
         network, params, problem, graph_representation
     )
-    _, energy, _ = moser_walk(
-        model_probabilities, problem, n_steps, seed=0, keep_trajectory=keep_trajectory
+    # _, energy, _ = moser_walk(
+    #    model_probabilities, problem, n_steps, seed=0, keep_trajectory=keep_trajectory
+    # )
+    _, _, energy, _, _ = run_sls_python(
+        "moser",
+        problem,
+        model_probabilities,
+        n_steps,
+        n_runs,
+        SEED,
     )
     _, m, _ = problem.params
     return np.min(energy) / m
