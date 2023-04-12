@@ -20,7 +20,7 @@ from model import (
     get_network_definition,
     get_model_probabilities,
 )
-from random_walk import moser_walk, run_sls_python
+from random_walk import moser_walk
 import mlflow
 from pathlib import Path
 import tempfile
@@ -30,16 +30,17 @@ from scipy.stats import entropy
 from jax.experimental.sparse import BCOO
 import glob
 import time
+import datetime
 
-NUM_EPOCHS = 50  # 10
+NUM_EPOCHS = 20  # 10
 f = 0.0001
-alpha = 1
+alpha = 10
 beta = 1
-gamma = 20
+gamma = 50
 batch_size = 1
-path = "../Data/LLL_sample_one"
+# path = "../Data/LLL_sample_one"
 # path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/generateSAT/samples_medium_subset"
-# path = "../Data/blocksworld"
+path = "../Data/blocksworld"
 # path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/ml_based_sat_solver/BroadcastTestSet_subset"
 # path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/generateSAT/samples_LLL_n80/"
 N_STEPS_MOSER = 1000
@@ -50,7 +51,10 @@ network_type = "interaction"
 # network_definition = get_network_definition(network_type = network_type, graph_representation = graph_representation) #network_definition_interaction_new
 
 MODEL_REGISTRY = Path("../../mlrun_save")
-EXPERIMENT_NAME = "trash"
+EXPERIMENT_NAME = "blocksworld_LCG"
+
+timestr = time.strftime("%Y%m%d-%H%M%S")
+model_path = "../params_save/" + EXPERIMENT_NAME + timestr
 
 print(glob.glob(path + "/*"))
 #  AUXILIARY METHODS
@@ -85,16 +89,8 @@ def evaluate_on_moser(
     model_probabilities = get_model_probabilities(
         network, params, problem, graph_representation
     )
-    # _, energy, _ = moser_walk(
-    #    model_probabilities, problem, n_steps, seed=0, keep_trajectory=keep_trajectory
-    # )
-    _, _, energy, _, _ = run_sls_python(
-        "moser",
-        problem,
-        model_probabilities,
-        n_steps,
-        n_runs,
-        SEED,
+    _, energy, _ = moser_walk(
+        model_probabilities, problem, n_steps, seed=0, keep_trajectory=keep_trajectory
     )
     _, m, _ = problem.params
     return np.min(energy) / m
@@ -170,7 +166,7 @@ def train(
     opt_init, opt_update = optax.adam(1e-3)
     opt_state = opt_init(params)
 
-    # @jax.jit
+    @jax.jit
     def update(params, opt_state, batch, f):
         g = jax.grad(combined_loss)(
             params, batch, f, alpha, beta, gamma, graph_representation
@@ -429,6 +425,14 @@ def train(
             _, _, final_energies = moser_rust.run_moser_python(
                 problem_path, model_probabilities, N_STEPS_MOSER, N_RUNS_MOSER, SEED
             )
+            # _, _, final_energies, _, _ = moser_rust.run_sls_python(
+            #        "moser",
+            #        problem,
+            #        model_probabilities,
+            #        N_STEPS_MOSER,
+            #        N_RUNS_MOSER,
+            #        SEED,
+            #    )
             _, m, _ = problem.params
             av_energies.append(np.mean(final_energies) / m)
             prob = np.vstack(
@@ -544,8 +548,10 @@ def train(
             plt.savefig(img_path + "accuracy.jpg", dpi=300, format="jpg")
 
     if model_path:
-        model_params = [params, batch_size, f, NUM_EPOCHS]
-        np.save(model_path, [model_params, *eval_objects])
+        jnp.save(
+            model_path,
+            np.asarray([params, [graph_representation, network_type]], dtype=object),
+        )
 
     return {
         "params": params,
@@ -636,7 +642,7 @@ if __name__ == "__main__":
         N_RUNS_MOSER,
         path,
         img_path=False,
-        model_path=False,
+        model_path=model_path,
         graph_representation=graph_representation,
         network_type=network_type,
     )

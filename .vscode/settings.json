@@ -3,5 +3,8 @@
     "python.linting.pylintEnabled": false,
     "python.linting.mypyEnabled": false,
     "python.linting.enabled": true,
-    "python.linting.flake8Enabled": true
+    "python.linting.flake8Enabled": true,
+    "rust-analyzer.linkedProjects": [
+        "./Cargo.toml"
+    ]
 }
