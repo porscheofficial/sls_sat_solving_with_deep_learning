@@ -222,8 +222,7 @@ def get_problem_from_cnf(
         edges = np.eye(2)[edges]
         nodes = np.eye(2)[nodes]
 
-    if mode == "LCG":
-        # print("mode LCG")
+    elif mode == "LCG":
         n_node = 2 * n + m
         clause_lengths = [len(c) for c in cnf.clauses]
         k = max(clause_lengths)
@@ -260,7 +259,7 @@ def get_problem_from_cnf(
                 else:
                     senders.append(int(2 * support[ii]))
             edges.extend(np.repeat(0, len(c)))
-            receivers.extend(np.repeat(j + n, len(c)))
+            receivers.extend(np.repeat(j + 2 * n, len(c)))
 
         for jj in range(n):
             senders.append(int(2 * jj + 1))
@@ -356,33 +355,34 @@ def get_problem_from_cnf(
         senders=np.asarray(senders),
         receivers=np.asarray(receivers),
     )
-    if mode == "LCG":
-        sender_clauses = []
-        receiver_clauses = []
-        for j1, c1 in enumerate(cnf.clauses):
-            for j2, c2 in enumerate(cnf.clauses):
-                variables1 = [
-                    (abs(l1)) for l1 in c1
-                ]  # gives the support qubits for clause c1
-                variables2 = [
-                    (abs(l2)) for l2 in c2
-                ]  # gives the support qubits for clause c2
-                intersection = list(
-                    set(variables1) & set(variables2)
-                )  # if this is non-empty, c1 and c2 are neighbors
-
-                if len(intersection) != 0:
-                    if mode == "LCG":
-                        sender_clauses.extend([j1 + 2 * n])
-                        receiver_clauses.extend([j2 + 2 * n])
-                    if mode == "VCG":
-                        sender_clauses.extend([j1 + n])
-                        receiver_clauses.extend([j2 + n])
-            neighbors_list = np.vstack(
-                (np.array(sender_clauses), np.array(receiver_clauses))
-            )
 
     if mode == "VCG":
+        row_ind = np.asarray(senders)
+        col_ind = np.asarray(receivers) - n * np.ones(len(receivers))
+        data = np.ones(len(row_ind))
+        # rint("n,m", n, m)
+        sparse_clause_matrix = scipy.sparse.csr_matrix(
+            (data, (row_ind, col_ind)), (n, m)
+        )
+        # print(sparse_clause_matrix.shape)
+        adj_matrix = sparse_clause_matrix.transpose() @ sparse_clause_matrix
+        major_dimension, minor_dimension = adj_matrix.shape
+        minor_indices = adj_matrix.indices
+        major_indices = np.empty(len(minor_indices), dtype=adj_matrix.indices.dtype)
+        scipy.sparse._sparsetools.expandptr(
+            major_dimension, adj_matrix.indptr, major_indices
+        )
+        x, y = np.array(
+            np.where(
+                minor_indices - major_indices != 0,
+                [minor_indices + n, major_indices + n],
+                0,
+            )
+        )
+        x = x[x != 0]
+        y = y[y != 0]
+        neighbors_list = np.vstack((y, x))
+        """
         e = len(senders)
         data = np.where(np.tile(senders, e) == np.repeat(senders, e), 1, 0)
         x = data * np.tile(receivers, e)
@@ -392,7 +392,33 @@ def get_problem_from_cnf(
         x = x[x != 0]
         y = y[y != 0]
         neighbors_list = np.stack((x, y))
+        """
     if mode == "LCG":
+        row_ind = np.floor(np.asarray(senders[:-n]) / 2)
+        col_ind = np.asarray(receivers[:-n]) - 2 * n * np.ones(len(receivers[:-n]))
+        data = np.ones(len(row_ind))
+        # print("n,m", n, m)
+        sparse_clause_matrix = scipy.sparse.csr_matrix(
+            (data, (row_ind, col_ind)), (n, m)
+        )
+        # print(sparse_clause_matrix.shape)
+        adj_matrix = sparse_clause_matrix.transpose() @ sparse_clause_matrix
+        major_dimension, minor_dimension = adj_matrix.shape
+        minor_indices = adj_matrix.indices
+        major_indices = np.empty(len(minor_indices), dtype=adj_matrix.indices.dtype)
+        scipy.sparse._sparsetools.expandptr(
+            major_dimension, adj_matrix.indptr, major_indices
+        )
+        x, y = np.array(
+            np.where(
+                minor_indices - major_indices != 0,
+                [minor_indices + 2 * n, major_indices + 2 * n],
+                0,
+            )
+        )
+        x = x[x != 0]
+        y = y[y != 0]
+        neighbors_list = np.vstack((y, x))
         """
         # returns the wrong result
         new_senders = (np.array(senders)+1)%2* np.array(senders) + (np.array(senders))%2*(np.array(senders)-1)
@@ -406,6 +432,8 @@ def get_problem_from_cnf(
         x = x[x!=0]
         y = y[y!=0]
         neighbors_list = np.stack((x,y))
+        """
+        # with two for-loops
         """
         sender_clauses = []
         receiver_clauses = []
@@ -428,12 +456,12 @@ def get_problem_from_cnf(
                     # if mode == "VCG":
                     #    sender_clauses.extend([j1 + n])
                     #    receiver_clauses.extend([j2 + n])
-        neighbors_list = np.vstack(
+        neighbors_list2 = np.vstack(
             (np.array(sender_clauses), np.array(receiver_clauses))
         )
 
-        # print("difference", neighbors_list - neighbors_list2)
-
+        print("difference", neighbors_list - neighbors_list2)
+        """
     # alternative methods for computing the neighbors_list
     """
     if mode == "LCG":

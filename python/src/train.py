@@ -35,20 +35,22 @@ NUM_EPOCHS = 50  # 10
 f = 0.0001
 alpha = 1
 beta = 1
-gamma = 100
+gamma = 20
 batch_size = 1
 # path = "../Data/LLL_sample_one"
 # path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/generateSAT/samples_medium_subset"
-path = "../Data/blocksworld"
-N_STEPS_MOSER = 20
-N_RUNS_MOSER = 2
+# path = "../Data/blocksworld"
+path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/ml_based_sat_solver/BroadcastTestSet_subset"
+# path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/generateSAT/samples_LLL_n80/"
+N_STEPS_MOSER = 1000
+N_RUNS_MOSER = 5
 SEED = 0
 graph_representation = "VCG"
 network_type = "interaction"
 # network_definition = get_network_definition(network_type = network_type, graph_representation = graph_representation) #network_definition_interaction_new
 
 MODEL_REGISTRY = Path("../../mlrun_save")
-EXPERIMENT_NAME = "trash"
+EXPERIMENT_NAME = "Broadcast_VCG"
 
 print(glob.glob(path + "/*"))
 #  AUXILIARY METHODS
@@ -159,7 +161,7 @@ def train(
     opt_init, opt_update = optax.adam(1e-3)
     opt_state = opt_init(params)
 
-    @jax.jit
+    # @jax.jit
     def update(params, opt_state, batch, f):
         g = jax.grad(combined_loss)(
             params, batch, f, alpha, beta, gamma, graph_representation
@@ -184,13 +186,13 @@ def train(
             if jnp.shape(decoded_nodes)[0] % 2 == 1:
                 new_decoded_nodes = jnp.vstack((jnp.asarray(decoded_nodes), [[0]]))
                 new_decoded_nodes = jnp.reshape(new_decoded_nodes, (-1, 2))
-                log_probs = jax.nn.softmax(new_decoded_nodes)
+                log_probs = jax.nn.log_softmax(new_decoded_nodes)
                 log_probs = jnp.ravel(log_probs)[:-1]
+
             else:
                 new_decoded_nodes = jnp.reshape(decoded_nodes, (-1, 2))
-                log_probs = jax.nn.softmax(new_decoded_nodes)
+                log_probs = jax.nn.log_softmax(new_decoded_nodes)
                 log_probs = jnp.ravel(log_probs)
-
             masked_log_probs = log_probs * mask
             relevant_log_probs = masked_log_probs[graph.senders]  # * graph.edges[0,:]
             convolved_log_probs = utils.segment_sum(
@@ -198,26 +200,25 @@ def train(
             )
             lhs_values = convolved_log_probs * constraint_node_mask
 
-            constraint_senders, constraint_receivers = neighbors_list
+            constraint_receivers, constraint_senders = neighbors_list
             constraint_senders = jnp.array(constraint_senders, int)
             constraint_receivers = jnp.array(constraint_receivers, int)
-
-            log_probs_sigmoid = jnp.ravel(jax.nn.sigmoid(decoded_nodes))
-            relevant_log_probs_sigmoid = log_probs_sigmoid[constraint_senders]
+            x_sigmoid = jnp.ravel(jax.nn.sigmoid(decoded_nodes))
+            relevant_x_sigmoid = x_sigmoid[constraint_senders]
             rhs_values = utils.segment_sum(
-                data=jnp.ravel(1 - relevant_log_probs_sigmoid),
+                data=jnp.ravel(jnp.log(1 - relevant_x_sigmoid)),
                 segment_ids=constraint_senders,
                 num_segments=n,
             )
-            rhs_values = rhs_values + log_probs_sigmoid
+            rhs_values = rhs_values + jnp.log(x_sigmoid)
 
-        if graph_representation == "VCG":
+        elif graph_representation == "VCG":
             (mask, graph, neighbors_list), _ = batch
             decoded_nodes = network.apply(params, graph)  # (B*N, 2)
             log_probs = jax.nn.log_softmax(
                 decoded_nodes
             )  # the log probs for each node (variable and constraint) # (B*N, 2)
-            e = len(graph.edges)
+            # e = len(graph.edges)
             n = jnp.shape(decoded_nodes)[0]
 
             constraint_node_mask = jnp.array(jnp.logical_not(mask), dtype=int)
@@ -228,21 +229,23 @@ def train(
 
             lhs_values = convolved_log_probs * constraint_node_mask
 
-            constraint_senders, constraint_receivers = neighbors_list
+            constraint_receivers, constraint_senders = neighbors_list
             constraint_senders = jnp.array(constraint_senders, int)
             constraint_receivers = jnp.array(constraint_receivers, int)
 
-            relevant_log_probs = log_probs[constraint_receivers][:, 1]
+            relevant_log_x = log_probs[constraint_receivers][:, 1]
             rhs_values = utils.segment_sum(
-                data=relevant_log_probs, segment_ids=constraint_senders, num_segments=n
+                data=relevant_log_x, segment_ids=constraint_senders, num_segments=n
             )
-            rhs_values += log_probs[:, 0]
+            rhs_values = rhs_values + log_probs[:, 0] * constraint_node_mask
+
+        else:
+            print("please use a valid graph representation")
 
         difference = lhs_values - rhs_values
         loss = jnp.sum(jnp.maximum(difference, jnp.zeros(len(rhs_values)))) / jnp.sum(
             constraint_node_mask
         )
-        # print("lll-loss shape", loss.shape)
         return beta * loss
 
     def entropy_loss(
@@ -261,7 +264,7 @@ def train(
             decoded_nodes = decoded_nodes * mask[:, None]
             prob = jax.nn.softmax(decoded_nodes)
             # constraint_prob = jnp.ones(jnp.shape(prob)) / 2 * constraint_node_mask[:, None]
-        if graph_representation == "LCG":
+        elif graph_representation == "LCG":
             decoded_nodes = decoded_nodes * mask[:, None]
             if np.shape(decoded_nodes)[0] % 2 == 1:
                 decoded_nodes = jnp.vstack((jnp.asarray(decoded_nodes), [0]))
@@ -275,6 +278,8 @@ def train(
             #    constraint_prob = jnp.reshape(constraint_prob, (-1, 2))
             # else:
             #    constraint_prob = jnp.reshape(constraint_prob, (-1, 2))
+        else:
+            print("please use a valid graph representation")
         # new_prob = prob + constraint_prob
         entropies = jnp.sum(jax.scipy.special.entr(prob), axis=1) / jnp.log(2)
         # print(entropies)
@@ -289,7 +294,6 @@ def train(
         #        for i in range(np.shape(new_prob)[1])
         #    ]
         loss = -jnp.sum(jnp.log(entropies), axis=0) / jnp.sum(mask) / 2
-        # print("entropy loss", loss.shape)
         return gamma * loss
 
     def prediction_loss(
@@ -349,7 +353,6 @@ def train(
         )  # (B*N, K, 2)
         weights = jax.nn.softmax(-f * energies)  # (B*N, K)
         loss = -jnp.sum(weights * jnp.sum(log_prob, axis=-1)) / jnp.sum(mask) / 2  # ()
-        # print("prediction_loss", loss.shape)
         return alpha * loss
 
     def combined_loss(
