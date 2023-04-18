@@ -31,8 +31,8 @@ def apply_interaction(graph: jraph.GraphsTuple, num_message_passing_steps: int =
     @jax.vmap
     @jraph.concatenated_args
     def update_fn(features):
-        net = mlp([20, 20, 20])
-        # net = mlp([40, 40, 40])
+        # net = mlp([20, 20, 20])
+        net = mlp([100, 100, 100])
         return net(features)
 
     for _ in range(num_message_passing_steps):
