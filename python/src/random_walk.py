@@ -105,7 +105,7 @@ def number_of_violated_constraints_VCG(problem: SATProblem, assignment):
     return np.sum(violated_constraints(problem, assignment).astype(int), axis=0)
 
 
-# @partial(jax.jit, static_argnames=("problem",))
+@partial(jax.jit, static_argnames=("problem",))
 def number_of_violated_constraints_LCG(problem: SATProblem, assignment):
     def one_hot(x, k, dtype=jnp.float32):
         """Create a one-hot encoding of x of size k."""
@@ -123,7 +123,6 @@ def number_of_violated_constraints_LCG(problem: SATProblem, assignment):
         data=edge_is_satisfied, segment_ids=receivers, num_segments=2 * n + m
     )[2 * n :]
     clause_is_unsat = jnp.where(number_of_literals_satisfied > 0, 0, 1)
-    print(clause_is_unsat)
     return jnp.sum(clause_is_unsat)
 
 

@@ -32,7 +32,7 @@ import glob
 import time
 import datetime
 
-NUM_EPOCHS = 500  # 10
+NUM_EPOCHS = 100  # 10
 f = 0.0001
 alpha = 1
 beta = 0
