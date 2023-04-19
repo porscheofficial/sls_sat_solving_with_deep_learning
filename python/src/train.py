@@ -38,22 +38,22 @@ alpha = 1
 beta = 0
 gamma = 0
 batch_size = 1
-path = "../Data/mini"
-# path = "../Data/LLL_sample_one_combination"
-# path = "../Data/LLL_sample_one_combination"
+# path = "../Data/mini"
+path = "../Data/LLL_sample_one_combination"
+# path = "../Data/LLL_sample_one"
 # path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/generateSAT/samples_medium_subset"
 # path = "../Data/blocksworld_subset"
 # path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/GIT_SAT_ML/data/BroadcastTestSet2"
 # path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/generateSAT/samples_LLL_n80/"
-N_STEPS_MOSER = 3
+N_STEPS_MOSER = 1000
 N_RUNS_MOSER = 5
 SEED = 0
-graph_representation = "VCG"
+graph_representation = "LCG"
 network_type = "interaction"
 # network_definition = get_network_definition(network_type = network_type, graph_representation = graph_representation) #network_definition_interaction_new
 
 MODEL_REGISTRY = Path("../../mlrun_save")
-EXPERIMENT_NAME = "trash3"
+EXPERIMENT_NAME = "trash4"
 
 timestr = time.strftime("%Y%m%d-%H%M%S")
 model_path = "../params_save/" + EXPERIMENT_NAME + timestr
@@ -176,7 +176,7 @@ def train(
     opt_init, opt_update = optax.adam(1e-3)
     opt_state = opt_init(params)
 
-    @jax.jit
+    # @jax.jit
     def update(params, opt_state, batch, f):
         g = jax.grad(combined_loss)(
             params, batch, f, alpha, beta, gamma, graph_representation
@@ -204,14 +204,24 @@ def train(
                 if jnp.shape(decoded_nodes)[0] % 2 == 1:
                     new_decoded_nodes = jnp.vstack((jnp.asarray(decoded_nodes), [[0]]))
                     new_decoded_nodes = jnp.reshape(new_decoded_nodes, (-1, 2))
+                    # print("b",new_decoded_nodes.shape)
+                    new_decoded_nodes = jnp.flip(new_decoded_nodes, axis=1)
+                    # print("a",new_decoded_nodes.shape)
                     log_probs = jax.nn.log_softmax(new_decoded_nodes)
                     log_probs = jnp.ravel(log_probs)[:-1]
 
                 else:
                     new_decoded_nodes = jnp.reshape(decoded_nodes, (-1, 2))
+                    # print("b",new_decoded_nodes.shape)
+                    new_decoded_nodes = jnp.flip(new_decoded_nodes, axis=1)
+                    # print("a",new_decoded_nodes.shape)
                     log_probs = jax.nn.log_softmax(new_decoded_nodes)
                     log_probs = jnp.ravel(log_probs)
                 masked_log_probs = log_probs * mask
+                # senders = graph.senders
+                # print("b",senders)
+                # senders = [(s%2*(s - 1) + (s%2-1)*(s + 1)) for s in senders]
+                # print("a", senders)
                 relevant_log_probs = masked_log_probs[
                     graph.senders
                 ]  # * graph.edges[0,:]
@@ -243,7 +253,7 @@ def train(
 
                 constraint_node_mask = jnp.array(jnp.logical_not(mask), dtype=int)
                 relevant_log_probs = jnp.sum(
-                    log_probs[graph.senders] * graph.edges, axis=1
+                    log_probs[graph.senders] * jnp.logical_not(graph.edges), axis=1
                 )
                 convolved_log_probs = utils.segment_sum(
                     relevant_log_probs, graph.receivers, num_segments=n
@@ -378,7 +388,7 @@ def train(
                     new_mask = new_mask[:, 0]
                     log_probs = jax.nn.log_softmax(conc_decoded_nodes)
                     rel_log_probs = jnp.ravel(log_probs) * mask
-                decoded_nodes = conc_decoded_nodes * mask
+                decoded_nodes = conc_decoded_nodes * new_mask[:, None]
                 # print(candidates[0:10])
 
                 candidates = vmap_one_hot(candidates, 2)
