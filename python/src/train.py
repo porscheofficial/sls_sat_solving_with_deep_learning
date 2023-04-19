@@ -32,19 +32,20 @@ import glob
 import time
 import datetime
 
-NUM_EPOCHS = 100  # 10
+NUM_EPOCHS = 500  # 10
 f = 0.0001
 alpha = 1
 beta = 0
 gamma = 0
 batch_size = 1
-path = "../Data/LLL_sample_one"
+path = "../Data/mini"
+# path = "../Data/LLL_sample_one_combination"
 # path = "../Data/LLL_sample_one_combination"
 # path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/generateSAT/samples_medium_subset"
 # path = "../Data/blocksworld_subset"
-# path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/ml_based_sat_solver/BroadcastTestSet_subset"
+# path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/GIT_SAT_ML/data/BroadcastTestSet2"
 # path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/generateSAT/samples_LLL_n80/"
-N_STEPS_MOSER = 1
+N_STEPS_MOSER = 3
 N_RUNS_MOSER = 5
 SEED = 0
 graph_representation = "VCG"
@@ -52,7 +53,7 @@ network_type = "interaction"
 # network_definition = get_network_definition(network_type = network_type, graph_representation = graph_representation) #network_definition_interaction_new
 
 MODEL_REGISTRY = Path("../../mlrun_save")
-EXPERIMENT_NAME = "trash"
+EXPERIMENT_NAME = "trash3"
 
 timestr = time.strftime("%Y%m%d-%H%M%S")
 model_path = "../params_save/" + EXPERIMENT_NAME + timestr
@@ -77,6 +78,14 @@ def compute_log_probs(decoded_nodes, mask, candidate):
 vmap_compute_log_probs = jax.vmap(
     compute_log_probs, in_axes=(None, None, 1), out_axes=1
 )
+
+# def compute_log_probs_LCG(rel_log_probs, candidate):
+#    candidate = jnp.ravel(candidate)
+#    return candidate * rel_log_probs
+#
+# vmap_compute_log_probs_LCG = jax.vmap(
+#    compute_log_probs_LCG, in_axes=(None, 1), out_axes=1
+# )
 
 
 def evaluate_on_moser(
@@ -358,6 +367,8 @@ def train(
                     new_mask = jnp.hstack((jnp.asarray(mask), [0]))
                     new_mask = jnp.reshape(new_mask, (-1, 2))
                     new_mask = new_mask[:, 0]
+                    # log_probs = jax.nn.log_softmax(conc_decoded_nodes)
+                    # rel_log_probs = jnp.ravel(log_probs)[:-1] * mask
                 else:
                     conc_decoded_nodes = jnp.reshape(decoded_nodes, (-1, 2))
                     # padded_conc_decoded_nodes = jnp.concatenate(
@@ -365,15 +376,25 @@ def train(
                     # )
                     new_mask = jnp.reshape(mask, (-1, 2))
                     new_mask = new_mask[:, 0]
-                decoded_nodes = conc_decoded_nodes
+                    log_probs = jax.nn.log_softmax(conc_decoded_nodes)
+                    rel_log_probs = jnp.ravel(log_probs) * mask
+                decoded_nodes = conc_decoded_nodes * mask
                 # print(candidates[0:10])
+
                 candidates = vmap_one_hot(candidates, 2)
                 # print(candidates[0:10])
                 energies = energies[: len(new_mask), :]
+                # candidate_log_prob = vmap_compute_log_probs_LCG(rel_log_probs, candidates)
 
             elif graph_representation == "VCG":
+                # print(candidates[0:10])
                 candidates = vmap_one_hot(candidates, 2)  # (B*N, K, 2))
                 new_mask = mask
+                # print(candidates[0:10])
+                # rel_log_probs = jax.nn.log_softmax(decoded_nodes) * mask[:,None]
+                # candidate_log_prob = vmap_compute_log_probs_VCG(
+                #    rel_log_probs, candidates
+                # )  # (B*N, K, 2)
             else:
                 print("please use a valid graph representation")
 
@@ -385,6 +406,8 @@ def train(
             loss = -jnp.sum(weights * jnp.sum(log_prob, axis=-1)) / jnp.sum(
                 mask
             )  # / 2  # ()
+            if graph_representation == "LCG":
+                loss = loss / 2
             return alpha * loss
 
     def combined_loss(
@@ -448,7 +471,12 @@ def train(
             else:
                 print("not valid argument for mode_probabilities")
             model_probabilities = model_probabilities.ravel()
-            print(np.max(model_probabilities), np.min(model_probabilities))
+            print(np.round(model_probabilities, 4))
+            print(
+                np.max(model_probabilities),
+                np.min(model_probabilities),
+                model_probabilities.shape,
+            )
             _, _, final_energies = moser_rust.run_moser_python(
                 problem_path, model_probabilities, N_STEPS_MOSER, N_RUNS_MOSER, SEED
             )

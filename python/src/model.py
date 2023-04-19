@@ -14,8 +14,8 @@ import numpy as np
 
 def get_embedding(graph: jraph.GraphsTuple):
     embedding = jraph.GraphMapFeatures(
-        embed_edge_fn=jax.vmap(hk.Linear(output_size=16)),
-        embed_node_fn=jax.vmap(hk.Linear(output_size=16)),
+        embed_edge_fn=jax.vmap(hk.Linear(output_size=32)),
+        embed_node_fn=jax.vmap(hk.Linear(output_size=32)),
     )
     graph = embedding(graph)
     return graph
@@ -32,7 +32,7 @@ def apply_interaction(graph: jraph.GraphsTuple, num_message_passing_steps: int =
     @jraph.concatenated_args
     def update_fn(features):
         # net = mlp([20, 20, 20])
-        net = mlp([100, 100, 100])
+        net = mlp([200])
         return net(features)
 
     for _ in range(num_message_passing_steps):

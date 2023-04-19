@@ -98,7 +98,6 @@ class SATTrainingDataset_LCG(data.Dataset):
             energies = vmap(
                 number_of_violated_constraints_LCG, in_axes=(None, 0), out_axes=0
             )(problem, candidates)
-            print(energies)
 
             return problem, (padded_candidates, energies)
         else:
@@ -187,8 +186,6 @@ class SATTrainingDataset_VCG(data.Dataset):
             # energies = vmap(
             #    violated_constraints_VCG, in_axes=(None, 0), out_axes=0
             # )(problem, candidates)
-            # print("violated", violated_constraints_VCG(problem, candidates[0]))
-            print(energies)
             return problem, (padded_candidates, energies)
         else:
             # return only solution
@@ -218,6 +215,7 @@ def collate_fn(batch):
     batched_energies = np.vstack(
         [np.repeat([e], len(m), axis=0) for (e, m) in zip(energies, masks)]
     )
+    assert min(energies) == 0
     # batched_energies = np.vstack(
     #    [np.repeat([e], int(jnp.sum(m) / 2), axis=0) for (e, m) in zip(energies, masks)]
     # )

@@ -22,7 +22,14 @@ def create_candidates_with_sol(data_dir, sample_size, threshold):
     for g in solved_instances:
         with open(g, "rb") as f:
             p = pickle.load(f)
-        n = np.array(list(p), dtype=bool)
+        if type(p) == dict:
+            p = [x for (_, x) in p.items()]
+        if type(p) == list:
+            if list[0] == int:
+                p = [int(abs(x) + 1) / 2 for x in p]
+        print(p)
+        n = np.array(p, dtype=bool)
+        print(n)
         samples = sample_candidates(n, sample_size - 1, threshold)
         samples = np.concatenate((np.reshape(n, (1, len(n))), samples), axis=0)
         name = g.split("_sol.pkl")[0]
@@ -234,6 +241,7 @@ def generate_dataset_VanDerWaerden(
                     )
 
 
+"""
 path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/generateSAT/samples_medium/"
 
 k = 3
@@ -244,7 +252,7 @@ vary_percent = 0.1
 generate_dataset_random_KCNF(
     n_list, alpha_3, num_samples, path, vary_percent=vary_percent, TIMEOUT=100
 )
-"""
+
 s_list = [10]
 k_list = [5]
 N_list = [12]
@@ -257,8 +265,9 @@ k1_list = [3]
 k2_list = [2]
 num_samples = 1
 generate_dataset_VanDerWaerden(N_list, k1_list, k2_list, num_samples, path, TIMEOUT = 100)
-"""
+
 
 sample_size = 10
 threshold = 0.03
 create_candidates_with_sol(path, sample_size, threshold)
+"""
