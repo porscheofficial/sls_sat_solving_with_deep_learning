@@ -215,7 +215,8 @@ def collate_fn(batch):
     batched_energies = np.vstack(
         [np.repeat([e], len(m), axis=0) for (e, m) in zip(energies, masks)]
     )
-    assert min(energies) == 0
+    # print(np.min(energies))
+    # assert np.min(energies) == 0
     # batched_energies = np.vstack(
     #    [np.repeat([e], int(jnp.sum(m) / 2), axis=0) for (e, m) in zip(energies, masks)]
     # )

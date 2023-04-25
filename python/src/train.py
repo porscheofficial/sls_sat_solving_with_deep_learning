@@ -32,20 +32,21 @@ import glob
 import time
 import datetime
 
-NUM_EPOCHS = 500  # 10
-f = 0.0001
+NUM_EPOCHS = 100  # 10
+f = 0.0000001
 alpha = 1
 beta = 0
 gamma = 0
 batch_size = 1
 # path = "../Data/mini"
-path = "../Data/LLL_sample_one_combination"
+# path = "../Data/LLL_sample_one_combination"
 # path = "../Data/LLL_sample_one"
-# path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/generateSAT/samples_medium_subset"
+path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/generateSAT/samples_medium_subset"
 # path = "../Data/blocksworld_subset"
 # path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/GIT_SAT_ML/data/BroadcastTestSet2"
+# path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/GIT_SAT_ML/data/BroadcastTestSet_subset"
 # path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/generateSAT/samples_LLL_n80/"
-N_STEPS_MOSER = 1000
+N_STEPS_MOSER = 100
 N_RUNS_MOSER = 5
 SEED = 0
 graph_representation = "LCG"
@@ -53,7 +54,7 @@ network_type = "interaction"
 # network_definition = get_network_definition(network_type = network_type, graph_representation = graph_representation) #network_definition_interaction_new
 
 MODEL_REGISTRY = Path("../../mlrun_save")
-EXPERIMENT_NAME = "trash4"
+EXPERIMENT_NAME = "samples_medium_subset_vcg"
 
 timestr = time.strftime("%Y%m%d-%H%M%S")
 model_path = "../params_save/" + EXPERIMENT_NAME + timestr
@@ -176,7 +177,7 @@ def train(
     opt_init, opt_update = optax.adam(1e-3)
     opt_state = opt_init(params)
 
-    # @jax.jit
+    @jax.jit
     def update(params, opt_state, batch, f):
         g = jax.grad(combined_loss)(
             params, batch, f, alpha, beta, gamma, graph_representation
