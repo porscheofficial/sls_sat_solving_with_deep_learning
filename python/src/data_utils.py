@@ -18,7 +18,10 @@ from pysat.formula import CNF
 from torch.utils import data
 
 from constraint_problems import get_problem_from_cnf
-from random_walk import number_of_violated_constraints
+from random_walk import (
+    number_of_violated_constraints_LCG,
+    number_of_violated_constraints_VCG,
+)
 
 MAX_TIME = 20
 
@@ -89,9 +92,13 @@ class SATTrainingDataset_LCG(data.Dataset):
                 candidates,
                 pad_width=((0, 0), (0, int(np.ceil(N / 2)) - n)),
             )
+            # energies = vmap(
+            #    number_of_violated_constraints, in_axes=(None, 0), out_axes=0
+            # )(problem, candidates)
             energies = vmap(
-                number_of_violated_constraints, in_axes=(None, 0), out_axes=0
+                number_of_violated_constraints_LCG, in_axes=(None, 0), out_axes=0
             )(problem, candidates)
+
             return problem, (padded_candidates, energies)
         else:
             # return only solution
@@ -99,7 +106,7 @@ class SATTrainingDataset_LCG(data.Dataset):
             with open(target_name, "rb") as f:
                 solution_dict = pickle.load(f)
                 candidates = self.solution_dict_to_array(solution_dict)
-            energies = number_of_violated_constraints(problem, candidates)
+            energies = number_of_violated_constraints_LCG(problem, candidates)
             # candidates already padded inside solution_dict_to_array but repeated here for transparency
             padded_candidates = np.pad(
                 candidates,
@@ -174,8 +181,11 @@ class SATTrainingDataset_VCG(data.Dataset):
                 pad_width=((0, 0), (0, N - n)),
             )
             energies = vmap(
-                number_of_violated_constraints, in_axes=(None, 0), out_axes=0
+                number_of_violated_constraints_VCG, in_axes=(None, 0), out_axes=0
             )(problem, candidates)
+            # energies = vmap(
+            #    violated_constraints_VCG, in_axes=(None, 0), out_axes=0
+            # )(problem, candidates)
             return problem, (padded_candidates, energies)
         else:
             # return only solution
@@ -183,7 +193,7 @@ class SATTrainingDataset_VCG(data.Dataset):
             with open(target_name, "rb") as f:
                 solution_dict = pickle.load(f)
                 candidates = self.solution_dict_to_array(solution_dict)
-            energies = number_of_violated_constraints(problem, candidates)
+            energies = number_of_violated_constraints_VCG(problem, candidates)
             # candidates already padded inside solution_dict_to_array but repeated here for transparency
             padded_candidates = np.pad(
                 candidates,
@@ -205,6 +215,8 @@ def collate_fn(batch):
     batched_energies = np.vstack(
         [np.repeat([e], len(m), axis=0) for (e, m) in zip(energies, masks)]
     )
+    # print(np.min(energies))
+    # assert np.min(energies) == 0
     # batched_energies = np.vstack(
     #    [np.repeat([e], int(jnp.sum(m) / 2), axis=0) for (e, m) in zip(energies, masks)]
     # )
