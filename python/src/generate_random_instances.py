@@ -72,11 +72,11 @@ def generate_random_KCNF(k, n, m, path, TIMEOUT=100):
     if sol == False:
         print(
             "no satisfiable random_KCNF problem found for (n,k,m)=("
-            + n
+            + str(n)
             + ","
-            + k
+            + str(k)
             + ","
-            + m
+            + str(m)
             + ")"
         )
 
@@ -138,11 +138,11 @@ def generate_Ramsey(s, k, N, path, TIMEOUT=100):
     if sol == False:
         print(
             "no satisfiable Ramsey problem found for (s,k,N)=("
-            + s
+            + str(s)
             + ","
-            + k
+            + str(k)
             + ","
-            + N
+            + str(N)
             + ")"
         )
 
@@ -204,11 +204,11 @@ def generate_VanDerWaerden(N, k1, k2, path, TIMEOUT=100):
     if sol == False:
         print(
             "no satisfiable VanDerWaerden problem found for (N, k1, k2)=("
-            + N
+            + str(N)
             + ","
-            + k1
+            + str(k1)
             + ","
-            + k2
+            + str(k2)
             + ")"
         )
 
@@ -243,18 +243,17 @@ def generate_dataset_VanDerWaerden(
                     )
 
 
-"""
-path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/generateSAT/samples_medium/"
+path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/generateSAT/samples_n300/"
 
 k = 3
-alpha_3 = 4.17 * 0.8
+alpha_3 = 4.17 * 1
 num_samples = 30
-n_list = [30, 40, 50]
-vary_percent = 0.1
+n_list = [300]
+vary_percent = 0.05
 generate_dataset_random_KCNF(
     n_list, alpha_3, num_samples, path, vary_percent=vary_percent, TIMEOUT=100
 )
-
+"""
 s_list = [10]
 k_list = [5]
 N_list = [12]

@@ -32,17 +32,17 @@ import glob
 import time
 import datetime
 
-NUM_EPOCHS = 100  # 10
+NUM_EPOCHS = 20  # 10
 f = 0.0000001
 alpha = 1
-beta = 0
+beta = 1
 gamma = 0
 batch_size = 1
 # path = "../Data/mini"
 # path = "../Data/LLL_sample_one_combination"
 # path = "../Data/LLL_sample_one"
-path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/generateSAT/samples_medium_subset"
-# path = "../Data/blocksworld_subset"
+# path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/generateSAT/samples_large_n"
+path = "../Data/blocksworld"
 # path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/GIT_SAT_ML/data/BroadcastTestSet2"
 # path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/GIT_SAT_ML/data/BroadcastTestSet_subset"
 # path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/generateSAT/samples_LLL_n80/"
@@ -54,7 +54,7 @@ network_type = "interaction"
 # network_definition = get_network_definition(network_type = network_type, graph_representation = graph_representation) #network_definition_interaction_new
 
 MODEL_REGISTRY = Path("../../mlrun_save")
-EXPERIMENT_NAME = "samples_medium_subset_vcg"
+EXPERIMENT_NAME = "LCG_blocksworld"
 
 timestr = time.strftime("%Y%m%d-%H%M%S")
 model_path = "../params_save/" + EXPERIMENT_NAME + timestr

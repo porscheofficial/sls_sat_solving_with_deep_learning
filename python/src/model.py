@@ -32,8 +32,9 @@ def apply_interaction(graph: jraph.GraphsTuple, num_message_passing_steps: int =
     @jraph.concatenated_args
     def update_fn(features):
         # net = mlp([20, 20, 20])
-        net = mlp([1000, 1000, 1000])
-        return net(features)
+        ln = hk.LayerNorm(axis=-1, param_axis=-1, create_scale=True, create_offset=True)
+        net = mlp([300, 300, 300])
+        return ln(net(features))
 
     for _ in range(num_message_passing_steps):
         gn = jraph.InteractionNetwork(

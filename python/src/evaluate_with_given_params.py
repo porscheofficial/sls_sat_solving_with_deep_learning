@@ -15,12 +15,14 @@ import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 
-data_path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/GIT_SAT_ML/data/LLL_sample_one"
+# data_path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/GIT_SAT_ML/data/LLL_sample_one"
 # data_path = "../Data/LLL_sample_one"
-data_path = "../Data/blocksworld"
-model_path = "../params_save/trash20230418-105437.npy"
+# data_path = "../Data/blocksworld"
+data_path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/generateSAT/samples_n300"
+# model_path = "../params_save/LCG_samples_large_n20230426-143758.npy"
+model_path = "../params_save/LCG_blocksworld20230427-170155.npy"
 
-N_STEPS_MOSER_list = [1, 10, 20, 50, 100]
+N_STEPS_MOSER_list = [1, 10, 50, 100, 500, 1000, 5000, 10000, 50000, 100000, 500000]
 N_RUNS_MOSER = 5
 SEED = 0
 
