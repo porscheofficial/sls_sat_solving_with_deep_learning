@@ -7,6 +7,7 @@ import jax.numpy as jnp
 import numpy as np
 from functools import partial
 from jax.experimental.sparse import BCOO
+from jraph._src import utils
 
 from constraint_problems import SATProblem
 
@@ -100,8 +101,56 @@ def violated_constraints(problem: SATProblem, assignment):
     return constraint_is_violated
 
 
-def number_of_violated_constraints(problem: SATProblem, assignment):
+def number_of_violated_constraints_VCG(problem: SATProblem, assignment):
     return np.sum(violated_constraints(problem, assignment).astype(int), axis=0)
 
 
+@partial(jax.jit, static_argnames=("problem",))
+def number_of_violated_constraints_LCG(problem: SATProblem, assignment):
+    def one_hot(x, k, dtype=jnp.float32):
+        """Create a one-hot encoding of x of size k."""
+        return jnp.array(x[:, None] == jnp.arange(k), dtype)
+
+    graph = problem.graph
+    n, m, k = problem.params
+    senders = graph.senders[:-n]
+    receivers = graph.receivers[:-n]
+    new_assignment = jnp.ravel(one_hot(assignment, 2))
+    edge_is_satisfied = jnp.ravel(
+        new_assignment[None].T[senders].T
+    )  # + np.ones(len(senders)), 2)
+    number_of_literals_satisfied = utils.segment_sum(
+        data=edge_is_satisfied, segment_ids=receivers, num_segments=2 * n + m
+    )[2 * n :]
+    clause_is_unsat = jnp.where(number_of_literals_satisfied > 0, 0, 1)
+    return jnp.sum(clause_is_unsat)
+
+
+"""
+# @partial(jax.jit, static_argnames=("problem",))
+def violated_constraints_VCG(problem: SATProblem, assignment):
+    def one_hot(x, k, dtype=jnp.float32):
+        '''Create a one-hot encoding of x of size k.'''
+        return jnp.array(x[:, None] == jnp.arange(k), dtype)
+        #return jnp.array(x[:, None] == jnp.arange(k), dtype)
+    graph = problem.graph
+    e = len(graph.edges)
+    n, m, k = problem.params
+    senders = graph.senders
+    edges = graph.edges
+    receivers = graph.receivers
+    print("edges")
+    print(edges)
+    new_assignment = one_hot(assignment.T,2)
+    edge_is_satisfied = new_assignment[senders] * edges[senders] # + np.ones(len(senders)), 2)
+    print("sat",edge_is_satisfied.shape)
+    edge_is_satisfied = jnp.sum(edge_is_satisfied,axis=1)
+    print("sat sum", edge_is_satisfied.shape)
+    number_of_literals_satisfied = utils.segment_sum(data=edge_is_satisfied, segment_ids=receivers, num_segments=n + m)[n:]
+    print(number_of_literals_satisfied)
+    clause_is_unsat = jnp.where(number_of_literals_satisfied > 0, 0, 1)
+    print("clause unsat", clause_is_unsat)
+    print(clause_is_unsat.shape) 
+    return jnp.sum(clause_is_unsat)
+"""
 # %%

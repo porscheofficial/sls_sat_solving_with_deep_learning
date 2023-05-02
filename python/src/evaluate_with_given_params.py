@@ -15,11 +15,12 @@ import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 
-# data_path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/GIT_SAT_ML/data/LLL_sample_one"
-data_path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/GIT_SAT_ML/data/blocksworld"
-model_path = "../params_save/blocksworld_LCG20230412-151026.npy"
+data_path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/GIT_SAT_ML/data/LLL_sample_one"
+# data_path = "../Data/LLL_sample_one"
+data_path = "../Data/blocksworld"
+model_path = "../params_save/trash20230418-105437.npy"
 
-N_STEPS_MOSER_list = [10, 100, 1000, 10000]
+N_STEPS_MOSER_list = [1, 10, 20, 50, 100]
 N_RUNS_MOSER = 5
 SEED = 0
 
@@ -64,13 +65,13 @@ def load_model_and_test_moser(data_path, model_path, N_STEPS_MOSER_list, N_RUNS_
             single_energy_uniform[i] = final_energies_uniform
             # print("N_STEPS_MOSER", N_STEPS_MOSER, final_energies)
         # print(single_energy)
-        energies_array += single_energy
-        energies_array_uniform += single_energy_uniform
+        energies_array += single_energy / problem.params[1]
+        energies_array_uniform += single_energy_uniform / problem.params[1]
 
     energies_array = energies_array / len(sat_data)
     energies_array_uniform = energies_array_uniform / len(sat_data)
-    plt.plot(N_STEPS_MOSER_list, energies_array, ".", label="model")
-    plt.plot(N_STEPS_MOSER_list, energies_array_uniform, ".", label="uniform")
+    plt.plot(N_STEPS_MOSER_list, energies_array, "--o", label="model")
+    plt.plot(N_STEPS_MOSER_list, energies_array_uniform, "--o", label="uniform")
     plt.xlabel("N_STEPS_MOSER")
     plt.ylabel("# violated clauses / m")
     plt.xscale("log")
