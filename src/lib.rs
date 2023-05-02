@@ -1,8 +1,8 @@
 use pyo3::prelude::*;
 use rand::rngs::StdRng;
 use rand::seq::SliceRandom;
+use rand::Rng;
 use rand::SeedableRng;
-use rand::{rngs::ThreadRng, Rng};
 
 use std::env;
 use std::fs::read_to_string;
@@ -120,7 +120,7 @@ fn run_sls(
         numtry += 1;
 
         let mut assignment = (0..formula.var_count())
-            .map(|_| rng.gen_bool(0.5))
+            .map(|i| rng.gen_bool(weights[i]))
             .collect();
 
         numstep = 0;
