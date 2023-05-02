@@ -243,6 +243,7 @@ def generate_dataset_VanDerWaerden(
                     )
 
 
+"""
 path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/generateSAT/samples_n300/"
 
 k = 3
@@ -253,7 +254,7 @@ vary_percent = 0.05
 generate_dataset_random_KCNF(
     n_list, alpha_3, num_samples, path, vary_percent=vary_percent, TIMEOUT=100
 )
-"""
+
 s_list = [10]
 k_list = [5]
 N_list = [12]

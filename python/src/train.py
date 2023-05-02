@@ -32,7 +32,7 @@ import glob
 import time
 import datetime
 
-NUM_EPOCHS = 20  # 10
+NUM_EPOCHS = 100  # 10
 f = 0.0000001
 alpha = 1
 beta = 1
@@ -41,12 +41,12 @@ batch_size = 1
 # path = "../Data/mini"
 # path = "../Data/LLL_sample_one_combination"
 # path = "../Data/LLL_sample_one"
-# path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/generateSAT/samples_large_n"
+# path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/generateSAT/LLL_subset"
 path = "../Data/blocksworld"
 # path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/GIT_SAT_ML/data/BroadcastTestSet2"
 # path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/GIT_SAT_ML/data/BroadcastTestSet_subset"
 # path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/generateSAT/samples_LLL_n80/"
-N_STEPS_MOSER = 100
+N_STEPS_MOSER = 0
 N_RUNS_MOSER = 5
 SEED = 0
 graph_representation = "LCG"
@@ -58,8 +58,8 @@ EXPERIMENT_NAME = "LCG_blocksworld"
 
 timestr = time.strftime("%Y%m%d-%H%M%S")
 model_path = "../params_save/" + EXPERIMENT_NAME + timestr
-
-print(glob.glob(path + "/*"))
+img_path = model_path + "_plot"
+print(glob.glob(path + "/*.cnf"))
 #  AUXILIARY METHODS
 
 
@@ -126,7 +126,7 @@ def plot_accuracy_fig(*eval_results):
     plt.grid()
     plt.legend()
     plt.tight_layout()
-    plt.show()
+    # plt.show()
 
 
 EvalResults = collections.namedtuple("EvalResult", ("name", "results", "normalize"))
@@ -488,17 +488,17 @@ def train(
                 np.min(model_probabilities),
                 model_probabilities.shape,
             )
-            _, _, final_energies = moser_rust.run_moser_python(
-                problem_path, model_probabilities, N_STEPS_MOSER, N_RUNS_MOSER, SEED
+            # _, _, final_energies = moser_rust.run_moser_python(
+            #    problem_path, model_probabilities, N_STEPS_MOSER, N_RUNS_MOSER, SEED
+            # )
+            _, _, final_energies, _, _ = moser_rust.run_sls_python(
+                "moser",
+                problem_path,
+                model_probabilities,
+                N_STEPS_MOSER,
+                N_RUNS_MOSER,
+                SEED,
             )
-            # _, _, final_energies, _, _ = moser_rust.run_sls_python(
-            #        "moser",
-            #        problem,
-            #        model_probabilities,
-            #        N_STEPS_MOSER,
-            #        N_RUNS_MOSER,
-            #        SEED,
-            #    )
             _, m, _ = problem.params
             av_energies.append(np.mean(final_energies) / m)
             prob = np.vstack(
@@ -522,18 +522,18 @@ def train(
         train_eval_data, mode_probabilities="uniform", mode=graph_representation
     )[0]
 
-    test_eval = EvalResults("Test loss", [], True)
-    train_eval = EvalResults("Train loss", [], True)
+    test_eval = EvalResults("Test loss", [], False)
+    train_eval = EvalResults("Train loss", [], False)
     test_moser_eval = EvalResults("Moser loss - test", [], False)
     train_moser_eval = EvalResults("Moser loss - train", [], False)
     test_moser_baseline = EvalResults("Moser loss uniform baseline - test", [], False)
     train_moser_baseline = EvalResults("Moser loss uniform baseline - train", [], False)
     test_entropy_eval = EvalResults("Test loss entropy", [], False)
     train_entropy_eval = EvalResults("Train loss entropy", [], False)
-    test_eval_lll = EvalResults("Test loss LLL", [], True)
-    train_eval_lll = EvalResults("Train loss LLL", [], True)
-    test_eval_dm = EvalResults("Test loss Deepmind", [], True)
-    train_eval_dm = EvalResults("Train loss Deepmind", [], True)
+    test_eval_lll = EvalResults("Test loss LLL", [], False)
+    train_eval_lll = EvalResults("Train loss LLL", [], False)
+    test_eval_dm = EvalResults("Test loss Deepmind", [], False)
+    train_eval_dm = EvalResults("Train loss Deepmind", [], False)
 
     eval_objects = [
         test_eval,
@@ -605,19 +605,19 @@ def train(
         if epoch == 0:
             t2 = time.time()
             print("took", t2 - t1, "seconds")
-
-    if img_path:
-        plot_accuracy_fig(*eval_objects)
-        if img_path == False:
-            plt.show()
-        else:
-            plt.savefig(img_path + "accuracy.jpg", dpi=300, format="jpg")
-
     if model_path:
         jnp.save(
             model_path,
             np.asarray([params, [graph_representation, network_type]], dtype=object),
         )
+        print("model successfully saved")
+
+    if img_path:
+        plot_accuracy_fig(*eval_objects)
+        if img_path == "show":
+            plt.show()
+        else:
+            plt.savefig(img_path + "accuracy.jpg", dpi=300, format="jpg")
 
     return {
         "params": params,
@@ -707,7 +707,7 @@ if __name__ == "__main__":
         N_STEPS_MOSER,
         N_RUNS_MOSER,
         path,
-        img_path=False,
+        img_path=img_path,
         model_path=model_path,
         graph_representation=graph_representation,
         network_type=network_type,

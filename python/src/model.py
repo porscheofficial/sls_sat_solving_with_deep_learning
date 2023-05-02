@@ -33,7 +33,7 @@ def apply_interaction(graph: jraph.GraphsTuple, num_message_passing_steps: int =
     def update_fn(features):
         # net = mlp([20, 20, 20])
         ln = hk.LayerNorm(axis=-1, param_axis=-1, create_scale=True, create_offset=True)
-        net = mlp([100, 100])
+        net = mlp([100, 100, 100])
         return ln(net(features))
 
     for _ in range(num_message_passing_steps):
@@ -92,12 +92,13 @@ def network_definition_interaction_VCG(
     number_message_passing_steps = number of layers
     """
     graph = get_embedding(graph)
-    graph = apply_interaction(graph, num_message_passing_steps)
+    graph = apply_interaction(graph, num_message_passing_steps, mlp_dims)
     return hk.Linear(2)(graph.nodes)
 
 
 def network_definition_interaction_LCG(
-    graph: jraph.GraphsTuple, num_message_passing_steps: int = 5
+    graph: jraph.GraphsTuple,
+    num_message_passing_steps: int = 5,
 ) -> jraph.ArrayTree:
     """Defines a graph neural network.
     Args:

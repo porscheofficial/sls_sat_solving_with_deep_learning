@@ -519,12 +519,14 @@ def get_problem_from_cnf(
     """
     # padding done in case we want to jit the graph, this is relevant mostly for training the gnn model, not for
     # executing moser's walk on single instances
-
+    """
+    #turn padding off...
     if pad_nodes > n_node or pad_edges > n_edge:
         n_node = max(pad_nodes, n_node)
         n_edge = max(pad_edges, n_edge)
         graph = jraph.pad_with_graphs(graph, n_node, n_edge)
         # neighbors_list =  np.pad(neighbors_list, ((0,n_node - np.shape(neighbors_list)[0]),(0,np.shape(neighbors_list)[0])))
+    """
 
     # For the loss calculation we create a mask for the nodes, which masks
     # the constraint nodes and the padding nodes.
