@@ -212,6 +212,14 @@ def load_model_and_test_moser2(
                 sat_data = SATTrainingDataset_LCG(data_path)
             if graph_representation == "VCG":
                 sat_data = SATTrainingDataset_VCG(data_path)
+        else:
+            params, model_details = np.load(model_paths_list[j + 1], allow_pickle=True)
+            graph_representation, network_type = model_details
+
+            if graph_representation == "LCG":
+                sat_data = SATTrainingDataset_LCG(data_path)
+            if graph_representation == "VCG":
+                sat_data = SATTrainingDataset_VCG(data_path)
 
             # data_loader = JraphDataLoader(sat_data, batch_size=1, shuffle=True)
 
@@ -231,7 +239,7 @@ def load_model_and_test_moser2(
                 )
                 model_probabilities = model_probabilities.ravel()
             else:
-                model_probabilities = np.ones(len(model_probabilities)) / 2
+                model_probabilities = np.ones(problem.params[0]) / 2
             _, _, final_energies, numtry, numstep = moser_rust.run_sls_python(
                 "moser",
                 problem_path,
