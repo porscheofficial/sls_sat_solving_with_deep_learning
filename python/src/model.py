@@ -33,7 +33,7 @@ def apply_interaction(graph: jraph.GraphsTuple, num_message_passing_steps: int =
     def update_fn(features):
         # net = mlp([20, 20, 20])
         ln = hk.LayerNorm(axis=-1, param_axis=-1, create_scale=True, create_offset=True)
-        net = mlp([100, 100, 100])
+        net = mlp([100, 100])
         return ln(net(features))
 
     for _ in range(num_message_passing_steps):
