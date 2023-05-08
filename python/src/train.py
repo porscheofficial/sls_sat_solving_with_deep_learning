@@ -15,12 +15,17 @@ from torch import Generator
 import matplotlib.pyplot as plt
 import pandas as pd
 import moser_rust
-from data_utils import SATTrainingDataset_LCG, SATTrainingDataset_VCG, JraphDataLoader
-from model import (
+from python.src.data_utils import (
+    SATTrainingDataset_LCG,
+    SATTrainingDataset_VCG,
+    JraphDataLoader,
+)
+from python.src.model import (
     get_network_definition,
     get_model_probabilities,
 )
-from random_walk import moser_walk
+
+# from random_walk import moser_walk
 import mlflow
 from pathlib import Path
 import tempfile
@@ -89,22 +94,22 @@ vmap_compute_log_probs = jax.vmap(
 # )
 
 
-def evaluate_on_moser(
-    network,
-    params,
-    problem,
-    n_steps,
-    n_runs,
-    keep_trajectory=False,
-):
-    model_probabilities = get_model_probabilities(
-        network, params, problem, graph_representation
-    )
-    _, energy, _ = moser_walk(
-        model_probabilities, problem, n_steps, seed=0, keep_trajectory=keep_trajectory
-    )
-    _, m, _ = problem.params
-    return np.min(energy) / m
+# def evaluate_on_moser(
+#     network,
+#     params,
+#     problem,
+#     n_steps,
+#     n_runs,
+#     keep_trajectory=False,
+# ):
+#     model_probabilities = get_model_probabilities(
+#         network, params, problem, graph_representation
+#     )
+#     _, energy, _ = moser_walk(
+#         model_probabilities, problem, n_steps, seed=0, keep_trajectory=keep_trajectory
+#     )
+#     _, m, _ = problem.params
+#     return np.min(energy) / m
 
 
 def plot_accuracy_fig(*eval_results):
@@ -452,15 +457,15 @@ def train(
             ]
         )
 
-    def evaluate_moser_jax(data_subset):
-        return np.mean(
-            [
-                evaluate_on_moser(
-                    network, params, sat_data.get_unpadded_problem(i), N_STEPS_MOSER
-                )
-                for i in data_subset.indices
-            ]
-        )
+    # def evaluate_moser_jax(data_subset):
+    #     return np.mean(
+    #         [
+    #             evaluate_on_moser(
+    #                 network, params, sat_data.get_unpadded_problem(i), N_STEPS_MOSER
+    #             )
+    #             for i in data_subset.indices
+    #         ]
+    #     )
 
     def evaluate_moser_rust(
         data_subset, mode_probabilities="model", mode=graph_representation
@@ -498,6 +503,7 @@ def train(
                 N_STEPS_MOSER,
                 N_RUNS_MOSER,
                 SEED,
+                return_trajectories=False,
             )
             _, m, _ = problem.params
             av_energies.append(np.mean(final_energies) / m)

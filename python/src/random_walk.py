@@ -9,7 +9,7 @@ from functools import partial
 from jax.experimental.sparse import BCOO
 from jraph._src import utils
 
-from constraint_problems import SATProblem
+from python.src.constraint_problems import SATProblem
 
 
 def moser_walk(weights, problem, n_steps, seed, keep_trajectory=False):

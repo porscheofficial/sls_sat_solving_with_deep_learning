@@ -3,7 +3,8 @@ import sys
 sys.path.append("../../")
 
 from collections import namedtuple
-from os.path import join, exists
+from os.path import join, exists, basename
+from os import mkdir
 
 import glob
 import gzip
@@ -17,8 +18,8 @@ from jax import vmap
 from pysat.formula import CNF
 from torch.utils import data
 
-from constraint_problems import get_problem_from_cnf
-from random_walk import (
+from python.src.constraint_problems import get_problem_from_cnf
+from python.src.random_walk import (
     number_of_violated_constraints_LCG,
     number_of_violated_constraints_VCG,
 )
@@ -279,8 +280,8 @@ def create_solutions(path, time_limit, suffix, open_util):
         root = f.split(".cnf")[0]
         solved_target_name = root + "_sol.pkl"
         unsolved_target_name = root + "_unsol.pkl"
-        solved_target_name = join("processed", "solved", solved_target_name)
-        unsolved_target_name = join("processed", "unsolved", unsolved_target_name)
+        solved_target_name = join(solved_target_name)
+        unsolved_target_name = join(unsolved_target_name)
         if exists(solved_target_name) or exists(unsolved_target_name):
             print("solution file already exists")
             continue

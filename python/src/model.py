@@ -78,6 +78,7 @@ def apply_convolution(graph: jraph.GraphsTuple, num_message_passing_steps: int =
         #    update_node_fn=update_fn,
         # )
         # graph = gn(graph)
+    return graph
 
 
 def network_definition_interaction_VCG(
@@ -92,7 +93,7 @@ def network_definition_interaction_VCG(
     number_message_passing_steps = number of layers
     """
     graph = get_embedding(graph)
-    graph = apply_interaction(graph, num_message_passing_steps, mlp_dims)
+    graph = apply_interaction(graph, num_message_passing_steps)
     return hk.Linear(2)(graph.nodes)
 
 
