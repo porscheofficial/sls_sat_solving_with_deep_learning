@@ -1,8 +1,8 @@
 use pyo3::prelude::*;
 use rand::rngs::StdRng;
 use rand::seq::SliceRandom;
+use rand::Rng;
 use rand::SeedableRng;
-use rand::{rngs::ThreadRng, Rng};
 
 use std::env;
 use std::fs::read_to_string;
@@ -55,7 +55,8 @@ fn run_sls_python(
     nsteps: usize,
     nruns: usize,
     seed: usize,
-) -> PyResult<(bool, Vec<bool>, usize, usize, usize)> {
+    return_trajectories: bool,
+) -> PyResult<(bool, Vec<bool>, usize, usize, usize, Vec<Vec<usize>>)> {
     let input: String = read_to_string(path).expect("failed to read");
 
     let implements_read = &input.as_bytes()[..];
@@ -74,10 +75,24 @@ fn run_sls_python(
         _ => panic!("Unknown algorithm type"),
     };
 
-    let (found_solution, assignment, final_energies, numtry, numstep) =
-        run_sls(algo_type, formula, weights, nsteps, nruns, seed);
+    let (found_solution, assignment, best_energy, numtry, numstep, trajectories) = run_sls(
+        algo_type,
+        formula,
+        weights,
+        nsteps,
+        nruns,
+        seed,
+        return_trajectories,
+    );
 
-    return Ok((found_solution, assignment, final_energies, numtry, numstep));
+    return Ok((
+        found_solution,
+        assignment,
+        best_energy,
+        numtry,
+        numstep,
+        trajectories,
+    ));
 }
 
 #[pymodule]
@@ -98,7 +113,8 @@ fn run_sls(
     nsteps: usize,
     nruns: usize,
     seed: usize,
-) -> (bool, Vec<bool>, usize, usize, usize) {
+    return_trajectories: bool,
+) -> (bool, Vec<bool>, usize, usize, usize, Vec<Vec<usize>>) {
     // Auxiliary functions
     // assert_eq!(weights.len(), formula.var_count());
 
@@ -115,12 +131,15 @@ fn run_sls(
     let mut found_solution = false;
     let mut best_energy: usize = formula.len();
     let mut best_assignment = vec![];
+    let mut trajectories: Vec<Vec<usize>> = vec![];
 
     while !found_solution && numtry < nruns {
+        let mut trajectory: Vec<usize> = vec![];
+
         numtry += 1;
 
         let mut assignment = (0..formula.var_count())
-            .map(|_| rng.gen_bool(0.5))
+            .map(|i| rng.gen_bool(weights[i]))
             .collect();
 
         numstep = 0;
@@ -130,6 +149,10 @@ fn run_sls(
         if numfalse < best_energy {
             best_energy = numfalse;
             best_assignment = assignment.clone();
+        }
+
+        if return_trajectories {
+            trajectory.push(numfalse);
         }
 
         while numfalse > 0 && numstep < nsteps {
@@ -150,10 +173,16 @@ fn run_sls(
                 best_assignment = assignment.clone();
             }
 
+            if return_trajectories {
+                trajectory.push(numfalse);
+            }
+
             found_solution = numfalse == 0;
         }
 
-        println!("Round {} ending with {} violated clauses", numtry, numfalse);
+        trajectories.push(trajectory);
+
+        // println!("Round {} ending with {} violated clauses", numtry, numfalse);
     }
 
     return (
@@ -162,6 +191,7 @@ fn run_sls(
         best_energy,
         numtry,
         numstep,
+        trajectories,
     );
 }
 
@@ -186,9 +216,17 @@ fn main() {
     let nsteps = 1000;
     let nruns = 10;
     let seed = 0;
+    let return_trajectories = false;
 
-    let (found_solution, assignment, _final_energies, _numtry, _numstep) =
-        run_sls(AlgoType::Moser, formula, weights, nsteps, nruns, seed);
+    let (found_solution, assignment, _final_energies, _numtry, _numstep, _trajectories) = run_sls(
+        AlgoType::Moser,
+        formula,
+        weights,
+        nsteps,
+        nruns,
+        seed,
+        return_trajectories,
+    );
 
     println!(
         "last candidate: {:#?}, Found solution: {}",

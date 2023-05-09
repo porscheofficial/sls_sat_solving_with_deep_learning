@@ -1,3 +1,4 @@
+from functools import partial
 import sys
 
 sys.path.append("../../")
@@ -190,6 +191,7 @@ def train(
         updates, opt_state = opt_update(g, opt_state)
         return optax.apply_updates(params, updates), opt_state
 
+    @partial(jax.jit, static_argnums=(3, 4, 5, 6))
     def local_lovasz_loss(
         params,
         batch,
@@ -294,6 +296,7 @@ def train(
             loss = jnp.sum(max_array) / jnp.sum(constraint_node_mask)
             return beta * loss
 
+    @partial(jax.jit, static_argnums=(3, 4, 5, 6))
     def entropy_loss(
         params,
         batch,
@@ -346,6 +349,7 @@ def train(
             # loss = -jnp.min(jnp.log2(entropies))
             return gamma * loss  # / (epoch + 1)
 
+    @partial(jax.jit, static_argnums=(3, 4, 5, 6))
     def prediction_loss(
         params,
         batch,
@@ -426,6 +430,7 @@ def train(
                 loss = loss / 2
             return alpha * loss
 
+    @partial(jax.jit, static_argnums=(3, 4, 5, 6))
     def combined_loss(
         params,
         batch,
@@ -496,7 +501,7 @@ def train(
             # _, _, final_energies = moser_rust.run_moser_python(
             #    problem_path, model_probabilities, N_STEPS_MOSER, N_RUNS_MOSER, SEED
             # )
-            _, _, final_energies, _, _ = moser_rust.run_sls_python(
+            _, _, final_energies, _, _, _ = moser_rust.run_sls_python(
                 "moser",
                 problem_path,
                 model_probabilities,
@@ -559,7 +564,7 @@ def train(
     for epoch in range(NUM_EPOCHS):
         start_time = time.time()
         for counter, batch in enumerate(train_loader):
-            # print("batch_number", counter)
+            print("batch_number", counter)
             params, opt_state = update(params, opt_state, batch, f)
 
         epoch_time = time.time() - start_time
