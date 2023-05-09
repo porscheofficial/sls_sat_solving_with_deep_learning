@@ -160,7 +160,7 @@ def get_k_sat_problem(n, m, k):
 
 
 def get_problem_from_cnf(
-    cnf: CNF, mode, pad_nodes=0, pad_edges=0
+    cnf: CNF, mode, LLL=False, pad_nodes=0, pad_edges=0
 ) -> HashableSATProblem:
     cnf.clauses = [c for c in cnf.clauses if len(c) > 0]
     n = cnf.nv
@@ -356,7 +356,7 @@ def get_problem_from_cnf(
         receivers=np.asarray(receivers),
     )
 
-    if mode == "VCG":
+    if mode == "VCG" and LLL == True:
         row_ind = np.asarray(senders)
         col_ind = np.asarray(receivers) - n * np.ones(len(receivers))
         data = np.ones(len(row_ind))
@@ -393,7 +393,7 @@ def get_problem_from_cnf(
         y = y[y != 0]
         neighbors_list = np.stack((x, y))
         """
-    if mode == "LCG":
+    if mode == "LCG" and LLL == True:
         row_ind = np.floor(np.asarray(senders[:-n]) / 2)
         col_ind = np.asarray(receivers[:-n]) - 2 * n * np.ones(len(receivers[:-n]))
         data = np.ones(len(row_ind))
@@ -462,6 +462,8 @@ def get_problem_from_cnf(
 
         print("difference", neighbors_list - neighbors_list2)
         """
+    if LLL == False:
+        neighbors_list = [[], []]
     # alternative methods for computing the neighbors_list
     """
     if mode == "LCG":
@@ -519,14 +521,12 @@ def get_problem_from_cnf(
     """
     # padding done in case we want to jit the graph, this is relevant mostly for training the gnn model, not for
     # executing moser's walk on single instances
-    """
-    #turn padding off...
-    if pad_nodes > n_node or pad_edges > n_edge:
-        n_node = max(pad_nodes, n_node)
-        n_edge = max(pad_edges, n_edge)
-        graph = jraph.pad_with_graphs(graph, n_node, n_edge)
-        # neighbors_list =  np.pad(neighbors_list, ((0,n_node - np.shape(neighbors_list)[0]),(0,np.shape(neighbors_list)[0])))
-    """
+    if LLL == False:
+        if pad_nodes > n_node or pad_edges > n_edge:
+            n_node = max(pad_nodes, n_node)
+            n_edge = max(pad_edges, n_edge)
+            graph = jraph.pad_with_graphs(graph, n_node, n_edge)
+            # neighbors_list =  np.pad(neighbors_list, ((0,n_node - np.shape(neighbors_list)[0]),(0,np.shape(neighbors_list)[0])))
 
     # For the loss calculation we create a mask for the nodes, which masks
     # the constraint nodes and the padding nodes.
