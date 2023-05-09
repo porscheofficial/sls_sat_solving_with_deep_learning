@@ -11,6 +11,7 @@ import jax.numpy as jnp
 import numpy as np
 import optax
 import time
+
 from torch.utils import data
 from torch import Generator
 import matplotlib.pyplot as plt
@@ -38,34 +39,35 @@ import glob
 import time
 import datetime
 
-NUM_EPOCHS = 100  # 10
+NUM_EPOCHS = 20  # 10
 f = 0.0000001
 alpha = 1
-beta = 1
+beta = 0
 gamma = 0
 batch_size = 1
 # path = "../Data/mini"
 # path = "../Data/LLL_sample_one_combination"
 # path = "../Data/LLL_sample_one"
 # path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/generateSAT/LLL_subset"
-path = "../Data/blocksworld"
+# path = "../Data/blocksworld"
 # path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/GIT_SAT_ML/data/BroadcastTestSet2"
-# path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/GIT_SAT_ML/data/BroadcastTestSet_subset"
+path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/GIT_SAT_ML/data/BroadcastTestSet"
 # path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/generateSAT/samples_LLL_n80/"
-N_STEPS_MOSER = 0
+N_STEPS_MOSER = 100
 N_RUNS_MOSER = 5
 SEED = 0
-graph_representation = "LCG"
+graph_representation = "VCG"
 network_type = "interaction"
 # network_definition = get_network_definition(network_type = network_type, graph_representation = graph_representation) #network_definition_interaction_new
 
 MODEL_REGISTRY = Path("../../mlrun_save")
-EXPERIMENT_NAME = "LCG_blocksworld"
+EXPERIMENT_NAME = "VCG_broadcast"
 
 timestr = time.strftime("%Y%m%d-%H%M%S")
 model_path = "../params_save/" + EXPERIMENT_NAME + timestr
 img_path = model_path + "_plot"
 print(glob.glob(path + "/*.cnf"))
+print(len(glob.glob(path + "/*.cnf")))
 #  AUXILIARY METHODS
 
 
@@ -566,7 +568,14 @@ def train(
         for counter, batch in enumerate(train_loader):
             print("batch_number", counter)
             params, opt_state = update(params, opt_state, batch, f)
-
+        if model_path:
+            jnp.save(
+                model_path,
+                np.asarray(
+                    [params, [graph_representation, network_type]], dtype=object
+                ),
+            )
+        print("model successfully saved")
         epoch_time = time.time() - start_time
 
         test_LLL_loss = evaluate(test_loader, local_lovasz_loss, graph_representation)

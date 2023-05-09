@@ -82,7 +82,7 @@ def generate_random_KCNF(k, n, m, path, TIMEOUT=100):
 
 
 def generate_dataset_random_KCNF(
-    n_list, alpha, num_samples, path, vary_percent=0, TIMEOUT=100
+    k, n_list, alpha, num_samples, path, vary_percent=0, TIMEOUT=100
 ):
     """This function generates a random_KCNF dataset.
 
