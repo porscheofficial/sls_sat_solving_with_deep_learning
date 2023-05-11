@@ -9,7 +9,7 @@ from functools import partial
 from jax.experimental.sparse import BCOO
 from jraph._src import utils
 
-from python.src.constraint_problems import SATProblem
+from python.src.sat_instances import SATProblem, SATRepresentation
 
 
 def moser_walk(weights, problem, n_steps, seed, keep_trajectory=False):
@@ -79,26 +79,14 @@ def moser_walk(weights, problem, n_steps, seed, keep_trajectory=False):
     return output, energy, counter
 
 
-@partial(jax.jit, static_argnames=("problem",))
-def violated_constraints(problem: SATProblem, assignment):
-    graph = problem.graph
-    edge_is_violated = jnp.mod(graph.edges[:, 1] + assignment.T[graph.senders].T, 2)
-
-    e = len(graph.edges)
-    _, m, k = problem.params
-    edge_mask_sp = BCOO(
-        (np.ones(e), np.column_stack((np.arange(e), graph.receivers))), shape=(e, m)
-    )
-
-    violated_constraint_edges = edge_is_violated @ edge_mask_sp  # (,x) @ (x,m)  = (,m)
-    constraint_is_violated = violated_constraint_edges == jnp.asarray(
-        problem.clause_lengths
-    )
-
-    # constraint_is_violated = (
-    #     jax.vmap(jnp.sum)(jnp.reshape(edge_is_violated, (m, k))) == k
-    # )
-    return constraint_is_violated
+def number_of_violated_constraints(
+    problem: SATProblem, assignment, representation: SATRepresentation
+):
+    match representation:
+        case SATRepresentation.VCG:
+            return number_of_violated_constraints_VCG(problem, assignment)
+        case SATRepresentation.LCG:
+            return number_of_violated_constraints_LCG(problem, assignment)
 
 
 def number_of_violated_constraints_VCG(problem: SATProblem, assignment):

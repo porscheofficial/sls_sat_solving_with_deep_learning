@@ -18,36 +18,40 @@ from jax import vmap
 from pysat.formula import CNF
 from torch.utils import data
 
-from python.src.constraint_problems import get_problem_from_cnf
-from python.src.random_walk import (
-    number_of_violated_constraints_LCG,
-    number_of_violated_constraints_VCG,
-)
+from python.src.sat_representations import SATRepresentation
+from python.src.sat_instances import get_problem_from_cnf
+from python.src.random_walk import number_of_violated_constraints
 
 MAX_TIME = 20
 
-SATInstanceMeta = namedtuple("SATInstanceMeta", ("name", "n", "m", "n_edges"))
+SATInstanceMeta = namedtuple("SATInstanceMeta", ("name", "n", "m"))
 
 
-class SATTrainingDataset_LCG(data.Dataset):
-    def __init__(self, data_dir, already_unzipped=True, return_candidates=True):
+class SATTrainingDataset(data.Dataset):
+    def __init__(
+        self, data_dir, representation, already_unzipped=True, return_candidates=True
+    ):
         self.return_candidates = return_candidates
         self.data_dir = data_dir
         self.already_unzipped = already_unzipped
+        self.representation: SATRepresentation = representation
         solved_instances = glob.glob(join(data_dir, "*_sol.pkl"))
 
         self.instances = []
+        edges_list = []
+        n_nodes_list = []
         for f in solved_instances:
             name = f.split("_sol.pkl")[0]
             problem_file = self._get_problem_file(name)
             cnf = CNF(from_string=problem_file.read())
-            instance = SATInstanceMeta(
-                name, cnf.nv, len(cnf.clauses), sum(len(c) for c in cnf.clauses)
-            )
+            n, m = cnf.nv, len(cnf.clauses)
+            instance = SATInstanceMeta(name, n, m)
+            n_nodes_list.append(self.representation.get_n_nodes(cnf))
+            edges_list.append(self.representation.get_n_edges(cnf))
             self.instances.append(instance)
 
-        self.max_n_node = max(2 * i.n + i.m for i in self.instances)
-        self.max_n_edge = max(i.n_edges for i in self.instances)
+        self.max_n_node = max(n_nodes_list)
+        self.max_n_edge = max(edges_list)
 
     def __len__(self):
         return len(self.instances)
@@ -55,7 +59,10 @@ class SATTrainingDataset_LCG(data.Dataset):
     def solution_dict_to_array(self, solution_dict):
         return np.pad(
             np.array(list(solution_dict.values()), dtype=int),
-            (0, int(np.ceil(self.max_n_node / 2)) - len(solution_dict)),
+            (
+                0,
+                int(np.ceil(self.max_n_node / 2)) - len(solution_dict),
+            ),  # @TODO: check if this is correct
         )
 
     def _get_problem_file(self, name):
@@ -68,159 +75,58 @@ class SATTrainingDataset_LCG(data.Dataset):
         instance_name = self.instances[idx].name
         problem_file = self._get_problem_file(instance_name)
         return get_problem_from_cnf(
-            cnf=CNF(from_string=problem_file.read()), mode="LCG"
+            cnf=CNF(from_string=problem_file.read()), representation=self.representation
         )
 
     def __getitem__(self, idx):
-        instance_name = self.instances[idx].name
+        instance = self.instances[idx]
+        instance_name = instance.name
         problem_file = self._get_problem_file(instance_name)
         problem = get_problem_from_cnf(
             cnf=CNF(from_string=problem_file.read()),
             pad_nodes=self.max_n_node,
             pad_edges=self.max_n_edge,
-            mode="LCG",
+            representation=self.representation,
         )
-        N = len(problem.mask[0])  # total number of nodes in (padded) graph
-        n, _, _ = problem.params  # number of variables nodes in instance
-
         if self.return_candidates:
             # return not just solution but also generated candidates
             target_name = instance_name + "_samples_sol.npy"
-            candidates = np.load(
-                target_name
-            )  # np.array which stores candidates and solution to problem
-            padded_candidates = np.pad(
-                candidates,
-                pad_width=((0, 0), (0, int(np.ceil(N / 2)) - n)),
-            )
-            # energies = vmap(
-            #    number_of_violated_constraints, in_axes=(None, 0), out_axes=0
-            # )(problem, candidates)
-            energies = vmap(
-                number_of_violated_constraints_LCG, in_axes=(None, 0), out_axes=0
-            )(problem, candidates)
+            candidates = np.load(target_name)  # (n_candidates, n_node)
 
-            return problem, (padded_candidates, energies)
         else:
             # return only solution
             target_name = instance_name + "_sol.pkl"
             with open(target_name, "rb") as f:
                 solution_dict = pickle.load(f)
-                candidates = self.solution_dict_to_array(solution_dict)
-            energies = number_of_violated_constraints_LCG(problem, candidates)
-            # candidates already padded inside solution_dict_to_array but repeated here for transparency
-            padded_candidates = np.pad(
-                candidates,
-                pad_width=(0, int(np.ceil(N / 2)) - n),
-            )
-            return problem, (padded_candidates, energies)
+                candidates = np.array(list(solution_dict.values()), dtype=int).reshape(
+                    1, -1
+                )  # (1, n_node)
 
+        padded_candidates = np.pad(
+            candidates,
+            pad_width=((0, 0), (0, self.max_n_node - instance.n)),
+        )  # (n_candidates, max_n_node)
 
-class SATTrainingDataset_VCG(data.Dataset):
-    def __init__(self, data_dir, already_unzipped=True, return_candidates=True):
-        self.return_candidates = return_candidates
-        self.data_dir = data_dir
-        self.already_unzipped = already_unzipped
-        solved_instances = glob.glob(join(data_dir, "*_sol.pkl"))
+        energies = vmap(
+            self.representation.get_violated_constraints, in_axes=(None, 0), out_axes=0
+        )(problem, candidates)
 
-        self.instances = []
-        for f in solved_instances:
-            name = f.split("_sol.pkl")[0]
-            problem_file = self._get_problem_file(name)
-            cnf = CNF(from_string=problem_file.read())
-            instance = SATInstanceMeta(
-                name, cnf.nv, len(cnf.clauses), sum(len(c) for c in cnf.clauses)
-            )
-            self.instances.append(instance)
-
-        self.max_n_node = max(i.n + i.m for i in self.instances)
-        self.max_n_edge = max(i.n_edges for i in self.instances)
-
-    def __len__(self):
-        return len(self.instances)
-
-    def solution_dict_to_array(self, solution_dict):
-        return np.pad(
-            np.array(list(solution_dict.values()), dtype=int),
-            (0, self.max_n_node - len(solution_dict)),
-        )
-
-    def _get_problem_file(self, name):
-        if self.already_unzipped:
-            return open(name + ".cnf", "rt")
-        else:
-            return gzip.open(name + ".cnf.gz", "rt")
-
-    def get_unpadded_problem(self, idx):
-        instance_name = self.instances[idx].name
-        problem_file = self._get_problem_file(instance_name)
-        return get_problem_from_cnf(
-            cnf=CNF(from_string=problem_file.read()), mode="VCG"
-        )
-
-    def __getitem__(self, idx):
-        instance_name = self.instances[idx].name
-        problem_file = self._get_problem_file(instance_name)
-        problem = get_problem_from_cnf(
-            cnf=CNF(from_string=problem_file.read()),
-            pad_nodes=self.max_n_node,
-            pad_edges=self.max_n_edge,
-            mode="VCG",
-        )
-        N = len(problem.mask[0])  # total number of nodes in (padded) graph
-        n, _, _ = problem.params  # number of variables nodes in instance
-
-        if self.return_candidates:
-            # return not just solution but also generated candidates
-            target_name = instance_name + "_samples_sol.npy"
-            candidates = np.load(
-                target_name
-            )  # np.array which stores candidates and solution to problem
-
-            padded_candidates = np.pad(
-                candidates,
-                pad_width=((0, 0), (0, N - n)),
-            )
-            energies = vmap(
-                number_of_violated_constraints_VCG, in_axes=(None, 0), out_axes=0
-            )(problem, candidates)
-            # energies = vmap(
-            #    violated_constraints_VCG, in_axes=(None, 0), out_axes=0
-            # )(problem, candidates)
-            return problem, (padded_candidates, energies)
-        else:
-            # return only solution
-            target_name = instance_name + "_sol.pkl"
-            with open(target_name, "rb") as f:
-                solution_dict = pickle.load(f)
-                candidates = self.solution_dict_to_array(solution_dict)
-            energies = number_of_violated_constraints_VCG(problem, candidates)
-            # candidates already padded inside solution_dict_to_array but repeated here for transparency
-            padded_candidates = np.pad(
-                candidates,
-                pad_width=(0, N - n),
-            )
-            return problem, (padded_candidates, energies)
+        return problem, (padded_candidates, energies)
 
 
 def collate_fn(batch):
     problems, tuples = zip(*batch)
     candidates, energies = zip(*tuples)
-    masks, graphs, neighbors_list = zip(
-        *((p.mask[0], p.graph, p.mask[1]) for p in problems)
+    masks, graphs, neighbors_lists = zip(
+        *((p.mask, p.graph, p.neighbors_list) for p in problems)
     )
     batched_masks = np.concatenate(masks)
-    batched_neighbors_list = np.concatenate(neighbors_list)
+    batched_neighbors_list = np.concatenate(neighbors_lists)
     batched_graphs = jraph.batch(graphs)
     batched_candidates = np.vstack([c.T for c in candidates])
     batched_energies = np.vstack(
         [np.repeat([e], len(m), axis=0) for (e, m) in zip(energies, masks)]
     )
-    # print(np.min(energies))
-    # assert np.min(energies) == 0
-    # batched_energies = np.vstack(
-    #    [np.repeat([e], int(jnp.sum(m) / 2), axis=0) for (e, m) in zip(energies, masks)]
-    # )
 
     return (batched_masks, batched_graphs, batched_neighbors_list), (
         batched_candidates,

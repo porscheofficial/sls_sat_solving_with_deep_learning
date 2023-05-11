@@ -17,11 +17,7 @@ from torch import Generator
 import matplotlib.pyplot as plt
 import pandas as pd
 import moser_rust
-from python.src.data_utils import (
-    SATTrainingDataset_LCG,
-    SATTrainingDataset_VCG,
-    JraphDataLoader,
-)
+from python.src.data_utils import SATTrainingDataset, JraphDataLoader, SATRepresentation
 from python.src.model import (
     get_network_definition,
     get_model_probabilities,
@@ -156,15 +152,22 @@ def train(
     graph_representation="LCG",
     network_type="interaction",
 ):
-    if graph_representation == "LCG":
-        sat_data = SATTrainingDataset_LCG(path)
-        if batch_size != 1:
-            sys.exit(
-                "Gives wrong result -> how to get correct probabilities? how to get correct energies? Need to fix this!"
-            )
-    if graph_representation == "VCG":
-        sat_data = SATTrainingDataset_VCG(path)
+    # if graph_representation == "LCG":
+    #     sat_data = SATTrainingDataset_LCG(path)
+    #     if batch_size != 1:
+    #         sys.exit(
+    #             "Gives wrong result -> how to get correct probabilities? how to get correct energies? Need to fix this!"
+    #         )
+    # if graph_representation == "VCG":
+    #     sat_data = SATTrainingDataset_VCG(path)
 
+    match graph_representation:
+        case "LCG":
+            rep = SATRepresentation.LCG
+        case "VCG":
+            rep = SATRepresentation.VCG
+
+    sat_data = SATTrainingDataset(path, rep)
     train_data, test_data = data.random_split(
         sat_data, [0.8, 0.2], generator=Generator().manual_seed(0)
     )
