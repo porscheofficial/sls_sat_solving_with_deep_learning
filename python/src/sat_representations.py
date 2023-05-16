@@ -17,7 +17,7 @@ class SATRepresentation(ABC):
 
     @staticmethod
     @abstractmethod
-    def get_constraint_graph(n, m, senders, receivers):
+    def get_constraint_graph(n, m, senders, receivers) -> list[list, list]:
         pass
 
     @staticmethod
@@ -32,22 +32,45 @@ class SATRepresentation(ABC):
 
     @staticmethod
     @abstractmethod
-    def prediction_loss():
-        pass
-
-    @staticmethod
-    @abstractmethod
-    def lll_loss():
-        pass
-
-    @staticmethod
-    @abstractmethod
     def get_n_nodes(cnf: CNF):
         pass
 
     @staticmethod
     @abstractmethod
     def get_n_edges(cnf: CNF):
+        pass
+
+    @staticmethod
+    @abstractmethod
+    def get_model_probilities(decoded_nodes, n):
+        """
+        Helper method that returns, for each, problem variable, the Bernoulli parameter of the model for this variable.
+        That is, the ith value of the returned array is the probability with which the model will assign 1 to the
+        ith variable.
+
+        The reasoning for choosing the first, rather than the zeroth, column of the model output below is as follows:
+
+        - When evaluating the loss function, candidates are one-hot encoded, which means that when a satisfying assignment
+        for a problem sets variable i to 1, then this will increase the likelihood that the model will set this variable to
+        1, meaning, all else being equal, a larger Bernoulli weight in element [i,1] of the model output. As a result the
+        right column of the softmax of the model output equals the models likelihood for setting variables to 1, which is
+        what we seek.
+        """
+        pass
+
+    @staticmethod
+    @abstractmethod
+    def prediction_loss(decoded_nodes, mask, candidates, energies, f: float):
+        pass
+
+    @staticmethod
+    @abstractmethod
+    def local_lovasz_loss(decoded_nodes, mask, graph, neighbors_list):
+        pass
+
+    @staticmethod
+    @abstractmethod
+    def entropy_loss(decoded_nodes, mask):
         pass
 
 
@@ -145,6 +168,63 @@ class VCG(SATRepresentation):
     @staticmethod
     def get_mask(n, n_node):
         return np.arange(n_node) < n
+
+    @staticmethod
+    @abstractmethod
+    def get_model_probilities(decoded_nodes, n):
+        return jax.nn.softmax(decoded_nodes)[:n, 1]
+
+    @staticmethod
+    def prediction_loss(decoded_nodes, mask, candidates, energies, f: float):
+        candidates = vmap_one_hot(candidates, 2)  # (B*N, K, 2))
+
+        log_prob = vmap_compute_log_probs(
+            decoded_nodes, mask, candidates
+        )  # (B*N, K, 2)
+
+        weights = jax.nn.softmax(-f * energies)  # (B*N, K)
+        loss = -jnp.sum(weights * jnp.sum(log_prob, axis=-1)) / jnp.sum(mask)  # ()
+
+        return loss
+
+    @staticmethod
+    def entropy_loss(decoded_nodes, mask):
+        decoded_nodes = decoded_nodes * mask[:, None]
+        prob = jax.nn.softmax(decoded_nodes)
+        entropies = jnp.sum(jax.scipy.special.entr(prob), axis=1) / jnp.log(2)
+        loss = -jnp.sum(jnp.log2(entropies), axis=0) / jnp.sum(mask)
+        return loss
+
+    @staticmethod
+    def local_lovasz_loss(decoded_nodes, mask, graph, neighbors_list):
+        log_probs = jax.nn.log_softmax(decoded_nodes)
+        n = jnp.shape(decoded_nodes)[0]
+
+        constraint_node_mask = jnp.array(jnp.logical_not(mask), dtype=int)
+        relevant_log_probs = jnp.sum(
+            log_probs[graph.senders] * jnp.logical_not(graph.edges), axis=1
+        )
+        convolved_log_probs = utils.segment_sum(
+            relevant_log_probs, graph.receivers, num_segments=n
+        )
+
+        lhs_values = convolved_log_probs * constraint_node_mask
+
+        constraint_receivers, constraint_senders = neighbors_list
+        constraint_senders = jnp.array(constraint_senders, int)
+        constraint_receivers = jnp.array(constraint_receivers, int)
+
+        relevant_log_x = log_probs[constraint_senders][:, 1]
+        rhs_values = utils.segment_sum(
+            data=relevant_log_x,
+            segment_ids=constraint_receivers,
+            num_segments=n,
+        )
+        rhs_values = (rhs_values + log_probs[:, 0]) * constraint_node_mask
+        difference = jnp.exp(lhs_values) - jnp.exp(rhs_values)
+        max_array = jnp.maximum(difference, jnp.zeros(len(rhs_values)))
+        loss = jnp.sum(max_array) / jnp.sum(constraint_node_mask)
+        return loss
 
 
 class LCG(SATRepresentation):
@@ -263,3 +343,111 @@ class LCG(SATRepresentation):
     @staticmethod
     def get_mask(n, n_node):
         return np.arange(n_node) < 2 * n
+
+    @staticmethod
+    def get_model_probilities(decoded_nodes, n):
+        if np.shape(decoded_nodes)[0] % 2 == 1:
+            decoded_nodes = jnp.vstack((jnp.asarray(decoded_nodes), [[0]]))
+            conc_decoded_nodes = jnp.reshape(decoded_nodes, (-1, 2))
+        else:
+            conc_decoded_nodes = jnp.reshape(decoded_nodes, (-1, 2))
+        return jax.nn.softmax(conc_decoded_nodes)[:n, 1]
+
+    @staticmethod
+    def prediction_loss(decoded_nodes, mask, candidates, energies, f: float):
+        if np.shape(decoded_nodes)[0] % 2 == 1:
+            conc_decoded_nodes = jnp.vstack((jnp.asarray(decoded_nodes), [0]))
+            conc_decoded_nodes = jnp.reshape(conc_decoded_nodes, (-1, 2))
+            new_mask = jnp.hstack((jnp.asarray(mask), [0]))
+            new_mask = jnp.reshape(new_mask, (-1, 2))
+            new_mask = new_mask[:, 0]
+        else:
+            conc_decoded_nodes = jnp.reshape(decoded_nodes, (-1, 2))
+            new_mask = jnp.reshape(mask, (-1, 2))
+            new_mask = new_mask[:, 0]
+        decoded_nodes = conc_decoded_nodes * new_mask[:, None]
+        candidates = vmap_one_hot(candidates, 2)
+        energies = energies[: len(new_mask), :]
+
+        log_prob = vmap_compute_log_probs(
+            decoded_nodes, new_mask, candidates
+        )  # (B*N, K, 2)
+
+        weights = jax.nn.softmax(-f * energies)  # (B*N, K)
+        loss = -jnp.sum(weights * jnp.sum(log_prob, axis=-1)) / jnp.sum(
+            mask
+        )  # / 2  # ()
+        return loss / 2
+
+    @staticmethod
+    def entropy_loss(decoded_nodes, mask):
+        decoded_nodes = decoded_nodes * mask[:, None]
+        if np.shape(decoded_nodes)[0] % 2 == 1:
+            decoded_nodes = jnp.vstack((jnp.asarray(decoded_nodes), [0]))
+            conc_decoded_nodes = jnp.reshape(decoded_nodes, (-1, 2))
+        else:
+            conc_decoded_nodes = jnp.reshape(decoded_nodes, (-1, 2))
+        prob = jax.nn.softmax(conc_decoded_nodes)
+        entropies = jnp.sum(jax.scipy.special.entr(prob), axis=1) / jnp.log(2)
+        loss = -jnp.sum(jnp.log2(entropies), axis=0) / jnp.sum(mask)
+        return loss
+
+    @staticmethod
+    def local_lovasz_loss(decoded_nodes, mask, graph, neighbors_list):
+        constraint_node_mask = jnp.array(jnp.logical_not(mask), dtype=int)
+        n = jnp.shape(decoded_nodes)[0]
+        if jnp.shape(decoded_nodes)[0] % 2 == 1:
+            new_decoded_nodes = jnp.vstack((jnp.asarray(decoded_nodes), [[0]]))
+            new_decoded_nodes = jnp.reshape(new_decoded_nodes, (-1, 2))
+            new_decoded_nodes = jnp.flip(new_decoded_nodes, axis=1)
+            log_probs = jax.nn.log_softmax(new_decoded_nodes)
+            log_probs = jnp.ravel(log_probs)[:-1]
+
+        else:
+            new_decoded_nodes = jnp.reshape(decoded_nodes, (-1, 2))
+            new_decoded_nodes = jnp.flip(new_decoded_nodes, axis=1)
+            log_probs = jax.nn.log_softmax(new_decoded_nodes)
+            log_probs = jnp.ravel(log_probs)
+        masked_log_probs = log_probs * mask
+        relevant_log_probs = masked_log_probs[graph.senders]
+        convolved_log_probs = utils.segment_sum(
+            relevant_log_probs, graph.receivers, num_segments=n
+        )
+        lhs_values = convolved_log_probs * constraint_node_mask
+
+        constraint_receivers, constraint_senders = neighbors_list
+        constraint_senders = jnp.array(constraint_senders, int)
+        constraint_receivers = jnp.array(constraint_receivers, int)
+        x_sigmoid = jnp.ravel(jax.nn.sigmoid(decoded_nodes))
+        relevant_x_sigmoid = x_sigmoid[constraint_senders]
+        rhs_values = utils.segment_sum(
+            data=jnp.ravel(jnp.log(1 - relevant_x_sigmoid)),
+            segment_ids=constraint_receivers,
+            num_segments=n,
+        )
+        rhs_values = (rhs_values + jnp.log(x_sigmoid)) * constraint_node_mask
+        difference = jnp.exp(lhs_values) - jnp.exp(rhs_values)
+        max_array = jnp.maximum(difference, jnp.zeros(len(rhs_values)))
+        loss = jnp.sum(max_array) / jnp.sum(constraint_node_mask)
+        return loss
+
+
+# Auxiliary functions ####
+
+
+def one_hot(x, k, dtype=jnp.float32):
+    """Create a one-hot encoding of x of size k."""
+    return jnp.array(x[:, None] == jnp.arange(k), dtype)
+
+
+vmap_one_hot = jax.vmap(one_hot, in_axes=(0, None), out_axes=0)
+
+
+def compute_log_probs(decoded_nodes, mask, candidate):
+    a = jax.nn.log_softmax(decoded_nodes) * mask[:, None]
+    return candidate * a
+
+
+vmap_compute_log_probs = jax.vmap(
+    compute_log_probs, in_axes=(None, None, 1), out_axes=1
+)
