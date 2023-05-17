@@ -116,14 +116,16 @@ def update_eval_moser_loss(network, params, eval_moser_loss):
 
 
 def plot_accuracy_fig(*eval_results):
-    ROLLING_WINDOW_SIZE = 10
+    ROLLING_WINDOW_SIZE = 1
     for eval_result in eval_results:
         results = np.array(eval_result.results)
         if eval_result.normalize:
             results /= np.max(results)
         plt.plot(
             # np.arange(0, NUM_EPOCHS - ROLLING_WINDOW_SIZE, 1),
-            pd.Series(results).rolling(ROLLING_WINDOW_SIZE).mean(),
+            pd.Series(results)
+            .rolling(np.min([ROLLING_WINDOW_SIZE, len(results)]))
+            .mean(),
             "o--",
             label=eval_result.name,
             alpha=0.4,
@@ -153,7 +155,6 @@ def evaluate_moser_rust(
             model_probabilities = np.ones(n) / 2
         elif mode_probabilities == "model":
             decoded_nodes = network.apply(params, problem.graph)
-            print("decoded_nodes", decoded_nodes)
             model_probabilities = representation.get_model_probabilities(
                 decoded_nodes, n
             )
