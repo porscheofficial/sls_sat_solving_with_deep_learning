@@ -41,7 +41,6 @@ def get_problem_from_cnf(
     pad_nodes=0,
     pad_edges=0,
 ) -> HashableSATProblem:
-
     clauses = [c for c in cnf.clauses if len(c) > 0]
     n = cnf.nv
     m = len(clauses)

@@ -13,12 +13,19 @@ import time
 from torch.utils import data
 from torch import Generator
 import matplotlib.pyplot as plt
+
+sys.path.append("../../")
+
 from python.src.data_utils import SATTrainingDataset, JraphDataLoader
 from python.src.sat_representations import VCG, LCG, SATRepresentation
 from python.src.model import get_network_definition
-from python.src.train_utils import evaluate_moser_rust, EvalResults, plot_accuracy_fig
-
-sys.path.append("../../")
+from python.src.train_utils import (
+    evaluate_moser_rust,
+    EvalResults,
+    plot_accuracy_fig,
+    initiate_eval_objects_loss,
+    update_eval_objects_loss,
+)
 
 
 def train(
@@ -98,14 +105,6 @@ def train(
 
     print("Entering training loop")
 
-    def evaluate(loader, loss, graph_representation=graph_representation):
-        return np.mean(
-            [
-                loss(params, b, f, alpha, beta, gamma, graph_representation)
-                for b in loader
-            ]
-        )
-
     # moser_baseline_test = evaluate_moser_rust(
     #     test_data,
     #     network,
@@ -119,35 +118,16 @@ def train(
     #     representation=graph_representation,
     # )[0]
 
-    test_eval = EvalResults("Test loss", [], False)
-    train_eval = EvalResults("Train loss", [], False)
-    test_moser_eval = EvalResults("Moser loss - test", [], False)
-    train_moser_eval = EvalResults("Moser loss - train", [], False)
-    test_moser_baseline = EvalResults("Moser loss uniform baseline - test", [], False)
-    train_moser_baseline = EvalResults("Moser loss uniform baseline - train", [], False)
-    test_entropy_eval = EvalResults("Test loss entropy", [], False)
-    train_entropy_eval = EvalResults("Train loss entropy", [], False)
-    test_eval_lll = EvalResults("Test loss LLL", [], False)
-    train_eval_lll = EvalResults("Train loss LLL", [], False)
-    test_eval_dm = EvalResults("Test loss Deepmind", [], False)
-    train_eval_dm = EvalResults("Train loss Deepmind", [], False)
-
-    eval_objects = [
-        test_eval,
-        train_eval,
-        test_moser_eval,
-        train_moser_eval,
-        test_entropy_eval,
-        train_moser_baseline,
-        test_moser_baseline,
-        train_entropy_eval,
-        test_eval_lll,
-        train_eval_lll,
-        test_eval_dm,
-        train_eval_dm,
-    ]
-
+    test_eval_objects_loss = initiate_eval_objects_loss(
+        "test", f, alpha, beta, gamma, graph_representation, test_loader
+    )
+    train_eval_objects_loss = initiate_eval_objects_loss(
+        "train", f, alpha, beta, gamma, graph_representation, train_eval_loader
+    )
+    eval_objects_loss = test_eval_objects_loss + train_eval_objects_loss
+    print(eval_objects_loss)
     for epoch in range(NUM_EPOCHS):
+        print("epoch " + str(epoch + 1) + " of " + str(NUM_EPOCHS))
         start_time = time.time()
         for counter, batch in enumerate(train_loader):
             print("batch_number", counter)
@@ -161,7 +141,13 @@ def train(
             )
         print("model successfully saved")
         epoch_time = time.time() - start_time
-
+        eval_objects_loss = update_eval_objects_loss(
+            params, total_loss, eval_objects_loss
+        )
+        train_eval_objects_loss = update_eval_objects_loss(
+            params, total_loss, train_eval_objects_loss
+        )
+        print(test_eval_objects_loss)
         # test_LLL_loss = evaluate(test_loader, local_lovasz_loss, graph_representation)
         # train_LLL_loss = evaluate(
         #     train_eval_loader, local_lovasz_loss, graph_representation
@@ -217,7 +203,14 @@ def train(
         print("model successfully saved")
 
     if img_path:
-        plot_accuracy_fig(*eval_objects)
+        plot_accuracy_fig(*test_eval_objects_loss)
+        plot_accuracy_fig(*train_eval_objects_loss)
+        plt.xlabel("epoch")
+        plt.ylabel("accuracy of model / loss")
+        plt.yscale("log")
+        plt.grid()
+        plt.legend()
+        plt.tight_layout()
         if img_path == "show":
             plt.show()
         else:
@@ -241,7 +234,7 @@ def experiment_tracking_train(
     path,
     img_path=False,
     model_path=False,
-    graph_representation="LCG",
+    graph_representation=SATRepresentation,
     network_type="interaction",
 ):
     network_definition = get_network_definition(
@@ -268,6 +261,7 @@ def experiment_tracking_train(
                 "network_type": network_type,
             }
         )
+
         # train and evaluate
         artifacts = train(
             batch_size,

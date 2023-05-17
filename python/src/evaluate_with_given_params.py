@@ -551,7 +551,6 @@ def load_model_and_test_moser_single(
         sat_data = SATTrainingDataset_LCG(data_path)
 
     for idx in range(len(sat_data)):
-
         print("problem ", idx + 1, "of ", len(sat_data))
         problem_path = sat_data.instances[idx].name + ".cnf"
         problem = sat_data.get_unpadded_problem(idx)

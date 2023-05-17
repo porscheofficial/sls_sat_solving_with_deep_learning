@@ -7,7 +7,61 @@ import pandas as pd
 
 from python.src.sat_representations import SATRepresentation
 
-EvalResults = collections.namedtuple("EvalResult", ("name", "results", "normalize"))
+EvalResults = collections.namedtuple(
+    "EvalResult", ("name", "results", "normalize", "loss_params", "rep", "loader")
+)
+
+
+def initiate_eval_objects_loss(
+    text: str,
+    f: float,
+    alpha: float,
+    beta: float,
+    gamma: float,
+    rep: SATRepresentation,
+    loader,
+):
+    eval_total = EvalResults(
+        text + " total loss", [], False, [f, alpha, beta, gamma], rep, loader
+    )
+    eval_dm = EvalResults(
+        text + " loss Deepmind", [], False, [f, alpha, 0, 0], rep, loader
+    )
+    eval_lll = EvalResults(text + " loss LLL", [], False, [f, 0, beta, 0], rep, loader)
+    eval_entropy = EvalResults(
+        text + " loss entropy", [], False, [f, 0, 0, gamma], rep, loader
+    )
+
+    eval_objects_loss = [
+        eval_total,
+        eval_dm,
+        eval_lll,
+        eval_entropy,
+    ]
+
+    return eval_objects_loss
+
+
+def update_eval_objects_loss(params, loss, eval_objects_loss):
+    for i in range(len(eval_objects_loss)):
+        eval_objects_loss[i].results.append(
+            np.mean(
+                [
+                    loss(
+                        params,
+                        b,
+                        eval_objects_loss[i].loss_params[0],
+                        eval_objects_loss[i].loss_params[1],
+                        eval_objects_loss[i].loss_params[2],
+                        eval_objects_loss[i].loss_params[3],
+                        eval_objects_loss[i].rep,
+                    )
+                    for b in eval_objects_loss[i].loader
+                ]
+            )
+        )
+    print(eval_objects_loss)
+    return eval_objects_loss
 
 
 def plot_accuracy_fig(*eval_results):
@@ -23,13 +77,6 @@ def plot_accuracy_fig(*eval_results):
             label=eval_result.name,
             alpha=0.4,
         )
-    plt.xlabel("epoch")
-    plt.ylabel("accuracy of model / loss")
-    plt.yscale("log")
-    plt.grid()
-    plt.legend()
-    plt.tight_layout()
-    # plt.show()
 
 
 ## Evaluation Functions
