@@ -42,6 +42,36 @@ def initiate_eval_objects_loss(
     return eval_objects_loss
 
 
+def initiate_eval_moser_loss(
+    text: str,
+    N_STEPS_MOSER: float,
+    N_RUNS_MOSER: float,
+    rep: SATRepresentation,
+    data_subset,
+    sat_data,
+):
+    moser_model = EvalResults(
+        text + " loss model Moser",
+        [],
+        False,
+        [N_STEPS_MOSER, N_RUNS_MOSER, "model"],
+        rep,
+        [data_subset, sat_data],
+    )
+    moser_uniform = EvalResults(
+        text + " loss uniform Moser",
+        [],
+        False,
+        [N_STEPS_MOSER, N_RUNS_MOSER, "uniform"],
+        rep,
+        [data_subset, sat_data],
+    )
+
+    eval_moser_loss = [moser_model, moser_uniform]
+
+    return eval_moser_loss
+
+
 def update_eval_objects_loss(params, loss, eval_objects_loss):
     for i in range(len(eval_objects_loss)):
         eval_objects_loss[i].results.append(
@@ -60,8 +90,29 @@ def update_eval_objects_loss(params, loss, eval_objects_loss):
                 ]
             )
         )
-    print(eval_objects_loss)
     return eval_objects_loss
+
+
+def update_eval_moser_loss(network, params, eval_moser_loss):
+    for i in range(len(eval_moser_loss)):
+        if (
+            eval_moser_loss[i].loss_params[2] == "model"
+            or len(eval_moser_loss[i].results) == 0
+        ):
+            eval_moser_loss[i].results.append(
+                evaluate_moser_rust(
+                    eval_moser_loss[i].loader[1],
+                    network,
+                    params,
+                    eval_moser_loss[i].loader[0],
+                    eval_moser_loss[i].rep,
+                    mode_probabilities=eval_moser_loss[i].loss_params[2],
+                    N_STEPS_MOSER=eval_moser_loss[i].loss_params[0],
+                    N_RUNS_MOSER=eval_moser_loss[i].loss_params[1],
+                    SEED=0,
+                )[0]
+            )
+    return eval_moser_loss
 
 
 def plot_accuracy_fig(*eval_results):
@@ -102,6 +153,7 @@ def evaluate_moser_rust(
             model_probabilities = np.ones(n) / 2
         elif mode_probabilities == "model":
             decoded_nodes = network.apply(params, problem.graph)
+            print("decoded_nodes", decoded_nodes)
             model_probabilities = representation.get_model_probabilities(
                 decoded_nodes, n
             )

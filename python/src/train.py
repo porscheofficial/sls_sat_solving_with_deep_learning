@@ -25,6 +25,8 @@ from python.src.train_utils import (
     plot_accuracy_fig,
     initiate_eval_objects_loss,
     update_eval_objects_loss,
+    initiate_eval_moser_loss,
+    update_eval_moser_loss,
 )
 
 
@@ -125,7 +127,19 @@ def train(
         "train", f, alpha, beta, gamma, graph_representation, train_eval_loader
     )
     eval_objects_loss = test_eval_objects_loss + train_eval_objects_loss
-
+    test_eval_moser_loss = initiate_eval_moser_loss(
+        "test", N_STEPS_MOSER, N_RUNS_MOSER, graph_representation, test_data, sat_data
+    )
+    train_eval_moser_loss = initiate_eval_moser_loss(
+        "train",
+        N_STEPS_MOSER,
+        N_RUNS_MOSER,
+        graph_representation,
+        train_eval_data,
+        sat_data,
+    )
+    eval_moser_loss = test_eval_moser_loss + train_eval_moser_loss
+    print(eval_moser_loss)
     for epoch in range(NUM_EPOCHS):
         print("epoch " + str(epoch + 1) + " of " + str(NUM_EPOCHS))
         start_time = time.time()
@@ -144,6 +158,8 @@ def train(
         eval_objects_loss = update_eval_objects_loss(
             params, total_loss, eval_objects_loss
         )
+        eval_moser_loss = update_eval_moser_loss(network, params, eval_moser_loss)
+        print(eval_moser_loss)
         # test_LLL_loss = evaluate(test_loader, local_lovasz_loss, graph_representation)
         # train_LLL_loss = evaluate(
         #     train_eval_loader, local_lovasz_loss, graph_representation

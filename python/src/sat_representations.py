@@ -42,7 +42,7 @@ class SATRepresentation(ABC):
 
     @staticmethod
     @abstractmethod
-    def get_model_probilities(decoded_nodes, n):
+    def get_model_probabilities(decoded_nodes, n):
         """
         Helper method that returns, for each, problem variable, the Bernoulli parameter of the model for this variable.
         That is, the ith value of the returned array is the probability with which the model will assign 1 to the
@@ -170,8 +170,7 @@ class VCG(SATRepresentation):
         return np.arange(n_node) < n
 
     @staticmethod
-    @abstractmethod
-    def get_model_probilities(decoded_nodes, n):
+    def get_model_probabilities(decoded_nodes, n):
         return jax.nn.softmax(decoded_nodes)[:n, 1]
 
     @staticmethod
@@ -345,7 +344,7 @@ class LCG(SATRepresentation):
         return np.arange(n_node) < 2 * n
 
     @staticmethod
-    def get_model_probilities(decoded_nodes, n):
+    def get_model_probabilities(decoded_nodes, n):
         if np.shape(decoded_nodes)[0] % 2 == 1:
             decoded_nodes = jnp.vstack((jnp.asarray(decoded_nodes), [[0]]))
             conc_decoded_nodes = jnp.reshape(decoded_nodes, (-1, 2))
