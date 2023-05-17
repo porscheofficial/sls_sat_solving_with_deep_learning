@@ -382,7 +382,7 @@ class LCG(SATRepresentation):
     def entropy_loss(decoded_nodes, mask):
         decoded_nodes = decoded_nodes * mask[:, None]
         if np.shape(decoded_nodes)[0] % 2 == 1:
-            decoded_nodes = jnp.vstack((jnp.asarray(decoded_nodes), [0]))
+            decoded_nodes = jnp.vstack((jnp.asarray(decoded_nodes), [[0]]))
             conc_decoded_nodes = jnp.reshape(decoded_nodes, (-1, 2))
         else:
             conc_decoded_nodes = jnp.reshape(decoded_nodes, (-1, 2))
