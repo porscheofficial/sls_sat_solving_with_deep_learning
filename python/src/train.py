@@ -125,7 +125,7 @@ def train(
         "train", f, alpha, beta, gamma, graph_representation, train_eval_loader
     )
     eval_objects_loss = test_eval_objects_loss + train_eval_objects_loss
-    print(eval_objects_loss)
+
     for epoch in range(NUM_EPOCHS):
         print("epoch " + str(epoch + 1) + " of " + str(NUM_EPOCHS))
         start_time = time.time()
@@ -144,10 +144,6 @@ def train(
         eval_objects_loss = update_eval_objects_loss(
             params, total_loss, eval_objects_loss
         )
-        train_eval_objects_loss = update_eval_objects_loss(
-            params, total_loss, train_eval_objects_loss
-        )
-        print(test_eval_objects_loss)
         # test_LLL_loss = evaluate(test_loader, local_lovasz_loss, graph_representation)
         # train_LLL_loss = evaluate(
         #     train_eval_loader, local_lovasz_loss, graph_representation
