@@ -147,50 +147,24 @@ def train(
         )
         eval_moser_loss = update_eval_moser_loss(network, params, eval_moser_loss)
 
-        # test_LLL_loss = evaluate(test_loader, local_lovasz_loss, graph_representation)
-        # train_LLL_loss = evaluate(
-        #     train_eval_loader, local_lovasz_loss, graph_representation
-        # )
-        # test_pred_loss = evaluate(test_loader, prediction_loss, graph_representation)
-        # train_pred_loss = evaluate(
-        #     train_eval_loader, prediction_loss, graph_representation
-        # )
-        # test_entropy_loss = evaluate(test_loader, entropy_loss, graph_representation)
-        # train_entropy_loss = evaluate(
-        #     train_eval_loader, entropy_loss, graph_representation
-        # )
-
-        # test_eval.results.append(test_LLL_loss + test_pred_loss + test_entropy_loss)
-        # train_eval.results.append(train_LLL_loss + train_pred_loss + train_entropy_loss)
-        # test_eval_lll.results.append(test_LLL_loss)
-        # train_eval_lll.results.append(train_LLL_loss)
-        # test_eval_dm.results.append(test_pred_loss)
-        # train_eval_dm.results.append(train_pred_loss)
-
-        # test_moser_energies, _ = evaluate_moser_rust(
-        #     test_data,
-        # )
-        # train_moser_energies, _ = evaluate_moser_rust(
-        #     train_eval_data,
-        # )
-
-        # test_moser_eval.results.append(test_moser_energies)
-        # train_moser_eval.results.append(train_moser_energies)
-        # test_entropy_eval.results.append(test_entropy_loss)
-        # train_entropy_eval.results.append(train_entropy_loss)
-        # test_moser_baseline.results.append(moser_baseline_test)
-        # train_moser_baseline.results.append(moser_baseline_train)
-
-        # loss_str = "Epoch {} in {:0.2f} sec".format(epoch, epoch_time) + ";  "
-        # for eval_result in eval_objects:
-        #     loss_str = (
-        #         loss_str
-        #         + f"{eval_result.name}: {np.round(eval_result.results[-1],4)}"
-        #         + "; "
-        #     )
-        #     if experiment_tracking == True:
-        #         mlflow.log_metric(eval_result.name, eval_result.results[-1], step=epoch)
-        # print(loss_str)
+        loss_str = "Epoch {} in {:0.2f} sec".format(epoch, epoch_time) + ";  "
+        for eval_result in eval_objects_loss:
+            loss_str = (
+                loss_str
+                + f"{eval_result.name}: {np.round(eval_result.results[-1],4)}"
+                + "; "
+            )
+            if experiment_tracking == True:
+                mlflow.log_metric(eval_result.name, eval_result.results[-1], step=epoch)
+        for eval_result in eval_moser_loss:
+            loss_str = (
+                loss_str
+                + f"{eval_result.name}: {np.round(eval_result.results[-1],4)}"
+                + "; "
+            )
+            if experiment_tracking == True:
+                mlflow.log_metric(eval_result.name, eval_result.results[-1], step=epoch)
+        print(loss_str)
         if epoch == 0:
             t2 = time.time()
             print("took", t2 - t1, "seconds")
