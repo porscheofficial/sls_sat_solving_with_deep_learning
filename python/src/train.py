@@ -107,19 +107,6 @@ def train(
 
     print("Entering training loop")
 
-    # moser_baseline_test = evaluate_moser_rust(
-    #     test_data,
-    #     network,
-    #     params,
-    #     mode_probabilities="uniform",
-    #     representation=graph_representation,
-    # )[0]
-    # moser_baseline_train = evaluate_moser_rust(
-    #     train_eval_data,
-    #     mode_probabilities="uniform",
-    #     representation=graph_representation,
-    # )[0]
-
     test_eval_objects_loss = initiate_eval_objects_loss(
         "test", f, alpha, beta, gamma, graph_representation, test_loader
     )
@@ -159,7 +146,7 @@ def train(
             params, total_loss, eval_objects_loss
         )
         eval_moser_loss = update_eval_moser_loss(network, params, eval_moser_loss)
-        print(eval_moser_loss)
+
         # test_LLL_loss = evaluate(test_loader, local_lovasz_loss, graph_representation)
         # train_LLL_loss = evaluate(
         #     train_eval_loader, local_lovasz_loss, graph_representation
