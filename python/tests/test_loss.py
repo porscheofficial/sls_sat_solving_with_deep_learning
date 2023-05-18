@@ -36,12 +36,16 @@ class LossTesting(TestCase):
     def test_entropy_loss_uniform_decoded_nodes_lcg(self):
         n = 10
         m = 25
+        if m % 2 == 1:
+            m += 1
         decoded_nodes = np.ones((2 * n + m, 1)) / 2
         mask = LCG.get_mask(n, 2 * n + m)
         self.assertEqual(LCG.entropy_loss(decoded_nodes, mask), 0)
 
         n = 9
         m = 26
+        if m % 2 == 1:
+            m += 1
         decoded_nodes = np.ones((2 * n + m, 1)) / 2
         mask = LCG.get_mask(n, 2 * n + m)
         self.assertEqual(LCG.entropy_loss(decoded_nodes, mask), 0)
@@ -52,7 +56,7 @@ class LossTesting(TestCase):
 
     def test_LLL_loss(self):
         n = 10
-        m = 25
+        m = 26
         k = 2
 
         # vcg

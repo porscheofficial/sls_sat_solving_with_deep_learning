@@ -65,7 +65,10 @@ def get_problem_from_cnf(
         senders=np.asarray(senders),
         receivers=np.asarray(receivers),
     )
-
+    # padding to get an even number of nodes
+    if n_node % 2 == 1:
+        n_node = n_node + 1
+        graph = jraph.pad_with_graphs(graph, n_node, n_edge)
     # padding
     if pad_nodes > n_node or pad_edges > n_edge:
         n_node = max(pad_nodes, n_node)

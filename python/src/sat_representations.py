@@ -354,16 +354,16 @@ class LCG(SATRepresentation):
 
     @staticmethod
     def prediction_loss(decoded_nodes, mask, candidates, energies, f: float):
-        if np.shape(decoded_nodes)[0] % 2 == 1:
-            conc_decoded_nodes = jnp.vstack((jnp.asarray(decoded_nodes), [0]))
-            conc_decoded_nodes = jnp.reshape(conc_decoded_nodes, (-1, 2))
-            new_mask = jnp.hstack((jnp.asarray(mask), [0]))
-            new_mask = jnp.reshape(new_mask, (-1, 2))
-            new_mask = new_mask[:, 0]
-        else:
-            conc_decoded_nodes = jnp.reshape(decoded_nodes, (-1, 2))
-            new_mask = jnp.reshape(mask, (-1, 2))
-            new_mask = new_mask[:, 0]
+        # if np.shape(decoded_nodes)[0] % 2 == 1:
+        #    conc_decoded_nodes = jnp.vstack((jnp.asarray(decoded_nodes), [0]))
+        #    conc_decoded_nodes = jnp.reshape(conc_decoded_nodes, (-1, 2))
+        #    new_mask = jnp.hstack((jnp.asarray(mask), [0]))
+        #    new_mask = jnp.reshape(new_mask, (-1, 2))
+        #    new_mask = new_mask[:, 0]
+        # else:
+        conc_decoded_nodes = jnp.reshape(decoded_nodes, (-1, 2))
+        new_mask = jnp.reshape(mask, (-1, 2))
+        new_mask = new_mask[:, 0]
         decoded_nodes = conc_decoded_nodes * new_mask[:, None]
         candidates = vmap_one_hot(candidates, 2)
         energies = energies[: len(new_mask), :]
@@ -381,11 +381,11 @@ class LCG(SATRepresentation):
     @staticmethod
     def entropy_loss(decoded_nodes, mask):
         decoded_nodes = decoded_nodes * mask[:, None]
-        if np.shape(decoded_nodes)[0] % 2 == 1:
-            decoded_nodes = jnp.vstack((jnp.asarray(decoded_nodes), [[0]]))
-            conc_decoded_nodes = jnp.reshape(decoded_nodes, (-1, 2))
-        else:
-            conc_decoded_nodes = jnp.reshape(decoded_nodes, (-1, 2))
+        # if np.shape(decoded_nodes)[0] % 2 == 1:
+        #    decoded_nodes = jnp.vstack((jnp.asarray(decoded_nodes), [[0]]))
+        #    conc_decoded_nodes = jnp.reshape(decoded_nodes, (-1, 2))
+        # else:
+        conc_decoded_nodes = jnp.reshape(decoded_nodes, (-1, 2))
         prob = jax.nn.softmax(conc_decoded_nodes)
         entropies = jnp.sum(jax.scipy.special.entr(prob), axis=1) / jnp.log(2)
         loss = -jnp.sum(jnp.log2(entropies), axis=0) / jnp.sum(mask)
@@ -395,18 +395,18 @@ class LCG(SATRepresentation):
     def local_lovasz_loss(decoded_nodes, mask, graph, neighbors_list):
         constraint_node_mask = jnp.array(jnp.logical_not(mask), dtype=int)
         n = jnp.shape(decoded_nodes)[0]
-        if jnp.shape(decoded_nodes)[0] % 2 == 1:
-            new_decoded_nodes = jnp.vstack((jnp.asarray(decoded_nodes), [[0]]))
-            new_decoded_nodes = jnp.reshape(new_decoded_nodes, (-1, 2))
-            new_decoded_nodes = jnp.flip(new_decoded_nodes, axis=1)
-            log_probs = jax.nn.log_softmax(new_decoded_nodes)
-            log_probs = jnp.ravel(log_probs)[:-1]
-
-        else:
-            new_decoded_nodes = jnp.reshape(decoded_nodes, (-1, 2))
-            new_decoded_nodes = jnp.flip(new_decoded_nodes, axis=1)
-            log_probs = jax.nn.log_softmax(new_decoded_nodes)
-            log_probs = jnp.ravel(log_probs)
+        # if jnp.shape(decoded_nodes)[0] % 2 == 1:
+        #    new_decoded_nodes = jnp.vstack((jnp.asarray(decoded_nodes), [[0]]))
+        #    new_decoded_nodes = jnp.reshape(new_decoded_nodes, (-1, 2))
+        #    new_decoded_nodes = jnp.flip(new_decoded_nodes, axis=1)
+        #    log_probs = jax.nn.log_softmax(new_decoded_nodes)
+        #    log_probs = jnp.ravel(log_probs)[:-1]
+        #
+        # else:
+        new_decoded_nodes = jnp.reshape(decoded_nodes, (-1, 2))
+        new_decoded_nodes = jnp.flip(new_decoded_nodes, axis=1)
+        log_probs = jax.nn.log_softmax(new_decoded_nodes)
+        log_probs = jnp.ravel(log_probs)
         masked_log_probs = log_probs * mask
         relevant_log_probs = masked_log_probs[graph.senders]
         convolved_log_probs = utils.segment_sum(
