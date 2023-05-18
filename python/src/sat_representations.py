@@ -42,6 +42,11 @@ class SATRepresentation(ABC):
 
     @staticmethod
     @abstractmethod
+    def get_padded_candidate(solution_dict, n_nodes):
+        pass
+
+    @staticmethod
+    @abstractmethod
     def get_model_probabilities(decoded_nodes, n):
         """
         Helper method that returns, for each, problem variable, the Bernoulli parameter of the model for this variable.
@@ -86,6 +91,18 @@ class VCG(SATRepresentation):
     @abstractmethod
     def get_n_edges(cnf: CNF):
         return sum([len(c) for c in cnf.clauses])
+
+    @staticmethod
+    @abstractmethod
+    def get_padded_candidate(solution_dict, n_nodes):
+        #
+        return np.pad(
+            np.array(list(solution_dict.values()), dtype=int),
+            (
+                0,
+                int(n_nodes) - len(solution_dict),
+            ),  # @TODO: check if this is correct
+        )
 
     @staticmethod
     def get_graph(n, m, clauses, clause_lengths):
@@ -243,6 +260,18 @@ class LCG(SATRepresentation):
         node.
         """
         return sum([len(c) for c in cnf.clauses]) + cnf.nv
+
+    @staticmethod
+    @abstractmethod
+    def get_padded_candidate(solution_dict, n_nodes):
+        #
+        return np.pad(
+            np.array(list(solution_dict.values()), dtype=int),
+            (
+                0,
+                int(np.ceil(n_nodes / 2)) - len(solution_dict),
+            ),  # @TODO: check if this is correct
+        )
 
     @staticmethod
     def get_graph(n, m, clauses, clause_lengths):

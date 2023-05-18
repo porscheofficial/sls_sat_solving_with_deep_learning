@@ -51,19 +51,17 @@ class SATTrainingDataset(data.Dataset):
             self.instances.append(instance)
 
         self.max_n_node = max(n_nodes_list)
+        if self.max_n_node % 2 == 1:
+            self.max_n_node = self.max_n_node + 1
         self.max_n_edge = max(edges_list)
 
     def __len__(self):
         return len(self.instances)
 
     def solution_dict_to_array(self, solution_dict):
-        return np.pad(
-            np.array(list(solution_dict.values()), dtype=int),
-            (
-                0,
-                int(np.ceil(self.max_n_node / 2)) - len(solution_dict),
-            ),  # @TODO: check if this is correct
-        )
+        return self.representation.get_padded_candidate(
+            self.max_n_node, solution_dict
+        )  # @TODO: Check if this is correct
 
     def _get_problem_file(self, name):
         if self.already_unzipped:
@@ -105,7 +103,7 @@ class SATTrainingDataset(data.Dataset):
         padded_candidates = np.pad(
             candidates,
             pad_width=((0, 0), (0, self.max_n_node - instance.n)),
-        )  # (n_candidates, max_n_node)
+        )  # (n_candidates, max_n_node) # @TODO: Check whether this is really necessary! See padding that is done already above -> depends on representation
         energies = vmap(
             self.representation.get_violated_constraints, in_axes=(None, 0), out_axes=0
         )(problem, candidates)
@@ -120,7 +118,27 @@ def collate_fn(batch):
         *((p.mask, p.graph, p.neighbors_list) for p in problems)
     )
     batched_masks = np.concatenate(masks)
-    batched_neighbors_list = np.concatenate(neighbors_lists)
+    # batched_neighbors_list = np.concatenate(neighbors_lists)
+    neighbors_graphs = []
+    for i in range(len(neighbors_lists)):
+        single_neighbors_graph = jraph.GraphsTuple(
+            nodes=np.ones(len()),
+            edges=np.ones(len(neighbors_lists[i][0])),
+            receivers=neighbors_lists[i][0],
+            senders=neighbors_lists[i][1],
+            globals=None,
+            n_node=graphs[i].n_nodes,
+            n_edge=len(neighbors_lists[i][0]),
+        )
+        neighbors_graphs.append(single_neighbors_graph)
+        print("graphs for i -> n_nodes", i, graphs[i].n_nodes)
+        print("i=", i, "receivers", neighbors_lists[i][0])
+        print("i=", i, "senders", neighbors_lists[i][1])
+    batched_neighbors_graph = jraph.batch(neighbors_graphs)
+    batched_neighbors_list = np.vstack(
+        (batched_neighbors_graph.receivers, batched_neighbors_graph.senders)
+    )
+    print("batched_neighbors", batched_neighbors_list)
     batched_graphs = jraph.batch(graphs)
     batched_candidates = np.vstack([c.T for c in candidates])
     batched_energies = np.vstack(

@@ -71,6 +71,8 @@ def get_problem_from_cnf(
         graph = jraph.pad_with_graphs(graph, n_node, n_edge)
     # padding
     if pad_nodes > n_node or pad_edges > n_edge:
+        print("pad_nodes, pad_edges", pad_nodes, pad_edges)
+        print("n_node, n_edge", n_node, n_edge)
         n_node = max(pad_nodes, n_node)
         n_edge = max(pad_edges, n_edge)
         graph = jraph.pad_with_graphs(graph, n_node, n_edge)
