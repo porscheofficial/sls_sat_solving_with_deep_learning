@@ -18,6 +18,7 @@ pairs = [
             [VCG, LCG],
             [True, False],
             [1, 2],
+            [True, False],
         ]
     )
 ]
@@ -25,7 +26,14 @@ pairs = [
 
 class TestParameterized(object):
     @pytest.mark.parametrize(
-        ["data_dir", "representation", "return_candidates", "batch_size"], pairs
+        [
+            "data_dir",
+            "representation",
+            "return_candidates",
+            "batch_size",
+            "include_constraint_graph",
+        ],
+        pairs,
     )
     def test_instance_loading(
         self,
@@ -33,26 +41,50 @@ class TestParameterized(object):
         representation,
         return_candidates,
         batch_size,
+        include_constraint_graph,
     ):
-        assert instance_loading_tester(data_dir, representation, return_candidates)
+        assert instance_loading_tester(
+            data_dir, representation, return_candidates, include_constraint_graph
+        )
 
     @pytest.mark.parametrize(
-        ["data_dir", "representation", "return_candidates", "batch_size"],
+        [
+            "data_dir",
+            "representation",
+            "return_candidates",
+            "batch_size",
+            "include_constraint_graph",
+        ],
         pairs,
     )
     def test_collate_function(
-        self, data_dir, representation, return_candidates, batch_size
+        self,
+        data_dir,
+        representation,
+        return_candidates,
+        batch_size,
+        include_constraint_graph,
     ):
         assert collate_function_tester(
-            data_dir, representation, return_candidates, batch_size
+            data_dir,
+            representation,
+            return_candidates,
+            batch_size,
+            include_constraint_graph,
         )
 
 
 def instance_loading_tester(
-    path: str, rep: SATRepresentation, return_candidates: bool = False
+    path: str,
+    rep: SATRepresentation,
+    return_candidates: bool = False,
+    include_constraint_graph: bool = False,
 ):
     dataset = SATTrainingDataset(
-        data_dir=path, representation=rep, return_candidates=return_candidates
+        data_dir=path,
+        representation=rep,
+        return_candidates=return_candidates,
+        include_constraint_graph=include_constraint_graph,
     )
     max_nodes = dataset.max_n_node
     max_edges = dataset.max_n_edge
@@ -71,15 +103,22 @@ def instance_loading_tester(
 
 # TODO: also bringin testing for the returning the correlation graph, i.e. test neighbors
 def collate_function_tester(
-    path, rep: SATRepresentation, return_candidates: bool = False, batch_size=1
+    path,
+    rep: SATRepresentation,
+    return_candidates: bool = False,
+    batch_size=1,
+    include_constraint_graph: bool = False,
 ):
     dataset = SATTrainingDataset(
-        data_dir=path, representation=rep, return_candidates=return_candidates
+        data_dir=path,
+        representation=rep,
+        return_candidates=return_candidates,
+        include_constraint_graph=include_constraint_graph,
     )
     loader = JraphDataLoader(dataset, batch_size=batch_size)
 
     for i, batch in enumerate(loader):
-        (masks, graphs, neighbors), (candidates, energies) = batch
+        (masks, graphs, constraint_graphs), (candidates, energies) = batch
         print("loading batch")
         batch_factor = (
             batch_size

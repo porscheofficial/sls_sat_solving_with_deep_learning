@@ -47,8 +47,15 @@ def train(
     network_type="interaction",
     return_candidates=False,
 ):
+    include_constraint_graph = (
+        beta > 0
+    )  # we calculate the constraint graphs only if we use it to calculate the llloss
+
     sat_data = SATTrainingDataset(
-        path, graph_representation, return_candidates=return_candidates
+        path,
+        graph_representation,
+        return_candidates=return_candidates,
+        include_constraint_graph=include_constraint_graph,
     )
     train_data, test_data = data.random_split(
         sat_data, [0.8, 0.2], generator=Generator().manual_seed(0)

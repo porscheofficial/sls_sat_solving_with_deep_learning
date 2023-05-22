@@ -7,6 +7,7 @@ from jax.experimental.sparse import BCOO
 from functools import partial
 from pysat.formula import CNF
 import scipy
+import jraph
 
 
 class SATRepresentation(ABC):
@@ -17,7 +18,7 @@ class SATRepresentation(ABC):
 
     @staticmethod
     @abstractmethod
-    def get_constraint_graph(n, m, senders, receivers) -> list[list, list]:
+    def get_constraint_graph(n, m, senders, receivers) -> jraph.GraphsTuple:
         pass
 
     @staticmethod
@@ -128,7 +129,7 @@ class VCG(SATRepresentation):
         return nodes, senders, receivers, edges, n_node, n_edge
 
     @staticmethod
-    def get_constraint_graph(n, m, senders, receivers):
+    def get_constraint_graph(n, m, senders, receivers) -> jraph.GraphsTuple:
         row_ind = np.asarray(senders)
         col_ind = np.asarray(receivers) - n * np.ones(len(receivers))
         data = np.ones(len(row_ind))
@@ -153,7 +154,16 @@ class VCG(SATRepresentation):
         x = x[x != 0]
         y = y[y != 0]
         neighbors_list = np.vstack((y, x))
-        return neighbors_list
+        graph = jraph.GraphsTuple(
+            n_node=np.asarray([m]),
+            n_edge=np.asarray([len(x)]),
+            senders=neighbors_list[0],
+            receivers=neighbors_list[1],
+            globals=None,
+            edges=None,
+            nodes=None,
+        )
+        return graph
 
     @staticmethod
     def get_violated_constraints(problem, assignment):
@@ -212,7 +222,9 @@ class VCG(SATRepresentation):
         return loss
 
     @staticmethod
-    def local_lovasz_loss(decoded_nodes, mask, graph, neighbors_list):
+    def local_lovasz_loss(decoded_nodes, mask, graph, constraint_graph):
+        if constraint_graph is None:
+            raise ValueError("Constraint graph is None. Cannot calculate Lovasz loss.")
         log_probs = jax.nn.log_softmax(decoded_nodes)
         n = jnp.shape(decoded_nodes)[0]
 
@@ -226,9 +238,8 @@ class VCG(SATRepresentation):
 
         lhs_values = convolved_log_probs * constraint_node_mask
 
-        constraint_receivers, constraint_senders = neighbors_list
-        constraint_senders = jnp.array(constraint_senders, int)
-        constraint_receivers = jnp.array(constraint_receivers, int)
+        constraint_senders = jnp.array(constraint_graph.senders, int)
+        constraint_receivers = jnp.array(constraint_graph.receivers, int)
 
         relevant_log_x = log_probs[constraint_senders][:, 1]
         rhs_values = utils.segment_sum(
@@ -345,7 +356,18 @@ class LCG(SATRepresentation):
         x = x[x != 0]
         y = y[y != 0]
         neighbors_list = np.vstack((y, x))
-        return neighbors_list
+        senders, receivers = neighbors_list
+        n_edge = len(senders)
+        graph = jraph.GraphsTuple(
+            n_node=np.asarray([m]),
+            n_edge=np.asarray([n_edge]),
+            senders=senders,
+            receivers=receivers,
+            globals=None,
+            edges=np.zeros(n_edge),
+            nodes=np.zeros(m),
+        )
+        return graph
 
     # @partial(jax.jit, static_argnames=("problem",))
     @staticmethod
@@ -421,7 +443,9 @@ class LCG(SATRepresentation):
         return loss
 
     @staticmethod
-    def local_lovasz_loss(decoded_nodes, mask, graph, neighbors_list):
+    def local_lovasz_loss(decoded_nodes, mask, graph, constraint_graph):
+        if constraint_graph is None:
+            raise ValueError("Constraint graph is None. Cannot calculate Lovasz loss.")
         constraint_node_mask = jnp.array(jnp.logical_not(mask), dtype=int)
         n = jnp.shape(decoded_nodes)[0]
         # if jnp.shape(decoded_nodes)[0] % 2 == 1:
@@ -443,9 +467,8 @@ class LCG(SATRepresentation):
         )
         lhs_values = convolved_log_probs * constraint_node_mask
 
-        constraint_receivers, constraint_senders = neighbors_list
-        constraint_senders = jnp.array(constraint_senders, int)
-        constraint_receivers = jnp.array(constraint_receivers, int)
+        constraint_senders = jnp.array(constraint_graph.senders, int)
+        constraint_receivers = jnp.array(constraint_graph.receivers, int)
         x_sigmoid = jnp.ravel(jax.nn.sigmoid(decoded_nodes))
         relevant_x_sigmoid = x_sigmoid[constraint_senders]
         rhs_values = utils.segment_sum(

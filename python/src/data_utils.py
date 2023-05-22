@@ -29,12 +29,18 @@ SATInstanceMeta = namedtuple("SATInstanceMeta", ("name", "n", "m"))
 
 class SATTrainingDataset(data.Dataset):
     def __init__(
-        self, data_dir, representation, already_unzipped=True, return_candidates=True
+        self,
+        data_dir,
+        representation,
+        already_unzipped=True,
+        return_candidates=True,
+        include_constraint_graph=False,
     ):
         self.return_candidates = return_candidates
         self.data_dir = data_dir
         self.already_unzipped = already_unzipped
         self.representation: SATRepresentation = representation
+        self.include_constraint_graph = include_constraint_graph
         solved_instances = glob.glob(join(data_dir, "*_sol.pkl"))
 
         self.instances = []
@@ -50,18 +56,11 @@ class SATTrainingDataset(data.Dataset):
             edges_list.append(self.representation.get_n_edges(cnf))
             self.instances.append(instance)
 
-        self.max_n_node = max(n_nodes_list)
-        if self.max_n_node % 2 == 1:
-            self.max_n_node = self.max_n_node + 1
+        self.max_n_node = n if (n := max(n_nodes_list)) % 2 == 0 else n + 1
         self.max_n_edge = max(edges_list)
 
     def __len__(self):
         return len(self.instances)
-
-    def solution_dict_to_array(self, solution_dict):
-        return self.representation.get_padded_candidate(
-            self.max_n_node, solution_dict
-        )  # @TODO: Check if this is correct
 
     def _get_problem_file(self, name):
         if self.already_unzipped:
@@ -85,6 +84,7 @@ class SATTrainingDataset(data.Dataset):
             pad_nodes=self.max_n_node,
             pad_edges=self.max_n_edge,
             representation=self.representation,
+            include_constraint_graph=self.include_constraint_graph,
         )
         if self.return_candidates:
             # return not just solution but also generated candidates
@@ -103,7 +103,7 @@ class SATTrainingDataset(data.Dataset):
         padded_candidates = np.pad(
             candidates,
             pad_width=((0, 0), (0, self.max_n_node - instance.n)),
-        )  # (n_candidates, max_n_node) # @TODO: Check whether this is really necessary! See padding that is done already above -> depends on representation
+        )  # (n_candidates, max_n_node), we pad the candidates to same length as the graph
         energies = vmap(
             self.representation.get_violated_constraints, in_axes=(None, 0), out_axes=0
         )(problem, candidates)
@@ -114,38 +114,26 @@ class SATTrainingDataset(data.Dataset):
 def collate_fn(batch):
     problems, tuples = zip(*batch)
     candidates, energies = zip(*tuples)
-    masks, graphs, neighbors_lists = zip(
-        *((p.mask, p.graph, p.neighbors_list) for p in problems)
+    masks, graphs, constraint_graphs = zip(
+        *((p.mask, p.graph, p.constraint_graph) for p in problems)
     )
     batched_masks = np.concatenate(masks)
-    # batched_neighbors_list = np.concatenate(neighbors_lists)
-    neighbors_graphs = []
-    for i in range(len(neighbors_lists)):
-        single_neighbors_graph = jraph.GraphsTuple(
-            nodes=np.ones(len()),
-            edges=np.ones(len(neighbors_lists[i][0])),
-            receivers=neighbors_lists[i][0],
-            senders=neighbors_lists[i][1],
-            globals=None,
-            n_node=graphs[i].n_nodes,
-            n_edge=len(neighbors_lists[i][0]),
-        )
-        neighbors_graphs.append(single_neighbors_graph)
-        print("graphs for i -> n_nodes", i, graphs[i].n_nodes)
-        print("i=", i, "receivers", neighbors_lists[i][0])
-        print("i=", i, "senders", neighbors_lists[i][1])
-    batched_neighbors_graph = jraph.batch(neighbors_graphs)
-    batched_neighbors_list = np.vstack(
-        (batched_neighbors_graph.receivers, batched_neighbors_graph.senders)
-    )
-    print("batched_neighbors", batched_neighbors_list)
+
+    # we expect either all data items to have a constraint graph or none
+    if all(g is None for g in constraint_graphs):
+        batched_constraint_graphs = None
+    elif not any(g is None for g in constraint_graphs):
+        batched_constraint_graphs = jraph.batch(constraint_graphs)
+    else:
+        raise ValueError("Either all data items must have a constraint graph or none")
+
     batched_graphs = jraph.batch(graphs)
     batched_candidates = np.vstack([c.T for c in candidates])
     batched_energies = np.vstack(
         [np.repeat([e], len(m), axis=0) for (e, m) in zip(energies, masks)]
     )
 
-    return (batched_masks, batched_graphs, batched_neighbors_list), (
+    return (batched_masks, batched_graphs, batched_constraint_graphs), (
         batched_candidates,
         batched_energies,
     )

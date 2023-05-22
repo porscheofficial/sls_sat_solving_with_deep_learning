@@ -1,5 +1,5 @@
 {
-    "python.formatting.provider": "black",
+    "python.formatting.provider": "none",
     "python.linting.pylintEnabled": false,
     "python.linting.mypyEnabled": false,
     "python.linting.enabled": true,
@@ -18,5 +18,8 @@
     "python.testing.unittestEnabled": false,
     "python.testing.pytestArgs": [
         "python"
-    ]
+    ],
+    "[python]": {
+        "editor.defaultFormatter": "ms-python.black-formatter"
+    }
 }
