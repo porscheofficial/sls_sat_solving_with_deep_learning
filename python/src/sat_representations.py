@@ -166,31 +166,17 @@ class VCG(SATRepresentation):
         return graph
 
     @staticmethod
+    # @partial(jax.jit, static_argnames=("problem",))
     def get_violated_constraints(problem, assignment):
-        # @partial(jax.jit, static_argnames=("problem",))
-        def violated_constraints(problem, assignment):
-            graph = problem.graph
-            edge_is_violated = jnp.mod(
-                graph.edges[:, 1] + assignment.T[graph.senders].T, 2
-            )
-
-            e = len(graph.edges)
-            _, m, k = problem.params
-            edge_mask_sp = BCOO(
-                (np.ones(e), np.column_stack((np.arange(e), graph.receivers))),
-                shape=(e, m),
-            )
-
-            violated_constraint_edges = (
-                edge_is_violated @ edge_mask_sp
-            )  # (,x) @ (x,m)  = (,m)
-            constraint_is_violated = violated_constraint_edges == jnp.asarray(
-                problem.clause_lengths
-            )
-
-            return constraint_is_violated
-
-        return np.sum(violated_constraints(problem, assignment).astype(int), axis=0)
+        graph = problem.graph
+        n, m, _ = problem.params
+        edge_is_satisfied = graph.edges[:, 1] == assignment.T[graph.senders].T
+        number_of_literals_satisfied = utils.segment_sum(
+            data=edge_is_satisfied.astype(int),
+            segment_ids=graph.receivers - n,
+            num_segments=m,
+        )
+        return jnp.where(number_of_literals_satisfied > 0, 0, 1)
 
     @staticmethod
     def get_mask(n, n_node):
@@ -377,9 +363,10 @@ class LCG(SATRepresentation):
             return jnp.array(x[:, None] == jnp.arange(k), dtype)
 
         graph = problem.graph
-        n, m, k = problem.params
-        senders = graph.senders[:-n]
+        n, m, _ = problem.params
+        # this is required because we added edges to connect literal nodes
         receivers = graph.receivers[:-n]
+        senders = graph.senders[:-n]
         new_assignment = jnp.ravel(one_hot(assignment, 2))
         edge_is_satisfied = jnp.ravel(
             new_assignment[None].T[senders].T
@@ -387,8 +374,7 @@ class LCG(SATRepresentation):
         number_of_literals_satisfied = utils.segment_sum(
             data=edge_is_satisfied, segment_ids=receivers, num_segments=2 * n + m
         )[2 * n :]
-        clause_is_unsat = jnp.where(number_of_literals_satisfied > 0, 0, 1)
-        return jnp.sum(clause_is_unsat)
+        return jnp.where(number_of_literals_satisfied > 0, 0, 1)
 
     @staticmethod
     def get_mask(n, n_node):

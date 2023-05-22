@@ -104,10 +104,10 @@ class SATTrainingDataset(data.Dataset):
             candidates,
             pad_width=((0, 0), (0, self.max_n_node - instance.n)),
         )  # (n_candidates, max_n_node), we pad the candidates to same length as the graph
-        energies = vmap(
+        violated_constraints = vmap(
             self.representation.get_violated_constraints, in_axes=(None, 0), out_axes=0
         )(problem, candidates)
-
+        energies = jnp.sum(violated_constraints, axis=1)  # (n_candidates,)
         return problem, (padded_candidates, energies)
 
 

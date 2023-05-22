@@ -105,7 +105,7 @@ class TestConstraintProblemUtils(unittest.TestCase):
         string = "p cnf 3 2 \n 1 2 0 \n 3 0"
         cnf = CNF(from_string=string)
         problem = get_problem_from_cnf(cnf, rep)
-        assert problem.params == [3, 2, 2]
+        assert list(problem.params) == [3, 2, 2]
         self.assertEqual(
             rep.get_violated_constraints(problem, np.array([0, 0, 1])).tolist(), [1, 0]
         )
