@@ -5,7 +5,7 @@ from pysat.formula import CNF
 from python.src.sat_representations import SATRepresentation
 
 SATProblem = collections.namedtuple(
-    "SATProblem", ("graph", "mask", "constraint_graph", "params", "clause_lengths")
+    "SATProblem", ("graph", "mask", "constraint_graph", "params")
 )
 
 
@@ -17,7 +17,6 @@ class HashableSATProblem(SATProblem):
                 self.graph.receivers.tostring(),
                 self.graph.edges.tostring(),
                 self.params,
-                tuple(self.clause_lengths),
             )
         )
 
@@ -88,6 +87,5 @@ def get_problem_from_cnf(
         graph=graph,
         mask=mask,
         constraint_graph=constraint_graph,
-        clause_lengths=clause_lengths,
         params=(n, m, k),
     )
