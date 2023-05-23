@@ -65,20 +65,24 @@ def get_problem_from_cnf(
         receivers=np.asarray(receivers),
     )
 
-    # padding
-    if pad_nodes > n_node or pad_edges > n_edge:
-        # print("pad_nodes, pad_edges", pad_nodes, pad_edges)
-        # print("n_node, n_edge", n_node, n_edge)
-        n_node = max(pad_nodes, n_node)
-        n_edge = max(pad_edges, n_edge)
-        graph = jraph.pad_with_graphs(graph, n_node, n_edge)
-
     # constraint graph
     constraint_graph = (
         representation.get_constraint_graph(n, m, senders, receivers)
         if include_constraint_graph
         else None
     )
+
+    # padding
+    if pad_nodes > n_node or pad_edges > n_edge:
+        print("pad_nodes, pad_edges", pad_nodes, pad_edges)
+        print("n_node, n_edge", n_node, n_edge)
+        n_node = max(pad_nodes, n_node)
+        n_edge = max(pad_edges, n_edge)
+        graph = jraph.pad_with_graphs(graph, n_node, n_edge)
+        if include_constraint_graph:
+            constraint_graph = jraph.pad_with_graphs(
+                constraint_graph, n_node, constraint_graph.n_edge
+            )
 
     # mask
     mask = representation.get_mask(n, n_node).astype(np.int32)

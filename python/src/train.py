@@ -217,6 +217,7 @@ def experiment_tracking_train(
     model_path=False,
     graph_representation=SATRepresentation,
     network_type="interaction",
+    return_candidates=True,
 ):
     network_definition = get_network_definition(
         network_type=network_type, graph_representation=graph_representation
@@ -240,6 +241,7 @@ def experiment_tracking_train(
                 "path_dataset": path,
                 "graph_representation": graph_representation,
                 "network_type": network_type,
+                "return_candidates": return_candidates,
             }
         )
 
@@ -259,6 +261,7 @@ def experiment_tracking_train(
             experiment_tracking=True,
             graph_representation=graph_representation,
             network_type=network_type,
+            return_candidates=return_candidates,
         )
         # log params which are a result of learning
         with tempfile.TemporaryDirectory() as dp:
@@ -286,6 +289,7 @@ if __name__ == "__main__":
     SEED = 0
     graph_representation = "LCG"
     network_type = "interaction"
+    return_candidates = True
     # network_definition = get_network_definition(network_type = network_type, graph_representation = graph_representation) #network_definition_interaction_new
 
     MODEL_REGISTRY = Path("../../mlrun_save")
@@ -317,4 +321,5 @@ if __name__ == "__main__":
         model_path=model_path,
         rep=rep,
         network_type=network_type,
+        return_candidates=return_candidates,
     )

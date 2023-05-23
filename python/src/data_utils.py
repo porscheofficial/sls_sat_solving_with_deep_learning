@@ -55,8 +55,7 @@ class SATTrainingDataset(data.Dataset):
             n_nodes_list.append(self.representation.get_n_nodes(cnf))
             edges_list.append(self.representation.get_n_edges(cnf))
             self.instances.append(instance)
-
-        self.max_n_node = n if (n := max(n_nodes_list)) % 2 == 0 else n + 1
+        self.max_n_node = n + 2 if (n := max(n_nodes_list)) % 2 == 0 else n + 1
         self.max_n_edge = max(edges_list)
 
     def __len__(self):
@@ -90,7 +89,7 @@ class SATTrainingDataset(data.Dataset):
             # return not just solution but also generated candidates
             target_name = instance_name + "_samples_sol.npy"
             candidates = np.load(target_name)  # (n_candidates, n_node)
-
+            candidates = np.array(candidates, dtype=int)
         else:
             # return only solution
             target_name = instance_name + "_sol.pkl"
