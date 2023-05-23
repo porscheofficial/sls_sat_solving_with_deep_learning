@@ -136,7 +136,6 @@ class VCG(SATRepresentation):
         sparse_clause_matrix = scipy.sparse.csr_matrix(
             (data, (row_ind, col_ind)), (n, m)
         )
-        # print(sparse_clause_matrix.shape)
         adj_matrix = sparse_clause_matrix.transpose() @ sparse_clause_matrix
         major_dimension, minor_dimension = adj_matrix.shape
         minor_indices = adj_matrix.indices
@@ -320,11 +319,9 @@ class LCG(SATRepresentation):
         row_ind = np.floor(np.asarray(senders[:-n]) / 2)
         col_ind = np.asarray(receivers[:-n]) - 2 * n * np.ones(len(receivers[:-n]))
         data = np.ones(len(row_ind))
-        # print("n,m", n, m)
         sparse_clause_matrix = scipy.sparse.csr_matrix(
             (data, (row_ind, col_ind)), (n, m)
         )
-        # print(sparse_clause_matrix.shape)
         adj_matrix = sparse_clause_matrix.transpose() @ sparse_clause_matrix
         major_dimension, minor_dimension = adj_matrix.shape
         minor_indices = adj_matrix.indices

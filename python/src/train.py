@@ -13,6 +13,9 @@ import time
 from torch.utils import data
 from torch import Generator
 import matplotlib.pyplot as plt
+from jsonargparse import CLI
+import os
+
 
 sys.path.append("../../")
 
@@ -40,11 +43,11 @@ def train(
     N_STEPS_MOSER,
     N_RUNS_MOSER,
     path,
+    graph_representation: SATRepresentation,
+    network_type,
     img_path=False,
     model_path=False,
     experiment_tracking=False,
-    graph_representation=SATRepresentation,
-    network_type="interaction",
     return_candidates=False,
 ):
     include_constraint_graph = (
@@ -133,7 +136,6 @@ def train(
         sat_data,
     )
     eval_moser_loss = test_eval_moser_loss + train_eval_moser_loss
-    print(eval_moser_loss)
     for epoch in range(NUM_EPOCHS):
         print("epoch " + str(epoch + 1) + " of " + str(NUM_EPOCHS))
         start_time = time.time()
@@ -201,26 +203,39 @@ def train(
 
 
 def experiment_tracking_train(
-    MODEL_REGISTRY,
-    EXPERIMENT_NAME,
-    batch_size,
-    f,
-    alpha,
-    beta,
-    gamma,
-    NUM_EPOCHS,
-    N_STEPS_MOSER,
-    N_RUNS_MOSER,
-    path,
-    img_path=False,
-    model_path=False,
-    graph_representation=SATRepresentation,
-    network_type="interaction",
+    MODEL_REGISTRY: str,
+    EXPERIMENT_NAME: str,
+    batch_size: int,
+    f: float,
+    alpha: float,
+    beta: float,
+    gamma: float,
+    NUM_EPOCHS: int,
+    N_STEPS_MOSER: int,
+    N_RUNS_MOSER: int,
+    data_path: str,
+    graph_representation: str,
+    network_type: str = "interaction",
 ):
+    match graph_representation:
+        case "LCG":
+            rep = LCG
+        case "VCG":
+            rep = VCG
+
     network_definition = get_network_definition(
-        network_type=network_type, graph_representation=graph_representation
+        network_type=network_type, graph_representation=rep
     )
-    Path(MODEL_REGISTRY).mkdir(exist_ok=True)  # create experiments dir
+
+    MODEL_REGISTRY = Path(MODEL_REGISTRY)
+    MODEL_REGISTRY.mkdir(exist_ok=True)  # create experiments dir
+
+    timestr = time.strftime("%Y%m%d-%H%M%S")
+    params_save = Path("..", "params_save")
+    params_save.mkdir(exist_ok=True)
+    model_path = os.path.join(params_save, EXPERIMENT_NAME + timestr)
+    img_path = model_path + "_plot"
+
     mlflow.set_tracking_uri("file://" + str(MODEL_REGISTRY.absolute()))
     mlflow.set_experiment(EXPERIMENT_NAME)
     with mlflow.start_run():
@@ -236,7 +251,7 @@ def experiment_tracking_train(
                 "N_STEPS_MOSER": N_STEPS_MOSER,
                 "N_RUNS_MOSER": N_RUNS_MOSER,
                 "network_definition": network_definition.__name__,
-                "path_dataset": path,
+                "path_dataset": data_path,
                 "graph_representation": graph_representation,
                 "network_type": network_type,
             }
@@ -252,11 +267,11 @@ def experiment_tracking_train(
             NUM_EPOCHS,
             N_STEPS_MOSER,
             N_RUNS_MOSER,
-            path,
+            data_path,
             img_path=img_path,
             model_path=model_path,
             experiment_tracking=True,
-            graph_representation=graph_representation,
+            graph_representation=rep,
             network_type=network_type,
         )
         # log params which are a result of learning
@@ -266,54 +281,4 @@ def experiment_tracking_train(
 
 
 if __name__ == "__main__":
-    NUM_EPOCHS = 20  # 10
-    f = 0.0000001
-    alpha = 1
-    beta = 0
-    gamma = 0
-    batch_size = 1
-    # path = "../Data/mini"
-    # path = "../Data/LLL_sample_one_combination"
-    # path = "../Data/LLL_sample_one"
-    # path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/generateSAT/LLL_subset"
-    # path = "../Data/blocksworld"
-    # path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/GIT_SAT_ML/data/BroadcastTestSet2"
-    path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/GIT_SAT_ML/data/BroadcastTestSet"
-    # path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/generateSAT/samples_LLL_n80/"
-    N_STEPS_MOSER = 100
-    N_RUNS_MOSER = 5
-    SEED = 0
-    graph_representation = "VCG"
-    network_type = "interaction"
-    # network_definition = get_network_definition(network_type = network_type, graph_representation = graph_representation) #network_definition_interaction_new
-
-    MODEL_REGISTRY = Path("../../mlrun_save")
-    EXPERIMENT_NAME = "VCG_broadcast"
-
-    timestr = time.strftime("%Y%m%d-%H%M%S")
-    model_path = "../params_save/" + EXPERIMENT_NAME + timestr
-    img_path = model_path + "_plot"
-
-    match graph_representation:
-        case "LCG":
-            rep = LCG
-        case "VCG":
-            rep = VCG
-
-    experiment_tracking_train(
-        MODEL_REGISTRY,
-        EXPERIMENT_NAME,
-        batch_size,
-        f,
-        alpha,
-        beta,
-        gamma,
-        NUM_EPOCHS,
-        N_STEPS_MOSER,
-        N_RUNS_MOSER,
-        path,
-        img_path=img_path,
-        model_path=model_path,
-        rep=rep,
-        network_type=network_type,
-    )
+    CLI(experiment_tracking_train)

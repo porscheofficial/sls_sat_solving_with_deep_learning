@@ -1,0 +1,13 @@
+MODEL_REGISTRY: ../../mlrun_save
+EXPERIMENT_NAME: blocksworld_vcg_interaction
+batch_size: 2
+f: 0.0000001
+alpha: 1
+beta: 0
+gamma: 0
+NUM_EPOCHS: 20
+N_STEPS_MOSER: 100
+N_RUNS_MOSER: 5
+data_path: ../../Data/blocksworld
+graph_representation: VCG
+network_type: interaction
