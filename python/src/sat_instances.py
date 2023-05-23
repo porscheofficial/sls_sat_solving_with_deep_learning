@@ -5,7 +5,7 @@ from pysat.formula import CNF
 from python.src.sat_representations import SATRepresentation
 
 SATProblem = collections.namedtuple(
-    "SATProblem", ("graph", "mask", "constraint_graph", "params")
+    "SATProblem", ("graph", "mask", "constraint_graph", "params", "constraint_mask")
 )
 
 
@@ -71,7 +71,11 @@ def get_problem_from_cnf(
         if include_constraint_graph
         else None
     )
-
+    constraint_mask = (
+        np.array(np.logical_not(representation.get_mask(n, n_node)), dtype=int)
+        if include_constraint_graph
+        else None
+    )
     # padding
     if pad_nodes > n_node or pad_edges > n_edge:
         print("pad_nodes, pad_edges", pad_nodes, pad_edges)
@@ -83,13 +87,16 @@ def get_problem_from_cnf(
             constraint_graph = jraph.pad_with_graphs(
                 constraint_graph, n_node, constraint_graph.n_edge
             )
-
+            constraint_mask = np.pad(
+                constraint_mask, (0, n_node - len(constraint_mask))
+            )
     # mask
     mask = representation.get_mask(n, n_node).astype(np.int32)
 
     return HashableSATProblem(
         graph=graph,
         mask=mask,
+        constraint_mask=constraint_mask,
         constraint_graph=constraint_graph,
         params=(n, m, k),
     )

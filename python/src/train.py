@@ -87,7 +87,7 @@ def train(
         gamma: float,
         rep: SATRepresentation,
     ):
-        (mask, graph, neighbors_list), (candidates, energies) = batch
+        (mask, graph, constraint_graph, constraint_mask), (candidates, energies) = batch
         decoded_nodes = network.apply(params, graph)
         prediction_loss = (
             alpha * rep.prediction_loss(decoded_nodes, mask, candidates, energies, f)
@@ -95,7 +95,10 @@ def train(
             else 0.0
         )
         local_lovasz_loss = (
-            beta * rep.local_lovasz_loss(decoded_nodes, mask, graph, neighbors_list)
+            beta
+            * rep.local_lovasz_loss(
+                decoded_nodes, mask, graph, constraint_graph, constraint_mask
+            )
             if beta > 0
             else 0.0
         )

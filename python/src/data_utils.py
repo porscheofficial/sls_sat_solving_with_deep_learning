@@ -112,16 +112,18 @@ class SATTrainingDataset(data.Dataset):
 def collate_fn(batch):
     problems, tuples = zip(*batch)
     candidates, energies = zip(*tuples)
-    masks, graphs, constraint_graphs = zip(
-        *((p.mask, p.graph, p.constraint_graph) for p in problems)
+    masks, graphs, constraint_graphs, constraint_mask = zip(
+        *((p.mask, p.graph, p.constraint_graph, p.constraint_mask) for p in problems)
     )
     batched_masks = np.concatenate(masks)
 
     # we expect either all data items to have a constraint graph or none
     if all(g is None for g in constraint_graphs):
         batched_constraint_graphs = None
+        batched_constraint_masks = None
     elif not any(g is None for g in constraint_graphs):
         batched_constraint_graphs = jraph.batch(constraint_graphs)
+        batched_constraint_masks = np.concatenate(constraint_mask)
     else:
         raise ValueError("Either all data items must have a constraint graph or none")
 
@@ -131,7 +133,12 @@ def collate_fn(batch):
         [np.repeat([e], np.shape(c)[1], axis=0) for (e, c) in zip(energies, candidates)]
     )
 
-    return (batched_masks, batched_graphs, batched_constraint_graphs), (
+    return (
+        batched_masks,
+        batched_graphs,
+        batched_constraint_graphs,
+        batched_constraint_masks,
+    ), (
         batched_candidates,
         batched_energies,
     )

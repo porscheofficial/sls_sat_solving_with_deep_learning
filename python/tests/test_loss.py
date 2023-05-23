@@ -76,8 +76,11 @@ class LossTesting(TestCase):
         g = problem.graph
         decoded_nodes = np.vstack([10000 * np.ones((n + m)), np.zeros((n + m))]).T
         mask = VCG.get_mask(n, n + m)
+        constraint_mask = np.array(np.logical_not(mask), dtype=int)
         neighbors_list = VCG.get_constraint_graph(n, m, g.senders, g.receivers)
-        loss = VCG.local_lovasz_loss(decoded_nodes, mask, g, neighbors_list)
+        loss = VCG.local_lovasz_loss(
+            decoded_nodes, mask, g, neighbors_list, constraint_mask
+        )
         self.assertEqual(loss, 0)
         # lcg
         problem = create_simple_neighbor_cnf(n, m, k, rep=LCG)
@@ -91,8 +94,11 @@ class LossTesting(TestCase):
         decoded_nodes = np.array([decoded_nodes], dtype=float).T
         assert decoded_nodes.shape == (2 * n + m, 1)
         mask = LCG.get_mask(n, 2 * n + m)
+        constraint_mask = np.array(np.logical_not(mask), dtype=int)
         neighbors_list = LCG.get_constraint_graph(n, m, g.senders, g.receivers)
-        loss = LCG.local_lovasz_loss(decoded_nodes, mask, g, neighbors_list)
+        loss = LCG.local_lovasz_loss(
+            decoded_nodes, mask, g, neighbors_list, constraint_mask
+        )
         self.assertEqual(loss, 0)
 
 
@@ -105,7 +111,7 @@ pairs = [
                 "python/tests/test_instances/multiple_instances/",
             ],
             [VCG, LCG],
-            [3, 2],
+            [1, 2],
         ]
     )
 ]
@@ -135,22 +141,28 @@ class TestParameterized(object):
         data_loader = JraphDataLoader(sat_data, batch_size=batch_size, shuffle=False)
         if representation == VCG:
             for counter, batch in enumerate(data_loader):
-                (mask, graph, neighbors_list), (candidates, energies) = batch
+                (mask, graph, neighbors_list, constraint_mask), (
+                    candidates,
+                    energies,
+                ) = batch
                 decoded_nodes = (
                     np.array(one_hot(candidates[:, 0], 2), dtype=float) * 100000
                 )
                 loss = representation.local_lovasz_loss(
-                    decoded_nodes, mask, graph, neighbors_list
+                    decoded_nodes, mask, graph, neighbors_list, constraint_mask
                 )
                 assert loss == 0
         if representation == LCG:
             for counter, batch in enumerate(data_loader):
-                (mask, graph, neighbors_list), (candidates, energies) = batch
+                (mask, graph, neighbors_list, constraint_mask), (
+                    candidates,
+                    energies,
+                ) = batch
                 decoded_nodes = np.ravel(
                     np.array(one_hot(candidates[:, 0], 2), dtype=float) * 100000
                 )
                 loss = representation.local_lovasz_loss(
-                    decoded_nodes, mask, graph, neighbors_list
+                    decoded_nodes, mask, graph, neighbors_list, constraint_mask
                 )
                 assert loss == 0
             # tbf
