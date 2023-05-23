@@ -217,6 +217,7 @@ def experiment_tracking_train(
     graph_representation=SATRepresentation,
     network_type="interaction",
 ):
+    print("rep", graph_representation)
     network_definition = get_network_definition(
         network_type=network_type, graph_representation=graph_representation
     )
@@ -276,19 +277,19 @@ if __name__ == "__main__":
     # path = "../Data/LLL_sample_one_combination"
     # path = "../Data/LLL_sample_one"
     # path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/generateSAT/LLL_subset"
-    # path = "../Data/blocksworld"
+    path = "../Data/blocksworld"
     # path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/GIT_SAT_ML/data/BroadcastTestSet2"
-    path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/GIT_SAT_ML/data/BroadcastTestSet"
+    # path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/GIT_SAT_ML/data/BroadcastTestSet"
     # path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/generateSAT/samples_LLL_n80/"
     N_STEPS_MOSER = 100
     N_RUNS_MOSER = 5
     SEED = 0
-    graph_representation = "VCG"
+    graph_representation = "LCG"
     network_type = "interaction"
     # network_definition = get_network_definition(network_type = network_type, graph_representation = graph_representation) #network_definition_interaction_new
 
     MODEL_REGISTRY = Path("../../mlrun_save")
-    EXPERIMENT_NAME = "VCG_broadcast"
+    EXPERIMENT_NAME = "trash"
 
     timestr = time.strftime("%Y%m%d-%H%M%S")
     model_path = "../params_save/" + EXPERIMENT_NAME + timestr

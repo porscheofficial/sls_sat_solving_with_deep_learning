@@ -98,10 +98,10 @@ class VCG(SATRepresentation):
     def get_padded_candidate(solution_dict, n_nodes):
         #
         return np.pad(
-            np.array(list(solution_dict.values()), dtype=int),
-            (
-                0,
-                int(n_nodes) - len(solution_dict),
+            solution_dict,
+            pad_width=(
+                (0, 0),
+                (0, int(np.ceil(n_nodes)) - np.shape(solution_dict)[1]),
             ),  # @TODO: check if this is correct
         )
 
@@ -263,10 +263,10 @@ class LCG(SATRepresentation):
     def get_padded_candidate(solution_dict, n_nodes):
         #
         return np.pad(
-            np.array(list(solution_dict.values()), dtype=int),
-            (
-                0,
-                int(np.ceil(n_nodes / 2)) - len(solution_dict),
+            solution_dict,
+            pad_width=(
+                (0, 0),
+                (0, int(np.ceil(n_nodes / 2)) - np.shape(solution_dict)[1]),
             ),  # @TODO: check if this is correct
         )
 
@@ -398,11 +398,19 @@ class LCG(SATRepresentation):
         #    new_mask = jnp.reshape(new_mask, (-1, 2))
         #    new_mask = new_mask[:, 0]
         # else:
+        print("decoded_nodes", jnp.shape(decoded_nodes))
         conc_decoded_nodes = jnp.reshape(decoded_nodes, (-1, 2))
+        print("conc_dec", jnp.shape(conc_decoded_nodes))
         new_mask = jnp.reshape(mask, (-1, 2))
+        print("mask", jnp.shape(mask))
+        print("new_mask", jnp.shape(new_mask))
         new_mask = new_mask[:, 0]
+        print("new_mask", jnp.shape(new_mask))
         decoded_nodes = conc_decoded_nodes * new_mask[:, None]
+        print("decoded_nodes", jnp.shape(decoded_nodes))
+        print("candidates before", jnp.shape(candidates))
         candidates = vmap_one_hot(candidates, 2)
+        print("candidates after", jnp.shape(candidates))
         energies = energies[: len(new_mask), :]
 
         log_prob = vmap_compute_log_probs(
