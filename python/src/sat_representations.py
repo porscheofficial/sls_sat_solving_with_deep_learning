@@ -403,7 +403,7 @@ class LCG(SATRepresentation):
         new_mask = new_mask[:, 0]
         decoded_nodes = conc_decoded_nodes * new_mask[:, None]
         candidates = vmap_one_hot(candidates, 2)
-        energies = energies[: len(new_mask), :]
+        # energies = energies[: len(new_mask), :]
 
         log_prob = vmap_compute_log_probs(
             decoded_nodes, new_mask, candidates

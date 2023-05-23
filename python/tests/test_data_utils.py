@@ -92,7 +92,10 @@ def instance_loading_tester(
         graph = problem.graph
         n_node_array = graph.n_node
         assert n_node_array.sum() == max_nodes
-        assert padded_candidates.shape[1] == max_nodes
+        if rep == VCG:
+            assert padded_candidates.shape[1] == max_nodes
+        if rep == LCG:
+            assert padded_candidates.shape[1] == max_nodes / 2
         assert energies.shape[0] == padded_candidates.shape[0]
         assert len(graph.receivers) == max_edges
         assert len(graph.senders) == max_edges
@@ -133,5 +136,8 @@ def collate_function_tester(
         assert len(graphs.edges) == batch_factor * dataset.max_n_edge
         assert len(graphs.nodes) == batch_factor * dataset.max_n_node
         assert candidates.shape == energies.shape
-        assert len(candidates) == batch_factor * dataset.max_n_node
+        if rep == VCG:
+            assert len(candidates) == batch_factor * dataset.max_n_node
+        elif rep == LCG:
+            assert len(candidates) == batch_factor * dataset.max_n_node / 2
     return True

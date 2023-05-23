@@ -76,7 +76,7 @@ class LossTesting(TestCase):
                 decoded_nodes.append(10000)
             else:
                 decoded_nodes.append(0)
-        decoded_nodes = np.array([decoded_nodes]).T
+        decoded_nodes = np.array([decoded_nodes], dtype=float).T
         assert decoded_nodes.shape == (2 * n + m, 1)
         mask = LCG.get_mask(n, 2 * n + m)
         neighbors_list = LCG.get_constraint_graph(n, m, g.senders, g.receivers)
