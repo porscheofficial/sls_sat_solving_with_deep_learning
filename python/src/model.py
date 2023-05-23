@@ -27,7 +27,7 @@ def apply_interaction(graph: jraph.GraphsTuple, num_message_passing_steps: int =
     def update_fn(features):
         # net = mlp([20, 20, 20])
         ln = hk.LayerNorm(axis=-1, param_axis=-1, create_scale=True, create_offset=True)
-        net = mlp([100, 100])
+        net = mlp([50, 50, 50])
         return ln(net(features))
 
     for _ in range(num_message_passing_steps):
@@ -141,17 +141,29 @@ def network_definition_convolution_LCG(
 
 
 def get_network_definition(network_type, graph_representation: SATRepresentation):
-    match network_type, graph_representation:
-        case "GCN", VCG:
+    if network_type == "GCN" and graph_representation == VCG:
+        return network_definition_convolution_VCG
+    elif network_type == "GCN" and graph_representation == LCG:
+        return network_definition_convolution_LCG
+    elif network_type == "interaction" and graph_representation == VCG:
+        return network_definition_interaction_VCG
+    elif network_type == "interaction" and graph_representation == LCG:
+        return network_definition_interaction_LCG
+    else:
+        raise ValueError("Invalid network_type or graph_representation")
+    """
+    match [network_type, graph_representation]:
+        case ["GCN", VCG]:
             return network_definition_convolution_VCG
-        case "GCN", LCG:
+        case ["GCN", LCG]:
             return network_definition_convolution_LCG
-        case "interaction", VCG:
+        case ["interaction", VCG]:
             return network_definition_interaction_VCG
-        case "interaction", LCG:
+        case ["interaction", LCG]:
             return network_definition_interaction_LCG
         case _:
             raise ValueError("Invalid network_type or graph_representation")
+    """
 
 
 '''

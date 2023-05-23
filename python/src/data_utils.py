@@ -100,10 +100,9 @@ class SATTrainingDataset(data.Dataset):
                     1, -1
                 )  # (1, n_node)
 
-        padded_candidates = np.pad(
-            candidates,
-            pad_width=((0, 0), (0, self.max_n_node - instance.n)),
-        )  # (n_candidates, max_n_node), we pad the candidates to same length as the graph
+        padded_candidates = self.representation.get_padded_candidate(
+            candidates, self.max_n_node
+        )
         violated_constraints = vmap(
             self.representation.get_violated_constraints, in_axes=(None, 0), out_axes=0
         )(problem, candidates)
@@ -130,7 +129,7 @@ def collate_fn(batch):
     batched_graphs = jraph.batch(graphs)
     batched_candidates = np.vstack([c.T for c in candidates])
     batched_energies = np.vstack(
-        [np.repeat([e], len(m), axis=0) for (e, m) in zip(energies, masks)]
+        [np.repeat([e], np.shape(c)[1], axis=0) for (e, c) in zip(energies, candidates)]
     )
 
     return (batched_masks, batched_graphs, batched_constraint_graphs), (

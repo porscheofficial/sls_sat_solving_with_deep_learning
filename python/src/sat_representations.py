@@ -98,10 +98,10 @@ class VCG(SATRepresentation):
     def get_padded_candidate(solution_dict, n_nodes):
         #
         return np.pad(
-            np.array(list(solution_dict.values()), dtype=int),
-            (
-                0,
-                int(n_nodes) - len(solution_dict),
+            solution_dict,
+            pad_width=(
+                (0, 0),
+                (0, int(np.ceil(n_nodes)) - np.shape(solution_dict)[1]),
             ),  # @TODO: check if this is correct
         )
 
@@ -262,10 +262,10 @@ class LCG(SATRepresentation):
     def get_padded_candidate(solution_dict, n_nodes):
         #
         return np.pad(
-            np.array(list(solution_dict.values()), dtype=int),
-            (
-                0,
-                int(np.ceil(n_nodes / 2)) - len(solution_dict),
+            solution_dict,
+            pad_width=(
+                (0, 0),
+                (0, int(np.ceil(n_nodes / 2)) - np.shape(solution_dict)[1]),
             ),  # @TODO: check if this is correct
         )
 
@@ -400,7 +400,7 @@ class LCG(SATRepresentation):
         new_mask = new_mask[:, 0]
         decoded_nodes = conc_decoded_nodes * new_mask[:, None]
         candidates = vmap_one_hot(candidates, 2)
-        energies = energies[: len(new_mask), :]
+        # energies = energies[: len(new_mask), :]
 
         log_prob = vmap_compute_log_probs(
             decoded_nodes, new_mask, candidates
