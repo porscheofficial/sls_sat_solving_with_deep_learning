@@ -100,12 +100,6 @@ class SATTrainingDataset(data.Dataset):
                     1, -1
                 )  # (1, n_node)
 
-        # padded_candidates = np.pad(
-        #    candidates,
-        #    pad_width=((0, 0), (0, self.max_n_node - instance.n)),
-        # )  # (n_candidates, max_n_node), we pad the candidates to same length as the graph
-        # padded_candidates = vmap(self.representation.get_padded_candidate, in_axes=(0,None), out_axes=0)(candidates, self.max_n_node)
-        print("max_n_node", self.max_n_node)
         padded_candidates = self.representation.get_padded_candidate(
             candidates, self.max_n_node
         )

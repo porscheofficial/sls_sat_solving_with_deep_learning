@@ -217,7 +217,6 @@ def experiment_tracking_train(
     graph_representation=SATRepresentation,
     network_type="interaction",
 ):
-    print("rep", graph_representation)
     network_definition = get_network_definition(
         network_type=network_type, graph_representation=graph_representation
     )
