@@ -2,14 +2,7 @@ import haiku as hk
 import jax
 import jraph
 from jraph._src import utils
-import jax.numpy as jnp
-
-from typing import Callable
-
 import jax
-import jax.numpy as jnp
-import jax.tree_util as tree
-import numpy as np
 from python.src.sat_representations import SATRepresentation, VCG, LCG
 
 

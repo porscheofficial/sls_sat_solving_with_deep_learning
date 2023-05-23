@@ -1,20 +1,20 @@
 from functools import partial
 import sys
-import mlflow
+import time
 from pathlib import Path
 import tempfile
+import os
 import joblib
+import mlflow
 import haiku as hk
 import jax
 import jax.numpy as jnp
 import numpy as np
 import optax
-import time
-from torch.utils import data
 from torch import Generator
+from torch.utils import data
 import matplotlib.pyplot as plt
 from jsonargparse import CLI
-import os
 
 
 sys.path.append("../../")
@@ -23,8 +23,6 @@ from python.src.data_utils import SATTrainingDataset, JraphDataLoader
 from python.src.sat_representations import VCG, LCG, SATRepresentation
 from python.src.model import get_network_definition
 from python.src.train_utils import (
-    evaluate_moser_rust,
-    EvalResults,
     plot_accuracy_fig,
     initiate_eval_objects_loss,
     update_eval_objects_loss,
@@ -35,7 +33,7 @@ from python.src.train_utils import (
 
 def train(
     batch_size,
-    f,
+    inv_temp,
     alpha,
     beta,
     gamma,
@@ -84,7 +82,7 @@ def train(
     def total_loss(
         params,
         batch,
-        f: float,
+        inv_temp: float,
         alpha: float,
         beta: float,
         gamma: float,
@@ -93,7 +91,8 @@ def train(
         (mask, graph, neighbors_list), (candidates, energies) = batch
         decoded_nodes = network.apply(params, graph)
         prediction_loss = (
-            alpha * rep.prediction_loss(decoded_nodes, mask, candidates, energies, f)
+            alpha
+            * rep.prediction_loss(decoded_nodes, mask, candidates, energies, inv_temp)
             if alpha > 0
             else 0.0
         )
@@ -110,7 +109,7 @@ def train(
     @jax.jit
     def update(params, batch, opt_state):
         g = jax.grad(total_loss)(
-            params, batch, f, alpha, beta, gamma, graph_representation
+            params, batch, inv_temp, alpha, beta, gamma, graph_representation
         )
         updates, opt_state = opt_update(g, opt_state)
         return optax.apply_updates(params, updates), opt_state
@@ -118,10 +117,10 @@ def train(
     print("Entering training loop")
 
     test_eval_objects_loss = initiate_eval_objects_loss(
-        "test", f, alpha, beta, gamma, graph_representation, test_loader
+        "test", inv_temp, alpha, beta, gamma, graph_representation, test_loader
     )
     train_eval_objects_loss = initiate_eval_objects_loss(
-        "train", f, alpha, beta, gamma, graph_representation, train_eval_loader
+        "train", inv_temp, alpha, beta, gamma, graph_representation, train_eval_loader
     )
     eval_objects_loss = test_eval_objects_loss + train_eval_objects_loss
     test_eval_moser_loss = initiate_eval_moser_loss(
@@ -206,7 +205,7 @@ def experiment_tracking_train(
     MODEL_REGISTRY: str,
     EXPERIMENT_NAME: str,
     batch_size: int,
-    f: float,
+    inv_temp: float,
     alpha: float,
     beta: float,
     gamma: float,
@@ -231,7 +230,7 @@ def experiment_tracking_train(
     MODEL_REGISTRY.mkdir(exist_ok=True)  # create experiments dir
 
     timestr = time.strftime("%Y%m%d-%H%M%S")
-    params_save = Path("..", "params_save")
+    params_save = Path("experiments", "params_save")
     params_save.mkdir(exist_ok=True)
     model_path = os.path.join(params_save, EXPERIMENT_NAME + timestr)
     img_path = model_path + "_plot"
@@ -242,7 +241,7 @@ def experiment_tracking_train(
         # log key hyperparameters
         mlflow.log_params(
             {
-                "f": f,
+                "inv_temp": inv_temp,
                 "alpha": alpha,
                 "beta": beta,
                 "gamma": gamma,
@@ -260,7 +259,7 @@ def experiment_tracking_train(
         # train and evaluate
         artifacts = train(
             batch_size,
-            f,
+            inv_temp,
             alpha,
             beta,
             gamma,

@@ -66,7 +66,7 @@ class SATRepresentation(ABC):
 
     @staticmethod
     @abstractmethod
-    def prediction_loss(decoded_nodes, mask, candidates, energies, f: float):
+    def prediction_loss(decoded_nodes, mask, candidates, energies, inv_temp: float):
         pass
 
     @staticmethod
@@ -186,14 +186,14 @@ class VCG(SATRepresentation):
         return jax.nn.softmax(decoded_nodes)[:n, 1]
 
     @staticmethod
-    def prediction_loss(decoded_nodes, mask, candidates, energies, f: float):
+    def prediction_loss(decoded_nodes, mask, candidates, energies, inv_temp: float):
         candidates = vmap_one_hot(candidates, 2)  # (B*N, K, 2))
 
         log_prob = vmap_compute_log_probs(
             decoded_nodes, mask, candidates
         )  # (B*N, K, 2)
 
-        weights = jax.nn.softmax(-f * energies)  # (B*N, K)
+        weights = jax.nn.softmax(-inv_temp * energies)  # (B*N, K)
         loss = -jnp.sum(weights * jnp.sum(log_prob, axis=-1)) / jnp.sum(mask)  # ()
 
         return loss
@@ -387,7 +387,7 @@ class LCG(SATRepresentation):
         return jax.nn.softmax(conc_decoded_nodes)[:n, 1]
 
     @staticmethod
-    def prediction_loss(decoded_nodes, mask, candidates, energies, f: float):
+    def prediction_loss(decoded_nodes, mask, candidates, energies, inv_temp: float):
         # if np.shape(decoded_nodes)[0] % 2 == 1:
         #    conc_decoded_nodes = jnp.vstack((jnp.asarray(decoded_nodes), [0]))
         #    conc_decoded_nodes = jnp.reshape(conc_decoded_nodes, (-1, 2))
@@ -406,7 +406,7 @@ class LCG(SATRepresentation):
             decoded_nodes, new_mask, candidates
         )  # (B*N, K, 2)
 
-        weights = jax.nn.softmax(-f * energies)  # (B*N, K)
+        weights = jax.nn.softmax(-inv_temp * energies)  # (B*N, K)
         loss = -jnp.sum(weights * jnp.sum(log_prob, axis=-1)) / jnp.sum(
             mask
         )  # / 2  # ()

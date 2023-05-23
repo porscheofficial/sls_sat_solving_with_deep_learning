@@ -59,7 +59,7 @@ class TestParameterized(object):
         f = 0.0000001
         train(
             batch_size=batch_size,
-            f=f,
+            inv_temp=f,
             alpha=alpha,
             beta=beta,
             gamma=gamma,
