@@ -50,9 +50,9 @@ class LossTesting(TestCase):
         mask = LCG.get_mask(n, 2 * n + m)
         self.assertEqual(LCG.entropy_loss(decoded_nodes, mask), 0)
 
-    def test_neighbors_list(self):
-        assert 0 == 0
-        # tbd
+    # def test_neighbors_list(self):
+    #    assert 0 == 0
+    #    # tbd
 
     def test_LLL_loss(self):
         n = 10
@@ -68,19 +68,17 @@ class LossTesting(TestCase):
         loss = VCG.local_lovasz_loss(decoded_nodes, mask, g, neighbors_list)
         self.assertEqual(loss, 0)
         # lcg
-        """
-        problem = create_simple_neighbor_cnf(n,m,k, rep = LCG)
+        problem = create_simple_neighbor_cnf(n, m, k, rep=LCG)
         g = problem.graph
         decoded_nodes = []
-        for i in range(2*n + m):
-            if i%2 == 0:
+        for i in range(2 * n + m):
+            if i % 2 == 0:
                 decoded_nodes.append(10000)
             else:
                 decoded_nodes.append(0)
         decoded_nodes = np.array([decoded_nodes]).T
-        assert decoded_nodes.shape == (2*n + m, 1)
-        mask = LCG.get_mask(n, 2*n + m)
+        assert decoded_nodes.shape == (2 * n + m, 1)
+        mask = LCG.get_mask(n, 2 * n + m)
         neighbors_list = LCG.get_constraint_graph(n, m, g.senders, g.receivers)
         loss = LCG.local_lovasz_loss(decoded_nodes, mask, g, neighbors_list)
         self.assertEqual(loss, 0)
-        """

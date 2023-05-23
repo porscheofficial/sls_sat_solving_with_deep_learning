@@ -112,6 +112,8 @@ def update_eval_moser_loss(network, params, eval_moser_loss):
                     SEED=0,
                 )[0]
             )
+        elif eval_moser_loss[i].loss_params[2] == "uniform":
+            eval_moser_loss[i].results.append(eval_moser_loss[i].results[0])
     return eval_moser_loss
 
 
@@ -161,7 +163,7 @@ def evaluate_moser_rust(
         else:
             print("not valid argument for mode_probabilities")
         model_probabilities = model_probabilities.ravel()
-        print(np.round(model_probabilities, 4))
+        # print(np.round(model_probabilities, 4))
         print(
             np.max(model_probabilities),
             np.min(model_probabilities),

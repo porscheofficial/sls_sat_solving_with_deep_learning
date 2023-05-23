@@ -133,7 +133,8 @@ def train(
         sat_data,
     )
     eval_moser_loss = test_eval_moser_loss + train_eval_moser_loss
-    print(eval_moser_loss)
+    eval_objects_loss = update_eval_objects_loss(params, total_loss, eval_objects_loss)
+    eval_moser_loss = update_eval_moser_loss(network, params, eval_moser_loss)
     for epoch in range(NUM_EPOCHS):
         print("epoch " + str(epoch + 1) + " of " + str(NUM_EPOCHS))
         start_time = time.time()
@@ -154,7 +155,7 @@ def train(
         )
         eval_moser_loss = update_eval_moser_loss(network, params, eval_moser_loss)
 
-        loss_str = "Epoch {} in {:0.2f} sec".format(epoch, epoch_time) + ";  "
+        loss_str = "Epoch {} in {:0.2f} sec".format(epoch + 1, epoch_time) + ";  "
         for eval_result in eval_objects_loss:
             loss_str = (
                 loss_str
@@ -183,8 +184,8 @@ def train(
         print("model successfully saved")
 
     if img_path:
-        plot_accuracy_fig(*test_eval_objects_loss)
-        plot_accuracy_fig(*train_eval_objects_loss)
+        plot_accuracy_fig(*eval_objects_loss)
+        plot_accuracy_fig(*eval_moser_loss)
         plt.xlabel("epoch")
         plt.ylabel("accuracy of model / loss")
         plt.yscale("log")
