@@ -1,0 +1,15 @@
+artifact_uri: file:///home/ubuntu/GIT_ML_MAIN/ml_based_sat_solver/mlrun_save/603983687658095993/ff845b5202014be1af7129c57bc48faf/artifacts
+end_time: 1684934566477
+entry_point_name: ''
+experiment_id: '603983687658095993'
+lifecycle_stage: active
+run_id: ff845b5202014be1af7129c57bc48faf
+run_name: dapper-wren-702
+run_uuid: ff845b5202014be1af7129c57bc48faf
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1684934566469
+status: 4
+tags: []
+user_id: ubuntu

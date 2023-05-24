@@ -1,0 +1,15 @@
+artifact_uri: file:///home/ubuntu/GIT_ML_MAIN/ml_based_sat_solver/mlrun_save/603983687658095993/ef355d63110f489f82a6b63aa4c4a3fc/artifacts
+end_time: 1684934559043
+entry_point_name: ''
+experiment_id: '603983687658095993'
+lifecycle_stage: active
+run_id: ef355d63110f489f82a6b63aa4c4a3fc
+run_name: skittish-hen-305
+run_uuid: ef355d63110f489f82a6b63aa4c4a3fc
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1684934559035
+status: 4
+tags: []
+user_id: ubuntu
