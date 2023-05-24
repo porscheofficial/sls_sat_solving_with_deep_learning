@@ -54,7 +54,7 @@ def apply_convolution(graph: jraph.GraphsTuple, num_message_passing_steps: int =
     @jax.vmap
     @jraph.concatenated_args
     def update_fn(features):
-        net = mlp([20, 20, 20])
+        net = mlp([200, 200, 200])
         # net = mlp([40, 40, 40])
         return net(features)
 

@@ -1,13 +1,13 @@
 MODEL_REGISTRY: mlrun_save
-EXPERIMENT_NAME: benchmark_LCG_VCG_3SAT
+EXPERIMENT_NAME: benchmark_LCG_VCG_broadcast_test
 batch_size: 2
 inv_temp: 0.001
-alpha: 0
+alpha: 1
 beta: 1
 gamma: 0
 NUM_EPOCHS: 30
 N_STEPS_MOSER: 100
 N_RUNS_MOSER: 5
-data_path: ../data_random_3SAT
+data_path: ../data_broadcast_test
 graph_representation: VCG
 network_type: interaction
