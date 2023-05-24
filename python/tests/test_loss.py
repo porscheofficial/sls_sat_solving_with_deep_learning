@@ -31,6 +31,17 @@ def create_simple_neighbor_cnf(n, m, k, rep: SATRepresentation):
     return problem
 
 
+def get_decoded_nodes_on_solution_vcg(candidates):
+    decoded_nodes = np.array(one_hot(candidates[:, 0], 2), dtype=float) * 100000
+    return decoded_nodes
+
+
+def get_decoded_nodes_on_solution_lcg(candidates):
+    decoded_nodes = np.array(one_hot(candidates[:, 0], 2), dtype=float) * 100000
+    decoded_nodes = np.ravel(decoded_nodes)
+    return decoded_nodes
+
+
 class LossTesting(TestCase):
     def test_entropy_loss_uniform_decoded_nodes_vcg(self):
         n = 10
@@ -112,6 +123,7 @@ pairs = [
             ],
             [VCG, LCG],
             [1, 2],
+            [True, False],
         ]
     )
 ]
@@ -119,11 +131,7 @@ pairs = [
 
 class TestParameterized(object):
     @pytest.mark.parametrize(
-        [
-            "data_dir",
-            "representation",
-            "batch_size",
-        ],
+        ["data_dir", "representation", "batch_size", "return_candidates"],
         pairs,
     )
     def test_LLL_on_solution(
@@ -131,38 +139,63 @@ class TestParameterized(object):
         data_dir,
         representation,
         batch_size,
+        return_candidates,
     ):
         sat_data = SATTrainingDataset(
             data_dir,
             representation=representation,
-            return_candidates=False,
+            return_candidates=return_candidates,
             include_constraint_graph=True,
         )
         data_loader = JraphDataLoader(sat_data, batch_size=batch_size, shuffle=False)
-        if representation == VCG:
-            for counter, batch in enumerate(data_loader):
-                (mask, graph, neighbors_list, constraint_mask), (
-                    candidates,
-                    energies,
-                ) = batch
-                decoded_nodes = (
-                    np.array(one_hot(candidates[:, 0], 2), dtype=float) * 100000
-                )
-                loss = representation.local_lovasz_loss(
-                    decoded_nodes, mask, graph, neighbors_list, constraint_mask
-                )
-                assert loss == 0
-        if representation == LCG:
-            for counter, batch in enumerate(data_loader):
-                (mask, graph, neighbors_list, constraint_mask), (
-                    candidates,
-                    energies,
-                ) = batch
-                decoded_nodes = np.ravel(
-                    np.array(one_hot(candidates[:, 0], 2), dtype=float) * 100000
-                )
-                loss = representation.local_lovasz_loss(
-                    decoded_nodes, mask, graph, neighbors_list, constraint_mask
-                )
-                assert loss == 0
-            # tbf
+
+        for counter, batch in enumerate(data_loader):
+            (mask, graph, neighbors_list, constraint_mask), (
+                candidates,
+                energies,
+            ) = batch
+            if representation == VCG:
+                decoded_nodes = get_decoded_nodes_on_solution_vcg(candidates)
+
+            if representation == LCG:
+                decoded_nodes = get_decoded_nodes_on_solution_lcg(candidates)
+
+            loss = representation.local_lovasz_loss(
+                decoded_nodes, mask, graph, neighbors_list, constraint_mask
+            )
+            assert loss == 0
+
+    @pytest.mark.parametrize(
+        ["data_dir", "representation", "batch_size", "return_candidates"],
+        pairs,
+    )
+    def test_DM_on_solution(
+        self,
+        data_dir,
+        representation,
+        batch_size,
+        return_candidates,
+    ):
+        sat_data = SATTrainingDataset(
+            data_dir,
+            representation=representation,
+            return_candidates=return_candidates,
+            include_constraint_graph=False,
+        )
+        data_loader = JraphDataLoader(sat_data, batch_size=batch_size, shuffle=False)
+        for counter, batch in enumerate(data_loader):
+            (mask, graph, neighbors_list, constraint_mask), (
+                candidates,
+                energies,
+            ) = batch
+            if representation == VCG:
+                decoded_nodes = get_decoded_nodes_on_solution_vcg(candidates)
+
+            if representation == LCG:
+                decoded_nodes = get_decoded_nodes_on_solution_lcg(candidates)
+
+            inv_temp = 1e10
+            loss = representation.prediction_loss(
+                decoded_nodes, mask, candidates, energies, inv_temp=inv_temp
+            )
+            assert loss == 0
