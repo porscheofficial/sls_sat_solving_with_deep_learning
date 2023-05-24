@@ -8,6 +8,6 @@ gamma: 0
 NUM_EPOCHS: 30
 N_STEPS_MOSER: 100
 N_RUNS_MOSER: 5
-data_path: ../../data_random_broadcast_test
+data_path: Data/BroadcastSubset
 graph_representation: VCG
 network_type: interaction
