@@ -1,5 +1,5 @@
 MODEL_REGISTRY: mlrun_save
-EXPERIMENT_NAME: benchmark_LCG_VCG_3SAT
+EXPERIMENT_NAME: benchmark_LCG_VCG_3SAT_blocksworld
 batch_size: 2
 inv_temp: 0.001
 alpha: 0
