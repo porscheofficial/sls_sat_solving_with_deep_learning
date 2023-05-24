@@ -1,0 +1,15 @@
+artifact_uri: file:///home/ubuntu/GIT_ML_MAIN/ml_based_sat_solver/mlrun_save/634047769586963630/97b38c5b823947cd8ea42f5fd1a9a37e/artifacts
+end_time: 1684934125453
+entry_point_name: ''
+experiment_id: '634047769586963630'
+lifecycle_stage: active
+run_id: 97b38c5b823947cd8ea42f5fd1a9a37e
+run_name: inquisitive-dog-292
+run_uuid: 97b38c5b823947cd8ea42f5fd1a9a37e
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1684934123178
+status: 4
+tags: []
+user_id: ubuntu
