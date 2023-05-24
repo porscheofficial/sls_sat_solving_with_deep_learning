@@ -1,0 +1,13 @@
+MODEL_REGISTRY: mlrun_save
+EXPERIMENT_NAME: batchsizes_broadcast
+batch_size: 10
+inv_temp: 0.000001
+alpha: 1
+beta: 1
+gamma: 0
+NUM_EPOCHS: 5
+N_STEPS_MOSER: 100
+N_RUNS_MOSER: 5
+data_path: ../data_broadcast_test
+graph_representation: LCG
+network_type: interaction
