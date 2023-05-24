@@ -88,7 +88,7 @@ def train(
         gamma: float,
         rep: SATRepresentation,
     ):
-        (mask, graph, neighbors_list), (candidates, energies) = batch
+        (mask, graph, constraint_graph, constraint_mask), (candidates, energies) = batch
         decoded_nodes = network.apply(params, graph)
         prediction_loss = (
             alpha
@@ -97,7 +97,10 @@ def train(
             else 0.0
         )
         local_lovasz_loss = (
-            beta * rep.local_lovasz_loss(decoded_nodes, mask, graph, neighbors_list)
+            beta
+            * rep.local_lovasz_loss(
+                decoded_nodes, mask, graph, constraint_graph, constraint_mask
+            )
             if beta > 0
             else 0.0
         )
@@ -255,6 +258,7 @@ def experiment_tracking_train(
                 "path_dataset": data_path,
                 "graph_representation": graph_representation,
                 "network_type": network_type,
+                "return_candidates": return_candidates,
             }
         )
 
@@ -274,6 +278,7 @@ def experiment_tracking_train(
             experiment_tracking=True,
             graph_representation=rep,
             network_type=network_type,
+            return_candidates=return_candidates,
         )
         # log params which are a result of learning
         with tempfile.TemporaryDirectory() as dp:
