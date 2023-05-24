@@ -3,7 +3,7 @@ EXPERIMENT_NAME: batchsizes_broadcast
 batch_size: 10
 inv_temp: 0.000001
 alpha: 1
-beta: 1
+beta: 0
 gamma: 0
 NUM_EPOCHS: 5
 N_STEPS_MOSER: 100

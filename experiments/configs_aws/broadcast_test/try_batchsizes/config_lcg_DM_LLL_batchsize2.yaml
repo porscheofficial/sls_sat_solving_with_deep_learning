@@ -1,9 +1,9 @@
 MODEL_REGISTRY: mlrun_save
 EXPERIMENT_NAME: batchsizes_broadcast
-batch_size: 5
+batch_size: 2
 inv_temp: 0.000001
 alpha: 1
-beta: 1
+beta: 0
 gamma: 0
 NUM_EPOCHS: 5
 N_STEPS_MOSER: 100
