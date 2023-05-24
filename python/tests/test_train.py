@@ -25,6 +25,7 @@ pairs = [
             [0, 1],
             [0, 1],
             [0, 1],
+            ["interaction", "GCN"],
         ]
     )
 ]
@@ -40,6 +41,7 @@ class TestParameterized(object):
             "alpha",
             "beta",
             "gamma",
+            "network_type",
         ],
         pairs,
     )
@@ -52,14 +54,15 @@ class TestParameterized(object):
         alpha,
         beta,
         gamma,
+        network_type,
     ):
         NUM_EPOCHS = 1
         N_STEPS_MOSER = 100
         N_RUNS_MOSER = 1
-        f = 0.0000001
+        inv_temp = 0.0000001
         train(
             batch_size=batch_size,
-            inv_temp=f,
+            inv_temp=inv_temp,
             alpha=alpha,
             beta=beta,
             gamma=gamma,
@@ -68,5 +71,6 @@ class TestParameterized(object):
             N_RUNS_MOSER=N_RUNS_MOSER,
             path=data_dir,
             graph_representation=representation,
+            network_type=network_type,
             return_candidates=return_candidates,
         )

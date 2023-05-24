@@ -121,7 +121,10 @@ def collate_function_tester(
     loader = JraphDataLoader(dataset, batch_size=batch_size)
 
     for i, batch in enumerate(loader):
-        (masks, graphs, constraint_graphs), (candidates, energies) = batch
+        (masks, graphs, constraint_graphs, constraint_masks), (
+            candidates,
+            energies,
+        ) = batch
         print("loading batch")
         batch_factor = (
             batch_size
@@ -136,6 +139,12 @@ def collate_function_tester(
         assert len(graphs.edges) == batch_factor * dataset.max_n_edge
         assert len(graphs.nodes) == batch_factor * dataset.max_n_node
         assert candidates.shape == energies.shape
+        if include_constraint_graph:
+            assert constraint_graphs.n_node.sum() == batch_factor * dataset.max_n_node
+            assert constraint_masks.shape == masks.shape
+        else:
+            assert constraint_graphs is None
+            assert constraint_masks is None
         if rep == VCG:
             assert len(candidates) == batch_factor * dataset.max_n_node
         elif rep == LCG:

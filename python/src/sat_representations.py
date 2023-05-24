@@ -214,7 +214,7 @@ class VCG(SATRepresentation):
     ):
         if constraint_graph is None:
             raise ValueError("Constraint graph is None. Cannot calculate Lovasz loss.")
-        log_probs = jax.nn.log_softmax(decoded_nodes)
+        log_probs = jax.nn.log_softmax(decoded_nodes) * mask[:, None]
         n = jnp.shape(decoded_nodes)[0]
         # constraint_nodes = jnp.unique(constraint_graph.senders)
         # constraint_node_mask = utils.segment_sum(

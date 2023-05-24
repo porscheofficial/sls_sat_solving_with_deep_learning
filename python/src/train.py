@@ -220,6 +220,7 @@ def experiment_tracking_train(
     data_path: str,
     graph_representation: str,
     network_type: str = "interaction",
+    return_candidates=False,
 ):
     match graph_representation:
         case "LCG":
