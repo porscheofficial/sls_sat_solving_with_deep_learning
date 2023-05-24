@@ -5,7 +5,7 @@ inv_temp: 0.000000001
 alpha: 1
 beta: 0
 gamma: 0
-NUM_EPOCHS: 30
+NUM_EPOCHS: 20
 N_STEPS_MOSER: 100
 N_RUNS_MOSER: 5
 data_path: ../data_broadcast_test
