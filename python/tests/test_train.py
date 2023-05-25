@@ -60,6 +60,7 @@ class TestParameterized(object):
         N_STEPS_MOSER = 100
         N_RUNS_MOSER = 1
         inv_temp = 0.0000001
+        mlp_layers = [32, 32]
         train(
             batch_size=batch_size,
             inv_temp=inv_temp,
@@ -73,4 +74,5 @@ class TestParameterized(object):
             graph_representation=representation,
             network_type=network_type,
             return_candidates=return_candidates,
+            mlp_layers=mlp_layers,
         )

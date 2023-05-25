@@ -11,3 +11,4 @@ N_RUNS_MOSER: 5
 data_path: Data/blocksworld
 graph_representation: VCG
 network_type: interaction
+mlp_layers: [64,64]

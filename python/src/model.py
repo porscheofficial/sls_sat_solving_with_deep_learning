@@ -4,6 +4,7 @@ import jraph
 from jraph._src import utils
 import jax
 from python.src.sat_representations import SATRepresentation, VCG, LCG
+from typing import Any
 
 
 def get_embedding(graph: jraph.GraphsTuple):
@@ -15,7 +16,11 @@ def get_embedding(graph: jraph.GraphsTuple):
     return graph
 
 
-def apply_interaction(graph: jraph.GraphsTuple, num_message_passing_steps: int = 5):
+def apply_interaction(
+    mlp_layers: list[int],
+    graph: jraph.GraphsTuple,
+    num_message_passing_steps: int = 5,
+):
     def mlp(dims):
         net = []
         for d in dims:
@@ -25,9 +30,8 @@ def apply_interaction(graph: jraph.GraphsTuple, num_message_passing_steps: int =
     @jax.vmap
     @jraph.concatenated_args
     def update_fn(features):
-        # net = mlp([20, 20, 20])
         ln = hk.LayerNorm(axis=-1, param_axis=-1, create_scale=True, create_offset=True)
-        net = mlp([50, 50, 50])
+        net = mlp(mlp_layers)
         return ln(net(features))
 
     for _ in range(num_message_passing_steps):
@@ -44,7 +48,9 @@ def apply_interaction(graph: jraph.GraphsTuple, num_message_passing_steps: int =
     return graph
 
 
-def apply_convolution(graph: jraph.GraphsTuple, num_message_passing_steps: int = 5):
+def apply_convolution(
+    mlp_layers: list[int], graph: jraph.GraphsTuple, num_message_passing_steps: int = 5
+):
     def mlp(dims):
         net = []
         for d in dims:
@@ -54,8 +60,7 @@ def apply_convolution(graph: jraph.GraphsTuple, num_message_passing_steps: int =
     @jax.vmap
     @jraph.concatenated_args
     def update_fn(features):
-        net = mlp([200, 200, 200])
-        # net = mlp([40, 40, 40])
+        net = mlp(mlp_layers)
         return net(features)
 
     for _ in range(num_message_passing_steps):
@@ -76,7 +81,7 @@ def apply_convolution(graph: jraph.GraphsTuple, num_message_passing_steps: int =
 
 
 def network_definition_interaction_VCG(
-    graph: jraph.GraphsTuple, num_message_passing_steps: int = 5
+    graph: jraph.GraphsTuple, mlp_layers: list[int], num_message_passing_steps: int = 5
 ) -> jraph.ArrayTree:
     """Defines a graph neural network.
     Args:
@@ -87,12 +92,13 @@ def network_definition_interaction_VCG(
     number_message_passing_steps = number of layers
     """
     graph = get_embedding(graph)
-    graph = apply_interaction(graph, num_message_passing_steps)
+    graph = apply_interaction(mlp_layers, graph, num_message_passing_steps)
     return hk.Linear(2)(graph.nodes)
 
 
 def network_definition_interaction_LCG(
     graph: jraph.GraphsTuple,
+    mlp_layers: list[int],
     num_message_passing_steps: int = 5,
 ) -> jraph.ArrayTree:
     """Defines a graph neural network.
@@ -104,12 +110,12 @@ def network_definition_interaction_LCG(
     number_message_passing_steps = number of layers
     """
     graph = get_embedding(graph)
-    graph = apply_interaction(graph, num_message_passing_steps)
+    graph = apply_interaction(mlp_layers, graph, num_message_passing_steps)
     return hk.Linear(1)(graph.nodes)
 
 
 def network_definition_convolution_VCG(
-    graph: jraph.GraphsTuple, num_message_passing_steps: int = 5
+    graph: jraph.GraphsTuple, mlp_layers: list[int], num_message_passing_steps: int = 5
 ) -> jraph.ArrayTree:
     """Defines a graph neural network.
     Args:
@@ -120,12 +126,12 @@ def network_definition_convolution_VCG(
     number_message_passing_steps = number of layers
     """
     graph = get_embedding(graph)
-    graph = apply_convolution(graph, num_message_passing_steps)
+    graph = apply_convolution(mlp_layers, graph, num_message_passing_steps)
     return hk.Linear(2)(graph.nodes)
 
 
 def network_definition_convolution_LCG(
-    graph: jraph.GraphsTuple, num_message_passing_steps: int = 5
+    graph: jraph.GraphsTuple, mlp_layers: list[int], num_message_passing_steps: int = 5
 ) -> jraph.ArrayTree:
     """Defines a graph neural network.
     Args:
@@ -136,7 +142,7 @@ def network_definition_convolution_LCG(
     number_message_passing_steps = number of layers
     """
     graph = get_embedding(graph)
-    graph = apply_convolution(graph, num_message_passing_steps)
+    graph = apply_convolution(mlp_layers, graph, num_message_passing_steps)
     return hk.Linear(1)(graph.nodes)
 
 

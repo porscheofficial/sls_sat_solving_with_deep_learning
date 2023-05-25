@@ -43,6 +43,7 @@ def train(
     path,
     graph_representation: SATRepresentation,
     network_type,
+    mlp_layers,
     img_path=False,
     model_path=False,
     experiment_tracking=False,
@@ -72,6 +73,7 @@ def train(
     network_definition = get_network_definition(
         network_type=network_type, graph_representation=graph_representation
     )
+    network_definition = partial(network_definition, mlp_layers=mlp_layers)
     network = hk.without_apply_rng(hk.transform(network_definition))
     params = network.init(jax.random.PRNGKey(42), sat_data[0][0].graph)
 
@@ -219,6 +221,7 @@ def experiment_tracking_train(
     N_RUNS_MOSER: int,
     data_path: str,
     graph_representation: str,
+    mlp_layers: list[int],
     network_type: str = "interaction",
     return_candidates=False,
 ):
@@ -274,6 +277,7 @@ def experiment_tracking_train(
             N_STEPS_MOSER,
             N_RUNS_MOSER,
             data_path,
+            mlp_layers=mlp_layers,
             img_path=img_path,
             model_path=model_path,
             experiment_tracking=True,
