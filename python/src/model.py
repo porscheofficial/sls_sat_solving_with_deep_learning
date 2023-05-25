@@ -2,14 +2,9 @@ import haiku as hk
 import jax
 import jraph
 from jraph._src import utils
-import jax.numpy as jnp
-
-from typing import Callable
-
 import jax
-import jax.numpy as jnp
-import jax.tree_util as tree
-import numpy as np
+from python.src.sat_representations import SATRepresentation, VCG, LCG
+from typing import Any
 
 
 def get_embedding(graph: jraph.GraphsTuple):
@@ -21,7 +16,11 @@ def get_embedding(graph: jraph.GraphsTuple):
     return graph
 
 
-def apply_interaction(graph: jraph.GraphsTuple, num_message_passing_steps: int = 5):
+def apply_interaction(
+    mlp_layers: list[int],
+    graph: jraph.GraphsTuple,
+    num_message_passing_steps: int = 5,
+):
     def mlp(dims):
         net = []
         for d in dims:
@@ -31,9 +30,9 @@ def apply_interaction(graph: jraph.GraphsTuple, num_message_passing_steps: int =
     @jax.vmap
     @jraph.concatenated_args
     def update_fn(features):
-        # net = mlp([20, 20, 20])
-        net = mlp([1000, 1000, 1000])
-        return net(features)
+        ln = hk.LayerNorm(axis=-1, param_axis=-1, create_scale=True, create_offset=True)
+        net = mlp(mlp_layers)
+        return ln(net(features))
 
     for _ in range(num_message_passing_steps):
         gn = jraph.InteractionNetwork(
@@ -49,7 +48,9 @@ def apply_interaction(graph: jraph.GraphsTuple, num_message_passing_steps: int =
     return graph
 
 
-def apply_convolution(graph: jraph.GraphsTuple, num_message_passing_steps: int = 5):
+def apply_convolution(
+    mlp_layers: list[int], graph: jraph.GraphsTuple, num_message_passing_steps: int = 5
+):
     def mlp(dims):
         net = []
         for d in dims:
@@ -59,8 +60,7 @@ def apply_convolution(graph: jraph.GraphsTuple, num_message_passing_steps: int =
     @jax.vmap
     @jraph.concatenated_args
     def update_fn(features):
-        net = mlp([20, 20, 20])
-        # net = mlp([40, 40, 40])
+        net = mlp(mlp_layers)
         return net(features)
 
     for _ in range(num_message_passing_steps):
@@ -77,10 +77,11 @@ def apply_convolution(graph: jraph.GraphsTuple, num_message_passing_steps: int =
         #    update_node_fn=update_fn,
         # )
         # graph = gn(graph)
+    return graph
 
 
 def network_definition_interaction_VCG(
-    graph: jraph.GraphsTuple, num_message_passing_steps: int = 5
+    graph: jraph.GraphsTuple, mlp_layers: list[int], num_message_passing_steps: int = 5
 ) -> jraph.ArrayTree:
     """Defines a graph neural network.
     Args:
@@ -91,12 +92,14 @@ def network_definition_interaction_VCG(
     number_message_passing_steps = number of layers
     """
     graph = get_embedding(graph)
-    graph = apply_interaction(graph, num_message_passing_steps)
+    graph = apply_interaction(mlp_layers, graph, num_message_passing_steps)
     return hk.Linear(2)(graph.nodes)
 
 
 def network_definition_interaction_LCG(
-    graph: jraph.GraphsTuple, num_message_passing_steps: int = 5
+    graph: jraph.GraphsTuple,
+    mlp_layers: list[int],
+    num_message_passing_steps: int = 5,
 ) -> jraph.ArrayTree:
     """Defines a graph neural network.
     Args:
@@ -107,12 +110,12 @@ def network_definition_interaction_LCG(
     number_message_passing_steps = number of layers
     """
     graph = get_embedding(graph)
-    graph = apply_interaction(graph, num_message_passing_steps)
+    graph = apply_interaction(mlp_layers, graph, num_message_passing_steps)
     return hk.Linear(1)(graph.nodes)
 
 
 def network_definition_convolution_VCG(
-    graph: jraph.GraphsTuple, num_message_passing_steps: int = 5
+    graph: jraph.GraphsTuple, mlp_layers: list[int], num_message_passing_steps: int = 5
 ) -> jraph.ArrayTree:
     """Defines a graph neural network.
     Args:
@@ -123,12 +126,12 @@ def network_definition_convolution_VCG(
     number_message_passing_steps = number of layers
     """
     graph = get_embedding(graph)
-    graph = apply_convolution(graph, num_message_passing_steps)
+    graph = apply_convolution(mlp_layers, graph, num_message_passing_steps)
     return hk.Linear(2)(graph.nodes)
 
 
 def network_definition_convolution_LCG(
-    graph: jraph.GraphsTuple, num_message_passing_steps: int = 5
+    graph: jraph.GraphsTuple, mlp_layers: list[int], num_message_passing_steps: int = 5
 ) -> jraph.ArrayTree:
     """Defines a graph neural network.
     Args:
@@ -139,50 +142,34 @@ def network_definition_convolution_LCG(
     number_message_passing_steps = number of layers
     """
     graph = get_embedding(graph)
-    graph = apply_convolution(graph, num_message_passing_steps)
+    graph = apply_convolution(mlp_layers, graph, num_message_passing_steps)
     return hk.Linear(1)(graph.nodes)
 
 
-def get_model_probabilities(network, params, problem, mode):
-    """
-    Helper method that returns, for each, problem variable, the Bernoulli parameter of the model for this variable.
-    That is, the ith value of the returned array is the probability with which the model will assign 1 to the
-    ith variable.
-
-    The reasoning for choosing the first, rather than the zeroth, column of the model output below is as follows:
-
-    - When evaluating the loss function, candidates are one-hot encoded, which means that when a satisfying assignment
-    for a problem sets variable i to 1, then this will increase the likelihood that the model will set this variable to
-    1, meaning, all else being equal, a larger Bernoulli weight in element [i,1] of the model output. As a result the
-    right column of the softmax of the model output equals the models likelihood for setting variables to 1, which is
-    what we seek.
-    """
-    # mode = "LCG"
-    n, _, _ = problem.params
-    decoded_nodes = network.apply(params, problem.graph)
-    if mode == "VCG":
-        return jax.nn.softmax(decoded_nodes)[:n, 1]
-    if mode == "LCG":
-        if np.shape(decoded_nodes)[0] % 2 == 1:
-            decoded_nodes = jnp.vstack((jnp.asarray(decoded_nodes), [[0]]))
-            conc_decoded_nodes = jnp.reshape(decoded_nodes, (-1, 2))
-        else:
-            conc_decoded_nodes = jnp.reshape(decoded_nodes, (-1, 2))
-        return jax.nn.softmax(conc_decoded_nodes)[:n, 1]
-
-
-def get_network_definition(network_type, graph_representation):
-    if network_type == "GCN" and graph_representation == "VCG":
-        network_definition = network_definition_convolution_VCG
-    elif network_type == "GCN" and graph_representation == "LCG":
-        network_definition = network_definition_convolution_LCG
-    elif network_type == "interaction" and graph_representation == "VCG":
-        network_definition = network_definition_interaction_VCG
-    elif network_type == "interaction" and graph_representation == "LCG":
-        network_definition = network_definition_interaction_LCG
+def get_network_definition(network_type, graph_representation: SATRepresentation):
+    if network_type == "GCN" and graph_representation == VCG:
+        return network_definition_convolution_VCG
+    elif network_type == "GCN" and graph_representation == LCG:
+        return network_definition_convolution_LCG
+    elif network_type == "interaction" and graph_representation == VCG:
+        return network_definition_interaction_VCG
+    elif network_type == "interaction" and graph_representation == LCG:
+        return network_definition_interaction_LCG
     else:
-        print("Network not defined. Please use a type that is defined")
-    return network_definition
+        raise ValueError("Invalid network_type or graph_representation")
+    """
+    match [network_type, graph_representation]:
+        case ["GCN", VCG]:
+            return network_definition_convolution_VCG
+        case ["GCN", LCG]:
+            return network_definition_convolution_LCG
+        case ["interaction", VCG]:
+            return network_definition_interaction_VCG
+        case ["interaction", LCG]:
+            return network_definition_interaction_LCG
+        case _:
+            raise ValueError("Invalid network_type or graph_representation")
+    """
 
 
 '''

@@ -3,7 +3,8 @@ import sys
 sys.path.append("../../")
 
 from collections import namedtuple
-from os.path import join, exists
+from os.path import join, exists, basename
+from os import mkdir
 
 import glob
 import gzip
@@ -17,45 +18,48 @@ from jax import vmap
 from pysat.formula import CNF
 from torch.utils import data
 
-from constraint_problems import get_problem_from_cnf
-from random_walk import (
-    number_of_violated_constraints_LCG,
-    number_of_violated_constraints_VCG,
-)
+from python.src.sat_representations import SATRepresentation
+from python.src.sat_instances import get_problem_from_cnf
+from python.src.random_walk import number_of_violated_constraints
 
 MAX_TIME = 20
 
-SATInstanceMeta = namedtuple("SATInstanceMeta", ("name", "n", "m", "n_edges"))
+SATInstanceMeta = namedtuple("SATInstanceMeta", ("name", "n", "m"))
 
 
-class SATTrainingDataset_LCG(data.Dataset):
-    def __init__(self, data_dir, already_unzipped=True, return_candidates=True):
+class SATTrainingDataset(data.Dataset):
+    def __init__(
+        self,
+        data_dir,
+        representation,
+        already_unzipped=True,
+        return_candidates=True,
+        include_constraint_graph=False,
+    ):
         self.return_candidates = return_candidates
         self.data_dir = data_dir
         self.already_unzipped = already_unzipped
+        self.representation: SATRepresentation = representation
+        self.include_constraint_graph = include_constraint_graph
         solved_instances = glob.glob(join(data_dir, "*_sol.pkl"))
 
         self.instances = []
+        edges_list = []
+        n_nodes_list = []
         for f in solved_instances:
             name = f.split("_sol.pkl")[0]
             problem_file = self._get_problem_file(name)
             cnf = CNF(from_string=problem_file.read())
-            instance = SATInstanceMeta(
-                name, cnf.nv, len(cnf.clauses), sum(len(c) for c in cnf.clauses)
-            )
+            n, m = cnf.nv, len(cnf.clauses)
+            instance = SATInstanceMeta(name, n, m)
+            n_nodes_list.append(self.representation.get_n_nodes(cnf))
+            edges_list.append(self.representation.get_n_edges(cnf))
             self.instances.append(instance)
-
-        self.max_n_node = max(2 * i.n + i.m for i in self.instances)
-        self.max_n_edge = max(i.n_edges for i in self.instances)
+        self.max_n_node = n + 2 if (n := max(n_nodes_list)) % 2 == 0 else n + 1
+        self.max_n_edge = max(edges_list)
 
     def __len__(self):
         return len(self.instances)
-
-    def solution_dict_to_array(self, solution_dict):
-        return np.pad(
-            np.array(list(solution_dict.values()), dtype=int),
-            (0, int(np.ceil(self.max_n_node / 2)) - len(solution_dict)),
-        )
 
     def _get_problem_file(self, name):
         if self.already_unzipped:
@@ -67,161 +71,78 @@ class SATTrainingDataset_LCG(data.Dataset):
         instance_name = self.instances[idx].name
         problem_file = self._get_problem_file(instance_name)
         return get_problem_from_cnf(
-            cnf=CNF(from_string=problem_file.read()), mode="LCG"
+            cnf=CNF(from_string=problem_file.read()), representation=self.representation
         )
 
     def __getitem__(self, idx):
-        instance_name = self.instances[idx].name
+        instance = self.instances[idx]
+        instance_name = instance.name
         problem_file = self._get_problem_file(instance_name)
         problem = get_problem_from_cnf(
             cnf=CNF(from_string=problem_file.read()),
             pad_nodes=self.max_n_node,
             pad_edges=self.max_n_edge,
-            mode="LCG",
+            representation=self.representation,
+            include_constraint_graph=self.include_constraint_graph,
         )
-        N = len(problem.mask[0])  # total number of nodes in (padded) graph
-        n, _, _ = problem.params  # number of variables nodes in instance
-
         if self.return_candidates:
             # return not just solution but also generated candidates
             target_name = instance_name + "_samples_sol.npy"
-            candidates = np.load(
-                target_name
-            )  # np.array which stores candidates and solution to problem
-            padded_candidates = np.pad(
-                candidates,
-                pad_width=((0, 0), (0, int(np.ceil(N / 2)) - n)),
-            )
-            # energies = vmap(
-            #    number_of_violated_constraints, in_axes=(None, 0), out_axes=0
-            # )(problem, candidates)
-            energies = vmap(
-                number_of_violated_constraints_LCG, in_axes=(None, 0), out_axes=0
-            )(problem, candidates)
-
-            return problem, (padded_candidates, energies)
+            candidates = np.load(target_name)  # (n_candidates, n_node)
+            candidates = np.array(candidates, dtype=int)
         else:
             # return only solution
             target_name = instance_name + "_sol.pkl"
             with open(target_name, "rb") as f:
                 solution_dict = pickle.load(f)
-                candidates = self.solution_dict_to_array(solution_dict)
-            energies = number_of_violated_constraints_LCG(problem, candidates)
-            # candidates already padded inside solution_dict_to_array but repeated here for transparency
-            padded_candidates = np.pad(
-                candidates,
-                pad_width=(0, int(np.ceil(N / 2)) - n),
-            )
-            return problem, (padded_candidates, energies)
+                if type(solution_dict) == dict:
+                    candidates = np.array(list(solution_dict.values()), dtype=int).reshape(
+                                                1, -1
+                                            )  # (1, n_node)
+                else:
+                    candidates = np.array([solution_dict])
 
 
-class SATTrainingDataset_VCG(data.Dataset):
-    def __init__(self, data_dir, already_unzipped=True, return_candidates=True):
-        self.return_candidates = return_candidates
-        self.data_dir = data_dir
-        self.already_unzipped = already_unzipped
-        solved_instances = glob.glob(join(data_dir, "*_sol.pkl"))
-
-        self.instances = []
-        for f in solved_instances:
-            name = f.split("_sol.pkl")[0]
-            problem_file = self._get_problem_file(name)
-            cnf = CNF(from_string=problem_file.read())
-            instance = SATInstanceMeta(
-                name, cnf.nv, len(cnf.clauses), sum(len(c) for c in cnf.clauses)
-            )
-            self.instances.append(instance)
-
-        self.max_n_node = max(i.n + i.m for i in self.instances)
-        self.max_n_edge = max(i.n_edges for i in self.instances)
-
-    def __len__(self):
-        return len(self.instances)
-
-    def solution_dict_to_array(self, solution_dict):
-        return np.pad(
-            np.array(list(solution_dict.values()), dtype=int),
-            (0, self.max_n_node - len(solution_dict)),
+        padded_candidates = self.representation.get_padded_candidate(
+            candidates, self.max_n_node
         )
-
-    def _get_problem_file(self, name):
-        if self.already_unzipped:
-            return open(name + ".cnf", "rt")
-        else:
-            return gzip.open(name + ".cnf.gz", "rt")
-
-    def get_unpadded_problem(self, idx):
-        instance_name = self.instances[idx].name
-        problem_file = self._get_problem_file(instance_name)
-        return get_problem_from_cnf(
-            cnf=CNF(from_string=problem_file.read()), mode="VCG"
-        )
-
-    def __getitem__(self, idx):
-        instance_name = self.instances[idx].name
-        problem_file = self._get_problem_file(instance_name)
-        problem = get_problem_from_cnf(
-            cnf=CNF(from_string=problem_file.read()),
-            pad_nodes=self.max_n_node,
-            pad_edges=self.max_n_edge,
-            mode="VCG",
-        )
-        N = len(problem.mask[0])  # total number of nodes in (padded) graph
-        n, _, _ = problem.params  # number of variables nodes in instance
-
-        if self.return_candidates:
-            # return not just solution but also generated candidates
-            target_name = instance_name + "_samples_sol.npy"
-            candidates = np.load(
-                target_name
-            )  # np.array which stores candidates and solution to problem
-
-            padded_candidates = np.pad(
-                candidates,
-                pad_width=((0, 0), (0, N - n)),
-            )
-            energies = vmap(
-                number_of_violated_constraints_VCG, in_axes=(None, 0), out_axes=0
-            )(problem, candidates)
-            # energies = vmap(
-            #    violated_constraints_VCG, in_axes=(None, 0), out_axes=0
-            # )(problem, candidates)
-            return problem, (padded_candidates, energies)
-        else:
-            # return only solution
-            target_name = instance_name + "_sol.pkl"
-            with open(target_name, "rb") as f:
-                solution_dict = pickle.load(f)
-                candidates = self.solution_dict_to_array(solution_dict)
-            energies = number_of_violated_constraints_VCG(problem, candidates)
-            # candidates already padded inside solution_dict_to_array but repeated here for transparency
-            padded_candidates = np.pad(
-                candidates,
-                pad_width=(0, N - n),
-            )
-            return problem, (padded_candidates, energies)
+        violated_constraints = vmap(
+            self.representation.get_violated_constraints, in_axes=(None, 0), out_axes=0
+        )(problem, candidates)
+        energies = jnp.sum(violated_constraints, axis=1)  # (n_candidates,)
+        return problem, (padded_candidates, energies)
 
 
 def collate_fn(batch):
     problems, tuples = zip(*batch)
     candidates, energies = zip(*tuples)
-    masks, graphs, neighbors_list = zip(
-        *((p.mask[0], p.graph, p.mask[1]) for p in problems)
+    masks, graphs, constraint_graphs, constraint_mask = zip(
+        *((p.mask, p.graph, p.constraint_graph, p.constraint_mask) for p in problems)
     )
     batched_masks = np.concatenate(masks)
-    batched_neighbors_list = np.concatenate(neighbors_list)
+
+    # we expect either all data items to have a constraint graph or none
+    if all(g is None for g in constraint_graphs):
+        batched_constraint_graphs = None
+        batched_constraint_masks = None
+    elif not any(g is None for g in constraint_graphs):
+        batched_constraint_graphs = jraph.batch(constraint_graphs)
+        batched_constraint_masks = np.concatenate(constraint_mask)
+    else:
+        raise ValueError("Either all data items must have a constraint graph or none")
+
     batched_graphs = jraph.batch(graphs)
     batched_candidates = np.vstack([c.T for c in candidates])
     batched_energies = np.vstack(
-        [np.repeat([e], len(m), axis=0) for (e, m) in zip(energies, masks)]
+        [np.repeat([e], np.shape(c)[1], axis=0) for (e, c) in zip(energies, candidates)]
     )
-    # print(np.min(energies))
-    # assert np.min(energies) == 0
-    # batched_energies = np.vstack(
-    #    [np.repeat([e], int(jnp.sum(m) / 2), axis=0) for (e, m) in zip(energies, masks)]
-    # )
 
-    return (batched_masks, batched_graphs, batched_neighbors_list), (
+    return (
+        batched_masks,
+        batched_graphs,
+        batched_constraint_graphs,
+        batched_constraint_masks,
+    ), (
         batched_candidates,
         batched_energies,
     )
@@ -279,8 +200,8 @@ def create_solutions(path, time_limit, suffix, open_util):
         root = f.split(".cnf")[0]
         solved_target_name = root + "_sol.pkl"
         unsolved_target_name = root + "_unsol.pkl"
-        solved_target_name = join("processed", "solved", solved_target_name)
-        unsolved_target_name = join("processed", "unsolved", unsolved_target_name)
+        solved_target_name = join(solved_target_name)
+        unsolved_target_name = join(unsolved_target_name)
         if exists(solved_target_name) or exists(unsolved_target_name):
             print("solution file already exists")
             continue

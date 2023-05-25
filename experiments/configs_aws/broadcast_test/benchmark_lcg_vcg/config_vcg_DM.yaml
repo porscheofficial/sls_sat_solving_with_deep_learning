@@ -1,0 +1,13 @@
+MODEL_REGISTRY: mlrun_save
+EXPERIMENT_NAME: benchmark_LCG_VCG_broadcast_test
+batch_size: 1
+inv_temp: 0.000001
+alpha: 1
+beta: 0
+gamma: 0
+NUM_EPOCHS: 30
+N_STEPS_MOSER: 100
+N_RUNS_MOSER: 5
+data_path: ../data_broadcast_test
+graph_representation: VCG
+network_type: interaction
