@@ -1,6 +1,6 @@
 MODEL_REGISTRY: mlrun_save
 EXPERIMENT_NAME: benchmark_LCG_VCG_broadcast_test
-batch_size: 2
+batch_size: 5
 inv_temp: 0.000001
 alpha: 1
 beta: 1
