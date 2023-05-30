@@ -146,6 +146,8 @@ def train(
         print("epoch " + str(epoch + 1) + " of " + str(NUM_EPOCHS))
         start_time = time.time()
         for counter, batch in enumerate(train_loader):
+            (_,_,_,_), (c, e) = batch
+            print("c",c.shape, c)
             print("batch_number", counter)
             params, opt_state = update(params, batch, opt_state)
         if model_path:
@@ -223,7 +225,7 @@ def experiment_tracking_train(
     graph_representation: str,
     mlp_layers: list[int],
     network_type: str = "interaction",
-    return_candidates=False,
+    return_candidates=True,
 ):
     match graph_representation:
         case "LCG":

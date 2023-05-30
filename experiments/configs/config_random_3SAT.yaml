@@ -1,6 +1,6 @@
-MODEL_REGISTRY: mlrun_save
+MODEL_REGISTRY: ../mlrun_save
 EXPERIMENT_NAME: random_3SAT
-batch_size: 2
+batch_size: 1
 inv_temp: 0.0000001
 alpha: 1
 beta: 0
@@ -11,3 +11,4 @@ N_RUNS_MOSER: 5
 data_path: /Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/generateSAT/random_3SAT_subset
 graph_representation: VCG
 network_type: interaction
+mlp_layers: [100,100]
