@@ -3,11 +3,12 @@ import sys
 sys.path.append("../../")
 
 import numpy as np
-from data_utils import SATTrainingDataset_LCG, SATTrainingDataset_VCG, JraphDataLoader
+from data_utils import SATTrainingDataset, JraphDataLoader
+from sat_representations import VCG, LCG, SATRepresentation
 from model import (
     get_network_definition,
-    get_model_probabilities,
 )
+from functools import partial
 import haiku as hk
 import moser_rust
 import glob
@@ -100,6 +101,7 @@ def load_model_and_test_moser(
         network_definition = get_network_definition(
             network_type=network_type, graph_representation=graph_representation
         )
+        network_definition = partial(network_definition, mlp_layers=mlp_layers)
         network = hk.without_apply_rng(hk.transform(network_definition))
 
         energies_array = []  # np.zeros(len(N_STEPS_MOSER_list))
@@ -109,9 +111,12 @@ def load_model_and_test_moser(
         for idx in range(len(sat_data)):
             problem_path = sat_data.instances[idx].name + ".cnf"
             problem = sat_data.get_unpadded_problem(idx)
-            model_probabilities = get_model_probabilities(
-                network, params, problem, graph_representation
+            decoded_nodes = network.apply(params, problem.graph)
+            n = problem.params[0]
+            model_probabilities = graph_representation.get_model_probabilities(
+                decoded_nodes, n
             )
+
             model_probabilities = model_probabilities.ravel()
             if j == 0:
                 uniform_probabilities = np.ones(len(model_probabilities)) / 2
@@ -260,18 +265,36 @@ def load_model_and_test_moser_traj(
     for j in range(len(model_paths)):
         print(model_names[j])
         params, model_details = np.load(model_paths[j], allow_pickle=True)
-        graph_representation, network_type = model_details
-
-        if graph_representation == "LCG":
-            sat_data = SATTrainingDataset_LCG(data_path)
-        if graph_representation == "VCG":
-            sat_data = SATTrainingDataset_VCG(data_path)
+        # graph_representation, network_type = model_details
+        (
+            inv_temp,
+            alpha,
+            beta,
+            gamma,
+            mlp_layers,
+            graph_representation,
+            network_type,
+            return_candidates,
+        ) = model_details
+        include_constraint_graph = beta > 0
+        sat_data = SATTrainingDataset(
+            data_path,
+            graph_representation,
+            return_candidates=return_candidates,
+            include_constraint_graph=include_constraint_graph,
+        )
+        # if graph_representation == "LCG":
+        #    sat_data = SATTrainingDataset_LCG(data_path)
+        # if graph_representation == "VCG":
+        #    sat_data = SATTrainingDataset_VCG(data_path)
 
         # data_loader = JraphDataLoader(sat_data, batch_size=1, shuffle=True)
 
         network_definition = get_network_definition(
             network_type=network_type, graph_representation=graph_representation
         )
+
+        network_definition = partial(network_definition, mlp_layers=mlp_layers)
         network = hk.without_apply_rng(hk.transform(network_definition))
 
         energies_array = []  # np.zeros(len(N_STEPS_MOSER_list))
@@ -282,8 +305,11 @@ def load_model_and_test_moser_traj(
             print("problem ", idx + 1, "of ", len(sat_data))
             problem_path = sat_data.instances[idx].name + ".cnf"
             problem = sat_data.get_unpadded_problem(idx)
-            model_probabilities = get_model_probabilities(
-                network, params, problem, graph_representation
+
+            decoded_nodes = network.apply(params, problem.graph)
+            n = problem.params[0]
+            model_probabilities = graph_representation.get_model_probabilities(
+                decoded_nodes, n
             )
             model_probabilities = model_probabilities.ravel()
             if j == 0:
@@ -458,18 +484,39 @@ def load_model_and_test_moser2(
     for j in range(len(model_paths_list)):
         if model_paths_list[j] != "schoening" and model_paths_list[j] != "uniform":
             params, model_details = np.load(model_paths_list[j], allow_pickle=True)
-            graph_representation, network_type = model_details
+            (
+                inv_temp,
+                alpha,
+                beta,
+                gamma,
+                mlp_layers,
+                graph_representation,
+                network_type,
+                return_candidates,
+            ) = model_details
+            include_constraint_graph = beta > 0
+            sat_data = SATTrainingDataset(
+                data_path,
+                graph_representation,
+                return_candidates=return_candidates,
+                include_constraint_graph=include_constraint_graph,
+            )
 
-            if graph_representation == "LCG":
-                sat_data = SATTrainingDataset_LCG(data_path)
-            if graph_representation == "VCG":
-                sat_data = SATTrainingDataset_VCG(data_path)
+            # graph_representation, network_type = model_details
+
+            # if graph_representation == "LCG":
+            #    sat_data = SATTrainingDataset_LCG(data_path)
+            # if graph_representation == "VCG":
+            #    sat_data = SATTrainingDataset_VCG(data_path)
             network_definition = get_network_definition(
                 network_type=network_type, graph_representation=graph_representation
             )
+            network_definition = partial(network_definition, mlp_layers=mlp_layers)
             network = hk.without_apply_rng(hk.transform(network_definition))
         else:
-            sat_data = SATTrainingDataset_LCG(data_path)
+            sat_data = SATTrainingDataset(
+                data_path, LCG, return_candidates=False, include_constraint_graph=False
+            )
 
             # data_loader = JraphDataLoader(sat_data, batch_size=1, shuffle=True)
 
@@ -505,8 +552,10 @@ def load_model_and_test_moser2(
                     True,
                 )
             else:
-                model_probabilities = get_model_probabilities(
-                    network, params, problem, graph_representation
+                decoded_nodes = network.apply(params, problem.graph)
+                n = problem.params[0]
+                model_probabilities = graph_representation.get_model_probabilities(
+                    decoced_nodes, n
                 )
                 model_probabilities = model_probabilities.ravel()
                 _, _, final_energies, numtry, numstep, traj = moser_rust.run_sls_python(
@@ -551,22 +600,53 @@ def load_model_and_test_moser_single(
     total_steps = []
     if model_path != "schoening" and model_path != "uniform":
         params, model_details = np.load(model_path, allow_pickle=True)
-        graph_representation, network_type = model_details
+        # graph_representation, network_type = model_details
+        (
+            inv_temp,
+            alpha,
+            beta,
+            gamma,
+            mlp_layers,
+            graph_representation,
+            network_type,
+            return_candidates,
+        ) = model_details
+        print(graph_representation.__name__)
+        model_details_list = [
+            inv_temp,
+            alpha,
+            beta,
+            gamma,
+            mlp_layers,
+            graph_representation.__name__,
+            network_type,
+            return_candidates,
+        ]
+        include_constraint_graph = beta > 0
+        sat_data = SATTrainingDataset(
+            data_path,
+            graph_representation,
+            return_candidates=return_candidates,
+            include_constraint_graph=include_constraint_graph,
+        )
 
-        if graph_representation == "LCG":
-            sat_data = SATTrainingDataset_LCG(data_path)
-        if graph_representation == "VCG":
-            sat_data = SATTrainingDataset_VCG(data_path)
+        # if graph_representation == "LCG":
+        #    sat_data = SATTrainingDataset_LCG(data_path)
+        # if graph_representation == "VCG":
+        #    sat_data = SATTrainingDataset_VCG(data_path)
 
-            # data_loader = JraphDataLoader(sat_data, batch_size=1, shuffle=True)
+        #    # data_loader = JraphDataLoader(sat_data, batch_size=1, shuffle=True)
 
         network_definition = get_network_definition(
             network_type=network_type, graph_representation=graph_representation
         )
+        network_definition = partial(network_definition, mlp_layers=mlp_layers)
         network = hk.without_apply_rng(hk.transform(network_definition))
     else:
-        sat_data = SATTrainingDataset_LCG(data_path)
-
+        sat_data = SATTrainingDataset(
+            data_path, LCG, return_candidates=False, include_constraint_graph=False
+        )
+        model_details_list = []
     for idx in range(len(sat_data)):
         print("problem ", idx + 1, "of ", len(sat_data))
         problem_path = sat_data.instances[idx].name + ".cnf"
@@ -575,8 +655,10 @@ def load_model_and_test_moser_single(
         n_array.append(problem.params[0])
         alpha_array.append(problem.params[1] / problem.params[0])
         if model_path != "schoening" and model_path != "uniform":
-            model_probabilities = get_model_probabilities(
-                network, params, problem, graph_representation
+            decoded_nodes = network.apply(params, problem.graph)
+            n = problem.params[0]
+            model_probabilities = graph_representation.get_model_probabilities(
+                decoded_nodes, n
             )
             model_probabilities = model_probabilities.ravel()
         else:
@@ -614,7 +696,14 @@ def load_model_and_test_moser_single(
 
     energies_array = np.array(energies_array, dtype=object)
     energies_array_mean = np.mean(energies_array, axis=0)
-    total_array = [[model_path], n_array, alpha_array, energies_array_mean, total_steps]
+    total_array = [
+        [model_path],
+        [model_details_list],
+        n_array,
+        alpha_array,
+        energies_array_mean,
+        total_steps,
+    ]
     if path_save:
         np.save(path_save, np.array(total_array, dtype=object))
     return total_array
