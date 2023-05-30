@@ -10,5 +10,5 @@ N_STEPS_MOSER: 100
 N_RUNS_MOSER: 5
 data_path: ../data_random_3SAT
 graph_representation: VCG
-network_type: interaction
+network_type: GCN
 mlp_layers: [200,200]
