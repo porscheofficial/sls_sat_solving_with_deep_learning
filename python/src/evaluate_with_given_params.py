@@ -70,13 +70,30 @@ def load_model_and_test_moser(
     data_path, model_paths, model_names, N_STEPS_MOSER_list, N_RUNS_MOSER, colors
 ):
     for j in range(len(model_paths)):
-        params, model_details = np.load(model_path[j], allow_pickle=True)
-        graph_representation, network_type = model_details
+        params, model_details = np.load(model_paths[j], allow_pickle=True)
+        # graph_representation, network_type = model_details
+        (
+            inv_temp,
+            alpha,
+            beta,
+            gamma,
+            mlp_layers,
+            graph_representation,
+            network_type,
+            return_candidates,
+        ) = model_details
+        include_constraint_graph = beta > 0
+        sat_data = SATTrainingDataset(
+            data_path,
+            graph_representation,
+            return_candidates=return_candidates,
+            include_constraint_graph=include_constraint_graph,
+        )
 
-        if graph_representation == "LCG":
-            sat_data = SATTrainingDataset_LCG(data_path)
-        if graph_representation == "VCG":
-            sat_data = SATTrainingDataset_VCG(data_path)
+        # if graph_representation == "LCG":
+        #    sat_data = SATTrainingDataset_LCG(data_path)
+        # if graph_representation == "VCG":
+        #    sat_data = SATTrainingDataset_VCG(data_path)
 
         # data_loader = JraphDataLoader(sat_data, batch_size=1, shuffle=True)
 

@@ -96,12 +96,13 @@ class SATTrainingDataset(data.Dataset):
             with open(target_name, "rb") as f:
                 solution_dict = pickle.load(f)
                 if type(solution_dict) == dict:
-                    candidates = np.array(list(solution_dict.values()), dtype=int).reshape(
-                                                1, -1
-                                            )  # (1, n_node)
+                    candidates = np.array(
+                        list(solution_dict.values()), dtype=int
+                    ).reshape(
+                        1, -1
+                    )  # (1, n_node)
                 else:
                     candidates = np.array([solution_dict])
-
 
         padded_candidates = self.representation.get_padded_candidate(
             candidates, self.max_n_node

@@ -186,7 +186,22 @@ def train(
     if model_path:
         jnp.save(
             model_path,
-            np.asarray([params, [graph_representation, network_type]], dtype=object),
+            np.asarray(
+                [
+                    params,
+                    [
+                        inv_temp,
+                        alpha,
+                        beta,
+                        gamma,
+                        mlp_layers,
+                        graph_representation,
+                        network_type,
+                        return_candidates,
+                    ],
+                ],
+                dtype=object,
+            ),
         )
         print("model successfully saved")
 
