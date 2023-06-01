@@ -95,14 +95,24 @@ class SATTrainingDataset(data.Dataset):
             target_name = instance_name + "_sol.pkl"
             with open(target_name, "rb") as f:
                 solution_dict = pickle.load(f)
-                if type(solution_dict) == dict:
-                    candidates = np.array(
-                        list(solution_dict.values()), dtype=int
-                    ).reshape(
-                        1, -1
-                    )  # (1, n_node)
-                else:
-                    candidates = np.array([solution_dict])
+            if type(solution_dict) == dict:
+                print("dict", solution_dict)
+                solution_dict = [x for (_, x) in solution_dict.items()]
+            if type(solution_dict) == list or np.array:
+                if 2 in solution_dict or -2 in solution_dict:
+                    solution_dict = np.array(solution_dict, dtype=float)
+                    solution_dict = [int(np.sign(x) + 1) / 2 for x in solution_dict]
+            candidates = np.array([solution_dict])
+            # with open(target_name, "rb") as f:
+            #    solution_dict = pickle.load(f)
+            #    if type(solution_dict) == dict:
+            #        candidates = np.array(
+            #            list(solution_dict.values()), dtype=int
+            #        ).reshape(
+            #            1, -1
+            #        )  # (1, n_node)
+            #    else:
+            #        candidates = np.array([solution_dict])
 
         padded_candidates = self.representation.get_padded_candidate(
             candidates, self.max_n_node
@@ -111,6 +121,7 @@ class SATTrainingDataset(data.Dataset):
             self.representation.get_violated_constraints, in_axes=(None, 0), out_axes=0
         )(problem, candidates)
         energies = jnp.sum(violated_constraints, axis=1)  # (n_candidates,)
+        assert energies[0] == 0
         return problem, (padded_candidates, energies)
 
 
