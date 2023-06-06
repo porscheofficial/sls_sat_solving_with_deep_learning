@@ -278,6 +278,7 @@ def experiment_tracking_train(
                 "graph_representation": graph_representation,
                 "network_type": network_type,
                 "return_candidates": return_candidates,
+                "mlp_layers": mlp_layers,
             }
         )
 
