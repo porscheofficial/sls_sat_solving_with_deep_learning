@@ -2,8 +2,8 @@ MODEL_REGISTRY: ../mlrun_save
 EXPERIMENT_NAME: random_3SAT
 batch_size: 1
 inv_temp: 0.0000001
-alpha: 1
-beta: 0
+alpha: 0
+beta: 1
 gamma: 0
 NUM_EPOCHS: 5
 N_STEPS_MOSER: 100
