@@ -666,7 +666,9 @@ def load_model_and_test_moser_single(
 
         # print(np.max(model_probabilities), np.min(model_probabilities))
         single_traj = []  # np.zeros(len(N_STEPS_MOSER_list))
+        print(model_path)
         if model_path != "schoening":
+            print("moser")
             _, _, final_energies, numtry, numstep, traj = moser_rust.run_sls_python(
                 "moser",
                 problem_path,
@@ -676,7 +678,8 @@ def load_model_and_test_moser_single(
                 SEED,
                 True,
             )
-        else:
+        elif model_path == "schoening":
+            print("schoening")
             _, _, final_energies, numtry, numstep, traj = moser_rust.run_sls_python(
                 "schoening",
                 problem_path,
