@@ -77,7 +77,7 @@ def train(
     network = hk.without_apply_rng(hk.transform(network_definition))
     params = network.init(jax.random.PRNGKey(42), sat_data[0][0].graph)
 
-    opt_init, opt_update = optax.adam(1e-3)
+    opt_init, opt_update = optax.adam(1e-6)
     opt_state = opt_init(params)
 
     @partial(jax.jit, static_argnums=(2, 3, 4, 5, 6))
@@ -141,7 +141,7 @@ def train(
     )
     eval_moser_loss = test_eval_moser_loss + train_eval_moser_loss
     eval_objects_loss = update_eval_objects_loss(params, total_loss, eval_objects_loss)
-    eval_moser_loss = update_eval_moser_loss(network, params, eval_moser_loss)
+    #eval_moser_loss = update_eval_moser_loss(network, params, eval_moser_loss)
     for epoch in range(NUM_EPOCHS):
         print("epoch " + str(epoch + 1) + " of " + str(NUM_EPOCHS))
         start_time = time.time()
@@ -152,7 +152,20 @@ def train(
             jnp.save(
                 model_path,
                 np.asarray(
-                    [params, [graph_representation, network_type]], dtype=object
+                    [
+                        params,
+                        [
+                            inv_temp,
+                            alpha,
+                            beta,
+                            gamma,
+                            mlp_layers,
+                            graph_representation,
+                            network_type,
+                            return_candidates,
+                        ],
+                    ],
+                    dtype=object,
                 ),
             )
         print("model successfully saved")
@@ -160,7 +173,7 @@ def train(
         eval_objects_loss = update_eval_objects_loss(
             params, total_loss, eval_objects_loss
         )
-        eval_moser_loss = update_eval_moser_loss(network, params, eval_moser_loss)
+        #eval_moser_loss = update_eval_moser_loss(network, params, eval_moser_loss)
 
         loss_str = "Epoch {} in {:0.2f} sec".format(epoch + 1, epoch_time) + ";  "
         for eval_result in eval_objects_loss:
@@ -171,14 +184,14 @@ def train(
             )
             if experiment_tracking == True:
                 mlflow.log_metric(eval_result.name, eval_result.results[-1], step=epoch)
-        for eval_result in eval_moser_loss:
-            loss_str = (
-                loss_str
-                + f"{eval_result.name}: {np.round(eval_result.results[-1],4)}"
-                + "; "
-            )
-            if experiment_tracking == True:
-                mlflow.log_metric(eval_result.name, eval_result.results[-1], step=epoch)
+        #for eval_result in eval_moser_loss:
+        #    loss_str = (
+        #        loss_str
+        #        + f"{eval_result.name}: {np.round(eval_result.results[-1],4)}"
+        #        + "; "
+        #    )
+        #    if experiment_tracking == True:
+        #        mlflow.log_metric(eval_result.name, eval_result.results[-1], step=epoch)
         print(loss_str)
         if epoch == 0:
             t2 = time.time()

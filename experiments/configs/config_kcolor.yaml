@@ -1,0 +1,14 @@
+MODEL_REGISTRY: mlrun_save
+EXPERIMENT_NAME: kcolor
+batch_size: 30
+inv_temp: 10
+alpha: 1
+beta: 1
+gamma: 0
+NUM_EPOCHS: 150
+N_STEPS_MOSER: 1500
+N_RUNS_MOSER: 5
+data_path: ../data_kcolor
+graph_representation: LCG
+network_type: interaction
+mlp_layers: [100,100]

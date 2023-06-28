@@ -1,7 +1,7 @@
 MODEL_REGISTRY: mlrun_save
 EXPERIMENT_NAME: blocksworld_vcg_interaction
 batch_size: 1
-inv_temp: 0.0000001
+inv_temp: 0.01
 alpha: 0
 beta: 1
 gamma: 0
