@@ -48,6 +48,8 @@ def train(
     model_path=False,
     experiment_tracking=False,
     return_candidates=False,
+    initial_learning_rate = 0.001,
+    final_learning_rate = 0.001,
 ):
     include_constraint_graph = (
         beta > 0
@@ -77,8 +79,18 @@ def train(
     network = hk.without_apply_rng(hk.transform(network_definition))
     params = network.init(jax.random.PRNGKey(42), sat_data[0][0].graph)
 
-    opt_init, opt_update = optax.adam(1e-6)
+    # use a schedule function for the ADAM optimizer
+    tot_steps = int(NUM_EPOCHS*np.ceil(len(train_data)/batch_size)) # NUM_EPOCHS*(len(train_data)//batch_size) + NUM_EPOCHS
+    decay_rate = final_learning_rate / initial_learning_rate
+    exponential_decay_scheduler = optax.exponential_decay(init_value=initial_learning_rate, transition_steps=tot_steps,
+                                                        decay_rate= decay_rate, transition_begin=int(tot_steps*0.05),
+                                                        staircase=False)
+    print("initial decay rate:", initial_learning_rate, "final learning rate:", final_learning_rate)
+    opt_init, opt_update = optax.adam(learning_rate=exponential_decay_scheduler)
     opt_state = opt_init(params)
+
+    #opt_init, opt_update = optax.adam(1e-6)
+    #opt_state = opt_init(params)
 
     @partial(jax.jit, static_argnums=(2, 3, 4, 5, 6))
     def total_loss(
@@ -113,6 +125,7 @@ def train(
 
     @jax.jit
     def update(params, batch, opt_state):
+        print()
         g = jax.grad(total_loss)(
             params, batch, inv_temp, alpha, beta, gamma, graph_representation
         )
@@ -179,7 +192,7 @@ def train(
         for eval_result in eval_objects_loss:
             loss_str = (
                 loss_str
-                + f"{eval_result.name}: {np.round(eval_result.results[-1],4)}"
+                + f"{eval_result.name}: {np.round(eval_result.results[-1],6)}"
                 + "; "
             )
             if experiment_tracking == True:
@@ -252,6 +265,8 @@ def experiment_tracking_train(
     mlp_layers: list[int],
     network_type: str = "interaction",
     return_candidates=True,
+    initial_learning_rate = 0.001,
+    final_learning_rate = 0.001
 ):
     match graph_representation:
         case "LCG":
@@ -292,6 +307,8 @@ def experiment_tracking_train(
                 "network_type": network_type,
                 "return_candidates": return_candidates,
                 "mlp_layers": mlp_layers,
+                "initial_learning_rate": initial_learning_rate,
+                "final_learning_rate": final_learning_rate
             }
         )
 
@@ -313,6 +330,8 @@ def experiment_tracking_train(
             graph_representation=rep,
             network_type=network_type,
             return_candidates=return_candidates,
+            initial_learning_rate=initial_learning_rate,
+            final_learning_rate=final_learning_rate
         )
         # log params which are a result of learning
         with tempfile.TemporaryDirectory() as dp:

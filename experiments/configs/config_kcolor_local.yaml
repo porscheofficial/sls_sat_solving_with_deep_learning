@@ -1,0 +1,16 @@
+MODEL_REGISTRY: mlrun_save
+EXPERIMENT_NAME: one_sample
+batch_size: 2
+inv_temp: 10000000000
+alpha: 1
+beta: 0
+gamma: 0
+NUM_EPOCHS: 1000
+N_STEPS_MOSER: 1500
+N_RUNS_MOSER: 5
+data_path: /Users/p403830/Downloads/one_sample
+graph_representation: LCG
+network_type: interaction
+mlp_layers: [50]
+initial_learning_rate: 0.01
+final_learning_rate: 0.001
