@@ -1,11 +1,11 @@
 MODEL_REGISTRY: mlrun_save
 EXPERIMENT_NAME: new_boadcast
-batch_size: 50
+batch_size: 1
 inv_temp: 1000000
 alpha: 1
 beta: 1
 gamma: 0
-NUM_EPOCHS: 30
+NUM_EPOCHS: 10
 N_STEPS_MOSER: 100
 N_RUNS_MOSER: 5
 data_path: ../data_broadcast_test
