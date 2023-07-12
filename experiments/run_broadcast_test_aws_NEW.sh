@@ -1,4 +1,4 @@
 #!/bin/bash
-for config in experiments/configs_aws/random_3SAT_NEW/*.yaml; do
+for config in experiments/configs_aws/broadcast_test_NEW/*.yaml; do
     python -m python.src.train --config $config
 done
