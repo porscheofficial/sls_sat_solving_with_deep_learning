@@ -3,6 +3,7 @@ use rand::rngs::StdRng;
 use rand::seq::SliceRandom;
 use rand::Rng;
 use rand::SeedableRng;
+use rand_distr::{Distribution, WeightedIndex};
 
 use std::env;
 use std::fs::read_to_string;
@@ -47,6 +48,28 @@ fn flip_literal(clause: &[Lit], assignment: &mut Vec<bool>, rng: &mut StdRng) {
     assignment[idx] = !assignment[idx];
 }
 
+fn flip_literal_probsat(clause: &[Lit], assignment: &mut Vec<bool>, rng: &mut StdRng, weights: &Vec<f64>) {
+    // let mut weights_sample = vec![0.0; clause.len()];
+    let mut weights_sample = vec![];
+    // println!("length of clause {}", clause.len());
+    // println!("weights {}", weights.len());
+    // let mut i = 1;
+    for lit in clause {
+        let idx = lit.var().index();
+        //println!("assignment {}",assignment[idx]);
+        let float_assignment = if assignment[idx] { 1.0 } else { 0.0 };
+        // weights_sample.push(float_assignment * weights[idx] + (1.0 - float_assignment) * (1.0 - weights[idx]));
+        weights_sample.push((1.0 - float_assignment) * weights[idx] + float_assignment * (1.0 - weights[idx]));
+        //println!("{}", idx);
+        // i = i + 1;
+    }
+    let dist = WeightedIndex::new(&weights_sample).unwrap();
+    let chosen_idx = clause[dist.sample(rng)].var().index();
+    // println!("chosen_idx {}", chosen_idx);
+    // let chosen_idx = clause.choose(rng).unwrap().var().index();
+    assignment[chosen_idx] = !assignment[chosen_idx];
+}
+
 #[pyfunction]
 fn run_sls_python(
     algo_type_as_str: String,
@@ -72,6 +95,7 @@ fn run_sls_python(
     let algo_type = match algo_type_as_str.as_str() {
         "moser" => AlgoType::Moser,
         "schoening" => AlgoType::Schoening,
+        "probsat" => AlgoType::Probsat,
         _ => panic!("Unknown algorithm type"),
     };
 
@@ -104,6 +128,7 @@ fn moser_rust(_py: Python, m: &PyModule) -> PyResult<()> {
 enum AlgoType {
     Moser,
     Schoening,
+    Probsat
 }
 
 fn run_sls(
@@ -163,6 +188,7 @@ fn run_sls(
                     resample_clause(next_clause, &mut assignment, &mut rng, &weights)
                 }
                 AlgoType::Schoening => flip_literal(next_clause, &mut assignment, &mut rng),
+                AlgoType::Probsat => flip_literal_probsat(next_clause, &mut assignment, &mut rng, &weights),
             }
             // resample_clause(next_clause, &mut assignment, &mut rng, &weights);
             violated_clauses = find_violated_clauses(&assignment);
