@@ -1,5 +1,6 @@
 use pyo3::prelude::*;
 use rand::rngs::StdRng;
+// use rand::rngs::ThreadRng;
 use rand::seq::SliceRandom;
 use rand::Rng;
 use rand::SeedableRng;
@@ -79,7 +80,7 @@ fn run_sls_python(
     nruns: usize,
     seed: usize,
     return_trajectories: bool,
-) -> PyResult<(bool, Vec<bool>, usize, usize, usize, Vec<Vec<usize>>)> {
+) -> PyResult<(Vec<bool>, Vec<bool>, usize, Vec<usize>, Vec<Vec<usize>>)> {
     let input: String = read_to_string(path).expect("failed to read");
 
     let implements_read = &input.as_bytes()[..];
@@ -99,7 +100,7 @@ fn run_sls_python(
         _ => panic!("Unknown algorithm type"),
     };
 
-    let (found_solution, assignment, best_energy, numtry, numstep, trajectories) = run_sls(
+    let (found_solutions, assignment, best_energy, numsteps, trajectories) = run_sls(
         algo_type,
         formula,
         weights,
@@ -110,11 +111,10 @@ fn run_sls_python(
     );
 
     return Ok((
-        found_solution,
+        found_solutions,
         assignment,
         best_energy,
-        numtry,
-        numstep,
+        numsteps,
         trajectories,
     ));
 }
@@ -139,7 +139,7 @@ fn run_sls(
     nruns: usize,
     seed: usize,
     return_trajectories: bool,
-) -> (bool, Vec<bool>, usize, usize, usize, Vec<Vec<usize>>) {
+) -> (Vec<bool>, Vec<bool>, usize, Vec<usize>, Vec<Vec<usize>>) {
     // Auxiliary functions
     // assert_eq!(weights.len(), formula.var_count());
 
@@ -151,23 +151,26 @@ fn run_sls(
     };
 
     let mut rng = StdRng::seed_from_u64(seed as u64);
-    let mut numtry: usize = 0;
-    let mut numstep: usize = 0;
-    let mut found_solution = false;
+    // let mut numtry: usize = 0;
+    // let mut numstep: usize = 0;
+    // let mut found_solution = false;
     let mut best_energy: usize = formula.len();
     let mut best_assignment = vec![];
     let mut trajectories: Vec<Vec<usize>> = vec![];
+    let mut num_steps: Vec<usize> = vec![];
+    let mut found_solutions: Vec<bool> = vec![];
 
-    while !found_solution && numtry < nruns {
+    for _ in 0..nruns {
         let mut trajectory: Vec<usize> = vec![];
 
-        numtry += 1;
+        let mut found_solution = false;
+        // numtry += 1;
 
         let mut assignment = (0..formula.var_count())
             .map(|i| rng.gen_bool(weights[i]))
             .collect();
 
-        numstep = 0;
+        let mut numstep = 0;
         let mut violated_clauses: Vec<&[Lit]> = find_violated_clauses(&assignment);
         let mut numfalse = violated_clauses.len();
 
@@ -190,7 +193,6 @@ fn run_sls(
                 AlgoType::Schoening => flip_literal(next_clause, &mut assignment, &mut rng),
                 AlgoType::Probsat => flip_literal_probsat(next_clause, &mut assignment, &mut rng, &weights),
             }
-            // resample_clause(next_clause, &mut assignment, &mut rng, &weights);
             violated_clauses = find_violated_clauses(&assignment);
             numfalse = violated_clauses.len();
 
@@ -202,21 +204,76 @@ fn run_sls(
             if return_trajectories {
                 trajectory.push(numfalse);
             }
-
-            found_solution = numfalse == 0;
         }
 
-        trajectories.push(trajectory);
+        if return_trajectories {
+            trajectories.push(trajectory);
+        }
 
-        // println!("Round {} ending with {} violated clauses", numtry, numfalse);
+        num_steps.push(numstep);
+
+        if numfalse == 0 {
+            found_solution = true;
+        }
+        found_solutions.push(found_solution);
     }
+    // while !found_solution && numtry < nruns {
+    //     let mut trajectory: Vec<usize> = vec![];
+
+    //     numtry += 1;
+
+    //     let mut assignment = (0..formula.var_count())
+    //         .map(|i| rng.gen_bool(weights[i]))
+    //         .collect();
+
+    //     numstep = 0;
+    //     let mut violated_clauses: Vec<&[Lit]> = find_violated_clauses(&assignment);
+    //     let mut numfalse = violated_clauses.len();
+
+    //     if numfalse < best_energy {
+    //         best_energy = numfalse;
+    //         best_assignment = assignment.clone();
+    //     }
+
+    //     if return_trajectories {
+    //         trajectory.push(numfalse);
+    //     }
+
+    //     while numfalse > 0 && numstep < nsteps {
+    //         numstep += 1;
+    //         let next_clause = violated_clauses.choose(&mut rng).unwrap();
+    //         match algo_type {
+    //             AlgoType::Moser => {
+    //                 resample_clause(next_clause, &mut assignment, &mut rng, &weights)
+    //             }
+    //             AlgoType::Schoening => flip_literal(next_clause, &mut assignment, &mut rng),
+    //         }
+    //         // resample_clause(next_clause, &mut assignment, &mut rng, &weights);
+    //         violated_clauses = find_violated_clauses(&assignment);
+    //         numfalse = violated_clauses.len();
+
+    //         if numfalse < best_energy {
+    //             best_energy = numfalse;
+    //             best_assignment = assignment.clone();
+    //         }
+
+    //         if return_trajectories {
+    //             trajectory.push(numfalse);
+    //         }
+
+    //         found_solution = numfalse == 0;
+    //     }
+
+    //     trajectories.push(trajectory);
+
+    //     // println!("Round {} ending with {} violated clauses", numtry, numfalse);
+    // }
 
     return (
-        found_solution,
+        found_solutions,
         best_assignment,
         best_energy,
-        numtry,
-        numstep,
+        num_steps,
         trajectories,
     );
 }
@@ -244,7 +301,7 @@ fn main() {
     let seed = 0;
     let return_trajectories = false;
 
-    let (found_solution, assignment, _final_energies, _numtry, _numstep, _trajectories) = run_sls(
+    let (found_solutions, assignment, _final_energies, _numsteps, _trajectories) = run_sls(
         AlgoType::Moser,
         formula,
         weights,
@@ -256,7 +313,8 @@ fn main() {
 
     println!(
         "last candidate: {:#?}, Found solution: {}",
-        assignment, found_solution
+        assignment,
+        found_solutions.last().unwrap()
     );
 }
 

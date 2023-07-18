@@ -594,7 +594,9 @@ def load_model_and_test_moser2(
 def load_model_and_test_moser_single(
     data_path, model_path, N_STEPS_MOSER, N_RUNS_MOSER, path_save=False
 ):
-    energies_array = []
+    energies_array_mean = []
+    energies_array_median = []
+
     n_array = []
     alpha_array = []
     total_steps = []
@@ -665,11 +667,12 @@ def load_model_and_test_moser_single(
             model_probabilities = np.ones(problem.params[0]) / 2
 
         # print(np.max(model_probabilities), np.min(model_probabilities))
-        single_traj = []  # np.zeros(len(N_STEPS_MOSER_list))
+        single_traj_mean = []  # np.zeros(len(N_STEPS_MOSER_list))
+        single_traj_median = []
         print(model_path)
         if model_path != "schoening":
             print("moser")
-            _, _, final_energies, numtry, numstep, traj = moser_rust.run_sls_python(
+            _, _, final_energies, numstep, traj = moser_rust.run_sls_python(
                 "moser",
                 problem_path,
                 model_probabilities,
@@ -680,7 +683,7 @@ def load_model_and_test_moser_single(
             )
         elif model_path == "schoening":
             print("schoening")
-            _, _, final_energies, numtry, numstep, traj = moser_rust.run_sls_python(
+            _, _, final_energies, numstep, traj = moser_rust.run_sls_python(
                 "schoening",
                 problem_path,
                 model_probabilities,
@@ -690,21 +693,30 @@ def load_model_and_test_moser_single(
                 True,
             )
         total_steps.append(numstep)
+        #print("total_steps", total_steps)
         traj = get_padded_trajs(traj, N_STEPS_MOSER)
-        single_traj.append(np.mean(traj, axis=0) / problem.params[1])
-
-        energies_array.append(
-            np.pad(np.array(single_traj)[0], (0, N_STEPS_MOSER - len(single_traj[0])))
+        single_traj_mean.append(np.mean(traj, axis=0) / problem.params[1])
+        single_traj_median.append(np.median(traj, axis=0) / problem.params[1])
+        #energies_array.append(energies_array)
+        energies_array_mean.append(
+            np.pad(np.array(single_traj_mean)[0], (0, N_STEPS_MOSER - len(single_traj_mean[0])))
         )  # += # single_energy / problem.params[1]
-
-    energies_array = np.array(energies_array, dtype=object)
-    energies_array_mean = np.mean(energies_array, axis=0)
+        energies_array_median.append(
+            np.pad(np.array(single_traj_median)[0], (0, N_STEPS_MOSER - len(single_traj_median[0])))
+        )
+    total_steps = np.array(total_steps)
+    print("total_steps", total_steps.shape)
+    #energies_array = np.array(energies_array_median) #, dtype=object)
+    #print("energies_final", energies_array.shape)
+    energies_array_mean = np.mean(energies_array_mean, axis=0)
+    energies_array_median = np.mean(energies_array_median, axis=0)
     total_array = [
         [model_path],
         [model_details_list],
         n_array,
         alpha_array,
         energies_array_mean,
+        energies_array_median, # _mean,
         total_steps,
     ]
     if path_save:
@@ -715,7 +727,9 @@ def load_model_and_test_moser_single(
 def load_model_and_test_probsat_single(
     data_path, model_path, N_STEPS_MOSER, N_RUNS_MOSER, path_save=False
 ):
-    energies_array = []
+    energies_array_mean = []
+    energies_array_median = []
+
     n_array = []
     alpha_array = []
     total_steps = []
@@ -786,11 +800,12 @@ def load_model_and_test_probsat_single(
             model_probabilities = np.ones(problem.params[0]) / 2
 
         # print(np.max(model_probabilities), np.min(model_probabilities))
-        single_traj = []  # np.zeros(len(N_STEPS_MOSER_list))
+        single_traj_mean = []  # np.zeros(len(N_STEPS_MOSER_list))
+        single_traj_median = []
         print(model_path)
         if model_path != "schoening":
-            print("moser")
-            _, _, final_energies, numtry, numstep, traj = moser_rust.run_sls_python(
+            print("probsat")
+            _, _, final_energies, numstep, traj = moser_rust.run_sls_python(
                 "probsat",
                 problem_path,
                 model_probabilities,
@@ -801,7 +816,7 @@ def load_model_and_test_probsat_single(
             )
         elif model_path == "schoening":
             print("schoening")
-            _, _, final_energies, numtry, numstep, traj = moser_rust.run_sls_python(
+            _, _, final_energies, numstep, traj = moser_rust.run_sls_python(
                 "schoening",
                 problem_path,
                 model_probabilities,
@@ -811,21 +826,30 @@ def load_model_and_test_probsat_single(
                 True,
             )
         total_steps.append(numstep)
+        #print("total_steps", total_steps)
         traj = get_padded_trajs(traj, N_STEPS_MOSER)
-        single_traj.append(np.mean(traj, axis=0) / problem.params[1])
-
-        energies_array.append(
-            np.pad(np.array(single_traj)[0], (0, N_STEPS_MOSER - len(single_traj[0])))
+        single_traj_mean.append(np.mean(traj, axis=0) / problem.params[1])
+        single_traj_median.append(np.median(traj, axis=0) / problem.params[1])
+        #energies_array.append(energies_array)
+        energies_array_mean.append(
+            np.pad(np.array(single_traj_mean)[0], (0, N_STEPS_MOSER - len(single_traj_mean[0])))
         )  # += # single_energy / problem.params[1]
-
-    energies_array = np.array(energies_array, dtype=object)
-    energies_array_mean = np.mean(energies_array, axis=0)
+        energies_array_median.append(
+            np.pad(np.array(single_traj_median)[0], (0, N_STEPS_MOSER - len(single_traj_median[0])))
+        )
+    total_steps = np.array(total_steps)
+    print("total_steps", total_steps.shape)
+    #energies_array = np.array(energies_array_median) #, dtype=object)
+    #print("energies_final", energies_array.shape)
+    energies_array_mean = np.mean(energies_array_mean, axis=0)
+    energies_array_median = np.mean(energies_array_median, axis=0)
     total_array = [
         [model_path],
         [model_details_list],
         n_array,
         alpha_array,
         energies_array_mean,
+        energies_array_median, # _mean,
         total_steps,
     ]
     if path_save:
