@@ -8,7 +8,7 @@ gamma: 0
 NUM_EPOCHS: 50
 N_STEPS_MOSER: 100
 N_RUNS_MOSER: 5
-data_path: ../data_random_3SAT
+data_path: ../data_random_3SAT_NEW
 graph_representation: LCG
 network_type: interaction
 mlp_layers: [200,200]
