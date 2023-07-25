@@ -75,7 +75,8 @@ fn flip_literal_probsat(clause: &[Lit], assignment: &mut Vec<bool>, rng: &mut St
 fn run_sls_python(
     algo_type_as_str: String,
     path: String,
-    weights: Vec<f64>,
+    weights_initialize: Vec<f64>,
+    weights_resample: Vec<f64>,
     nsteps: usize,
     nruns: usize,
     seed: usize,
@@ -103,7 +104,8 @@ fn run_sls_python(
     let (found_solutions, assignment, best_energy, numsteps, trajectories) = run_sls(
         algo_type,
         formula,
-        weights,
+        weights_initialize,
+        weights_resample,
         nsteps,
         nruns,
         seed,
@@ -134,7 +136,8 @@ enum AlgoType {
 fn run_sls(
     algo_type: AlgoType,
     formula: CnfFormula,
-    weights: Vec<f64>,
+    weights_initialize: Vec<f64>,
+    weights_resample: Vec,f64>,
     nsteps: usize,
     nruns: usize,
     seed: usize,
@@ -167,7 +170,7 @@ fn run_sls(
         // numtry += 1;
 
         let mut assignment = (0..formula.var_count())
-            .map(|i| rng.gen_bool(weights[i]))
+            .map(|i| rng.gen_bool(weights_initialize[i]))
             .collect();
 
         let mut numstep = 0;
@@ -188,10 +191,10 @@ fn run_sls(
             let next_clause = violated_clauses.choose(&mut rng).unwrap();
             match algo_type {
                 AlgoType::Moser => {
-                    resample_clause(next_clause, &mut assignment, &mut rng, &weights)
+                    resample_clause(next_clause, &mut assignment, &mut rng, &weights_resample)
                 }
                 AlgoType::Schoening => flip_literal(next_clause, &mut assignment, &mut rng),
-                AlgoType::Probsat => flip_literal_probsat(next_clause, &mut assignment, &mut rng, &weights),
+                AlgoType::Probsat => flip_literal_probsat(next_clause, &mut assignment, &mut rng, &weights_resample),
             }
             violated_clauses = find_violated_clauses(&assignment);
             numfalse = violated_clauses.len();
@@ -293,9 +296,9 @@ fn main() {
         formula.len()
     );
     let mut rng = rand::thread_rng();
-    let weights = (0..formula.var_count()).map(|_| rng.gen::<f64>()).collect();
+    let weights_initialize = (0..formula.var_count()).map(|_| rng.gen::<f64>()).collect();
     // let weights = vec![0.5; formula.var_count()];
-
+    let weights_resample = (0..formula.var_count()).map(|_| rng.gen::<f64>()).collect();
     let nsteps = 1000;
     let nruns = 10;
     let seed = 0;
@@ -304,7 +307,8 @@ fn main() {
     let (found_solutions, assignment, _final_energies, _numsteps, _trajectories) = run_sls(
         AlgoType::Moser,
         formula,
-        weights,
+        weights_initialize,
+        weights_resample,
         nsteps,
         nruns,
         seed,
