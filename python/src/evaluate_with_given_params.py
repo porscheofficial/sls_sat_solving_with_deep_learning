@@ -676,6 +676,7 @@ def load_model_and_test_moser_single(
                 "moser",
                 problem_path,
                 model_probabilities,
+                model_probabilities,
                 N_STEPS_MOSER - 1,
                 N_RUNS_MOSER,
                 SEED,
@@ -686,6 +687,7 @@ def load_model_and_test_moser_single(
             _, _, final_energies, numstep, traj = moser_rust.run_sls_python(
                 "schoening",
                 problem_path,
+                model_probabilities,
                 model_probabilities,
                 N_STEPS_MOSER - 1,
                 N_RUNS_MOSER,
@@ -811,6 +813,7 @@ def load_model_and_test_probsat_single(
                 "probsat",
                 problem_path,
                 model_probabilities,
+                model_probabilities,
                 N_STEPS_MOSER - 1,
                 N_RUNS_MOSER,
                 SEED,
@@ -821,6 +824,7 @@ def load_model_and_test_probsat_single(
             _, _, final_energies, numstep, traj = moser_rust.run_sls_python(
                 "schoening",
                 problem_path,
+                model_probabilities,
                 model_probabilities,
                 N_STEPS_MOSER - 1,
                 N_RUNS_MOSER,
@@ -863,6 +867,361 @@ def load_model_and_test_probsat_single(
 # load_model_and_test_moser(
 #    data_path, model_paths, model_names, N_STEPS_MOSER_list, N_RUNS_MOSER, colors
 # )
+
+
+def load_model_and_test_probsat_single_two_models(
+    data_path, model_path_initialize, model_path_resample, N_STEPS_MOSER, N_RUNS_MOSER, path_save=False, keep_traj = True
+):
+    energies_array_mean = []
+    energies_array_median = []
+
+    n_array = []
+    alpha_array = []
+    total_steps = []
+    if model_path_initialize != "schoening" and model_path_initialize != "uniform":
+        params_i, model_details_i = np.load(model_path_initialize, allow_pickle=True)
+        # graph_representation, network_type = model_details
+        (
+            inv_temp_i,
+            alpha_i,
+            beta_i,
+            gamma_i,
+            mlp_layers_i,
+            graph_representation_i,
+            network_type_i,
+            return_candidates_i,
+        ) = model_details_i
+        print(graph_representation_i.__name__)
+        model_details_list_i = [
+            inv_temp_i,
+            alpha_i,
+            beta_i,
+            gamma_i,
+            mlp_layers_i,
+            graph_representation_i.__name__,
+            network_type_i,
+            return_candidates_i,
+        ]
+        include_constraint_graph_i = beta_i > 0
+        sat_data = SATTrainingDataset(
+            data_path,
+            graph_representation_i,
+            return_candidates=return_candidates_i,
+            include_constraint_graph=include_constraint_graph_i,
+        )
+
+        # if graph_representation == "LCG":
+        #    sat_data = SATTrainingDataset_LCG(data_path)
+        # if graph_representation == "VCG":
+        #    sat_data = SATTrainingDataset_VCG(data_path)
+
+        #    # data_loader = JraphDataLoader(sat_data, batch_size=1, shuffle=True)
+
+        network_definition_i = get_network_definition(
+            network_type=network_type_i, graph_representation=graph_representation_i
+        )
+        network_definition_i = partial(network_definition_i, mlp_layers=mlp_layers_i)
+        network_i = hk.without_apply_rng(hk.transform(network_definition_i))
+    else:
+        sat_data = SATTrainingDataset(
+            data_path, LCG, return_candidates=False, include_constraint_graph=False
+        )
+        model_details_list_i = []
+    if model_path_resample != "schoening" and model_path_resample != "uniform":
+        params_r, model_details_r = np.load(model_path_resample, allow_pickle=True)
+        # graph_representation, network_type = model_details
+        (
+            inv_temp_r,
+            alpha_r,
+            beta_r,
+            gamma_r,
+            mlp_layers_r,
+            graph_representation_r,
+            network_type_r,
+            return_candidates_r,
+        ) = model_details_r
+        print(graph_representation_r.__name__)
+        model_details_list_r = [
+            inv_temp_r,
+            alpha_r,
+            beta_r,
+            gamma_r,
+            mlp_layers_r,
+            graph_representation_r.__name__,
+            network_type_r,
+            return_candidates_r,
+        ]
+
+        network_definition_r = get_network_definition(
+            network_type=network_type_r, graph_representation=graph_representation_r
+        )
+        network_definition_r = partial(network_definition_r, mlp_layers=mlp_layers_r)
+        network_r = hk.without_apply_rng(hk.transform(network_definition_r))
+    else:
+        model_details_list_r = []
+    for idx in range(len(sat_data)):
+        print("problem ", idx + 1, "of ", len(sat_data))
+        problem_path = sat_data.instances[idx].name + ".cnf"
+        problem = sat_data.get_unpadded_problem(idx)
+
+        n_array.append(problem.params[0])
+        alpha_array.append(problem.params[1] / problem.params[0])
+        if model_path_initialize != "schoening" and model_path_initialize != "uniform":
+            decoded_nodes = network_i.apply(params_i, problem.graph)
+            n = problem.params[0]
+            model_probabilities_i = graph_representation_i.get_model_probabilities(
+                decoded_nodes, n
+            )
+            model_probabilities_i = model_probabilities_i.ravel()
+        else:
+            model_probabilities_i = np.ones(problem.params[0]) / 2
+        if model_path_resample != "schoening" and model_path_resample != "uniform":
+            decoded_nodes = network_r.apply(params_r, problem.graph)
+            n = problem.params[0]
+            model_probabilities_r = graph_representation_r.get_model_probabilities(
+                decoded_nodes, n
+            )
+            model_probabilities_r = model_probabilities_r.ravel()
+        else:
+            model_probabilities_r = np.ones(problem.params[0]) / 2
+        # print(np.max(model_probabilities), np.min(model_probabilities))
+        single_traj_mean = []  # np.zeros(len(N_STEPS_MOSER_list))
+        single_traj_median = []
+        print(model_path_initialize)
+        print(model_path_resample)
+        if model_path_initialize != "schoening":
+            print("probsat")
+            _, _, final_energies, numstep, traj = moser_rust.run_sls_python(
+                "probsat",
+                problem_path,
+                model_probabilities_i,
+                model_probabilities_r,
+                N_STEPS_MOSER - 1,
+                N_RUNS_MOSER,
+                SEED,
+                keep_traj,
+            )
+        elif model_path_initialize == "schoening":
+            print("schoening")
+            _, _, final_energies, numstep, traj = moser_rust.run_sls_python(
+                "schoening",
+                problem_path,
+                model_probabilities_i,
+                model_probabilities_r,
+                N_STEPS_MOSER - 1,
+                N_RUNS_MOSER,
+                SEED,
+                keep_traj,
+            )
+        total_steps.append(numstep)
+        #print("total_steps", total_steps)
+        if len(traj)!= 0:
+            traj = get_padded_trajs(traj, N_STEPS_MOSER)
+            single_traj_mean.append(np.mean(traj, axis=0) / problem.params[1])
+            single_traj_median.append(np.median(traj, axis=0) / problem.params[1])
+            #energies_array.append(energies_array)
+            energies_array_mean.append(
+                np.pad(np.array(single_traj_mean)[0], (0, N_STEPS_MOSER - len(single_traj_mean[0])))
+            )  # += # single_energy / problem.params[1]
+            energies_array_median.append(
+                np.pad(np.array(single_traj_median)[0], (0, N_STEPS_MOSER - len(single_traj_median[0])))
+            )
+    total_steps = np.array(total_steps)
+    print("total_steps", total_steps.shape)
+    #energies_array = np.array(energies_array_median) #, dtype=object)
+    #print("energies_final", energies_array.shape)
+    if energies_array_mean != []:
+        energies_array_mean = np.mean(energies_array_mean, axis=0)
+        energies_array_median = np.mean(energies_array_median, axis=0)
+    total_array = [
+        [model_path_initialize, model_path_resample],
+        [model_details_list_i, model_details_list_r],
+        n_array,
+        alpha_array,
+        energies_array_mean,
+        energies_array_median, # _mean,
+        total_steps,
+    ]
+    if path_save:
+        np.save(path_save, np.array(total_array, dtype=object))
+    return total_array
+
+def load_model_and_test_moser_single_two_models(
+    data_path, model_path_initialize, model_path_resample, N_STEPS_MOSER, N_RUNS_MOSER, path_save=False, keep_traj = True
+):
+    energies_array_mean = []
+    energies_array_median = []
+
+    n_array = []
+    alpha_array = []
+    total_steps = []
+    if model_path_initialize != "schoening" and model_path_initialize != "uniform":
+        params_i, model_details_i = np.load(model_path_initialize, allow_pickle=True)
+        # graph_representation, network_type = model_details
+        (
+            inv_temp_i,
+            alpha_i,
+            beta_i,
+            gamma_i,
+            mlp_layers_i,
+            graph_representation_i,
+            network_type_i,
+            return_candidates_i,
+        ) = model_details_i
+        print(graph_representation_i.__name__)
+        model_details_list_i = [
+            inv_temp_i,
+            alpha_i,
+            beta_i,
+            gamma_i,
+            mlp_layers_i,
+            graph_representation_i.__name__,
+            network_type_i,
+            return_candidates_i,
+        ]
+        include_constraint_graph_i = beta_i > 0
+        sat_data = SATTrainingDataset(
+            data_path,
+            graph_representation_i,
+            return_candidates=return_candidates_i,
+            include_constraint_graph=include_constraint_graph_i,
+        )
+
+        # if graph_representation == "LCG":
+        #    sat_data = SATTrainingDataset_LCG(data_path)
+        # if graph_representation == "VCG":
+        #    sat_data = SATTrainingDataset_VCG(data_path)
+
+        #    # data_loader = JraphDataLoader(sat_data, batch_size=1, shuffle=True)
+
+        network_definition_i = get_network_definition(
+            network_type=network_type_i, graph_representation=graph_representation_i
+        )
+        network_definition_i = partial(network_definition_i, mlp_layers=mlp_layers_i)
+        network_i = hk.without_apply_rng(hk.transform(network_definition_i))
+    else:
+        sat_data = SATTrainingDataset(
+            data_path, LCG, return_candidates=False, include_constraint_graph=False
+        )
+        model_details_list_i = []
+    if model_path_resample != "schoening" and model_path_resample != "uniform":
+        params_r, model_details_r = np.load(model_path_resample, allow_pickle=True)
+        # graph_representation, network_type = model_details
+        (
+            inv_temp_r,
+            alpha_r,
+            beta_r,
+            gamma_r,
+            mlp_layers_r,
+            graph_representation_r,
+            network_type_r,
+            return_candidates_r,
+        ) = model_details_r
+        print(graph_representation_r.__name__)
+        model_details_list_r = [
+            inv_temp_r,
+            alpha_r,
+            beta_r,
+            gamma_r,
+            mlp_layers_r,
+            graph_representation_r.__name__,
+            network_type_r,
+            return_candidates_r,
+        ]
+
+        network_definition_r = get_network_definition(
+            network_type=network_type_r, graph_representation=graph_representation_r
+        )
+        network_definition_r = partial(network_definition_r, mlp_layers=mlp_layers_r)
+        network_r = hk.without_apply_rng(hk.transform(network_definition_r))
+    else:
+        model_details_list_r = []
+    for idx in range(len(sat_data)):
+        print("problem ", idx + 1, "of ", len(sat_data))
+        problem_path = sat_data.instances[idx].name + ".cnf"
+        problem = sat_data.get_unpadded_problem(idx)
+
+        n_array.append(problem.params[0])
+        alpha_array.append(problem.params[1] / problem.params[0])
+        if model_path_initialize != "schoening" and model_path_initialize != "uniform":
+            decoded_nodes = network_i.apply(params_i, problem.graph)
+            n = problem.params[0]
+            model_probabilities_i = graph_representation_i.get_model_probabilities(
+                decoded_nodes, n
+            )
+            model_probabilities_i = model_probabilities_i.ravel()
+        else:
+            model_probabilities_i = np.ones(problem.params[0]) / 2
+        if model_path_resample != "schoening" and model_path_resample != "uniform":
+            decoded_nodes = network_r.apply(params_r, problem.graph)
+            n = problem.params[0]
+            model_probabilities_r = graph_representation_r.get_model_probabilities(
+                decoded_nodes, n
+            )
+            model_probabilities_r = model_probabilities_r.ravel()
+        else:
+            model_probabilities_r = np.ones(problem.params[0]) / 2
+        # print(np.max(model_probabilities), np.min(model_probabilities))
+        single_traj_mean = []  # np.zeros(len(N_STEPS_MOSER_list))
+        single_traj_median = []
+        print(model_path_initialize)
+        print(model_path_resample)
+        if model_path_initialize != "schoening":
+            print("moser")
+            _, _, final_energies, numstep, traj = moser_rust.run_sls_python(
+                "moser",
+                problem_path,
+                model_probabilities_i,
+                model_probabilities_r,
+                N_STEPS_MOSER - 1,
+                N_RUNS_MOSER,
+                SEED,
+                keep_traj,
+            )
+        elif model_path_initialize == "schoening":
+            print("schoening")
+            _, _, final_energies, numstep, traj = moser_rust.run_sls_python(
+                "schoening",
+                problem_path,
+                model_probabilities_i,
+                model_probabilities_r,
+                N_STEPS_MOSER - 1,
+                N_RUNS_MOSER,
+                SEED,
+                keep_traj,
+            )
+        total_steps.append(numstep)
+        #print("total_steps", total_steps)
+        if len(traj)!= 0:
+            traj = get_padded_trajs(traj, N_STEPS_MOSER)
+            single_traj_mean.append(np.mean(traj, axis=0) / problem.params[1])
+            single_traj_median.append(np.median(traj, axis=0) / problem.params[1])
+            #energies_array.append(energies_array)
+            energies_array_mean.append(
+                np.pad(np.array(single_traj_mean)[0], (0, N_STEPS_MOSER - len(single_traj_mean[0])))
+            )  # += # single_energy / problem.params[1]
+            energies_array_median.append(
+                np.pad(np.array(single_traj_median)[0], (0, N_STEPS_MOSER - len(single_traj_median[0])))
+            )
+    total_steps = np.array(total_steps)
+    print("total_steps", total_steps.shape)
+    #energies_array = np.array(energies_array_median) #, dtype=object)
+    #print("energies_final", energies_array.shape)
+    if energies_array_mean != []:
+        energies_array_mean = np.mean(energies_array_mean, axis=0)
+        energies_array_median = np.mean(energies_array_median, axis=0)
+    total_array = [
+        [model_path_initialize, model_path_resample],
+        [model_details_list_i, model_details_list_r],
+        n_array,
+        alpha_array,
+        energies_array_mean,
+        energies_array_median, # _mean,
+        total_steps,
+    ]
+    if path_save:
+        np.save(path_save, np.array(total_array, dtype=object))
+    return total_array
 """"
 N_STEPS_MOSER = 100000
 

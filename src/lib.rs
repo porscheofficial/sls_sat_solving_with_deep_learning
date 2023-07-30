@@ -137,7 +137,7 @@ fn run_sls(
     algo_type: AlgoType,
     formula: CnfFormula,
     weights_initialize: Vec<f64>,
-    weights_resample: Vec,f64>,
+    weights_resample: Vec<f64>,
     nsteps: usize,
     nruns: usize,
     seed: usize,
