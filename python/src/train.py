@@ -52,7 +52,7 @@ def train(
     final_learning_rate=0.001,
 ):
     include_constraint_graph = (
-        beta > 0
+        beta + gamma > 0 
     )  # we calculate the constraint graphs only if we use it to calculate the llloss
 
     sat_data = SATTrainingDataset(
@@ -137,7 +137,7 @@ def train(
             * rep.alt_local_lovasz_loss(
                 decoded_nodes, mask, graph, constraint_graph, constraint_mask
             )
-            if beta > 0
+            if gamma > 0
             else 0.0
         )
 
