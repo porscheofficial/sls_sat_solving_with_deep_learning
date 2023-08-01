@@ -600,8 +600,7 @@ class LCG(SATRepresentation):
         max_array = jnp.maximum(
             jnp.zeros(len(difference)),
             (
-                (jnp.exp(convolved_log_probs) / (1 - x_sigmoid) * constraint_mask)
-                - inner_max
+                inner_max - (jnp.exp(convolved_log_probs) / (1 - x_sigmoid) * constraint_mask)
             ),
         )
         # loss = jnp.sum(max_array) / jnp.sum(constraint_mask)
