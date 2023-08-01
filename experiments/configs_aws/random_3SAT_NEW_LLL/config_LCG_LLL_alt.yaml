@@ -5,7 +5,7 @@ inv_temp: 1
 alpha: 0
 beta: 0
 gamma: 1
-NUM_EPOCHS: 50
+NUM_EPOCHS: 20
 N_STEPS_MOSER: 100
 N_RUNS_MOSER: 5
 data_path: ../data_random_3SAT_NEW
