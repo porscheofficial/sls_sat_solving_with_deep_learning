@@ -78,6 +78,13 @@ class SATRepresentation(ABC):
 
     @staticmethod
     @abstractmethod
+    def alt_local_lovasz_loss(
+        decoded_nodes, mask, graph, constraint_graph, constraint_mask
+    ):
+        pass
+
+    @staticmethod
+    @abstractmethod
     def entropy_loss(decoded_nodes, mask):
         pass
 
@@ -214,7 +221,7 @@ class VCG(SATRepresentation):
     ):
         if constraint_graph is None:
             raise ValueError("Constraint graph is None. Cannot calculate Lovasz loss.")
-        #log_probs = jnp.flip(jax.nn.log_softmax(decoded_nodes),axis = 1)
+        # log_probs = jnp.flip(jax.nn.log_softmax(decoded_nodes),axis = 1)
         log_probs = jax.nn.log_softmax(decoded_nodes)
         masked_log_probs = log_probs * mask[:, None]
         n = jnp.shape(decoded_nodes)[0]
@@ -246,11 +253,64 @@ class VCG(SATRepresentation):
         rhs_values = (
             rhs_values + log_probs[:, 0]
         )  # * constraint_mask <- we do this later!
-        #print("lhs", (jnp.exp(lhs_values)) * constraint_mask)
-        #print("rhs", (jnp.exp(rhs_values)) * constraint_mask)
+        # print("lhs", jnp.log((jnp.exp(lhs_values)) * constraint_mask))
+        # print("rhs", (jnp.exp(rhs_values)) * constraint_mask)
+
+        # OLD:
         difference = (jnp.exp(lhs_values) - jnp.exp(rhs_values)) * constraint_mask
         max_array = jnp.maximum(difference, jnp.zeros(len(rhs_values)))
-        loss = jnp.sum(max_array) / jnp.sum(constraint_mask)
+        # loss = jnp.sum(max_array) / jnp.sum(constraint_mask)
+        loss = jnp.linalg.norm(max_array, "2") / jnp.sum(constraint_mask)
+        # loss = jnp.sum(jnp.exp(lhs_values) * (lhs_values - rhs_values))/ jnp.sum(constraint_mask) #KL-div
+        # loss = jnp.max(max_array) #inf norm
+        # NEW:
+        # difference = (jnp.exp(lhs_values) - jnp.exp(rhs_values)) * constraint_mask
+        # max_array = jnp.maximum(jnp.maximum(difference, jnp.zeros(len(rhs_values))) - jnp.exp(lhs_values)* constraint_mask, jnp.zeros(len(rhs_values)))
+        # loss = jnp.sum(max_array) / jnp.sum(constraint_mask)
+        return loss
+
+    @staticmethod
+    def alt_local_lovasz_loss(
+        decoded_nodes, mask, graph, constraint_graph, constraint_mask
+    ):
+        if constraint_graph is None:
+            raise ValueError("Constraint graph is None. Cannot calculate Lovasz loss.")
+        log_probs = jax.nn.log_softmax(decoded_nodes)
+        masked_log_probs = log_probs * mask[:, None]
+        n = jnp.shape(decoded_nodes)[0]
+        relevant_log_probs = jnp.sum(
+            masked_log_probs[graph.senders] * jnp.logical_not(graph.edges), axis=1
+        )
+        convolved_log_probs = utils.segment_sum(
+            relevant_log_probs, graph.receivers, num_segments=n
+        )
+
+        constraint_senders = jnp.array(constraint_graph.senders, int)
+        constraint_receivers = jnp.array(constraint_graph.receivers, int)
+
+        relevant_log_x = log_probs[constraint_senders][:, 1]
+        log_neighborhood = utils.segment_sum(
+            data=relevant_log_x,
+            segment_ids=constraint_receivers,
+            num_segments=n,
+        )
+        log_neighborhood = log_neighborhood + log_probs[:, 1]
+
+        lhs_values = (
+            jnp.exp(convolved_log_probs) / jnp.exp(log_neighborhood) / log_probs[:, 1]
+        ) * contraint_mask
+        rhs_values = (log_probs[:, 0] / log_probs[:, 1]) * constraint_mask
+
+        # OLD:
+        difference = (lhs_values - rhs_values) * constraint_mask
+        max_array = jnp.maximum(
+            jnp.zeros(len(rhs_values)),
+            jnp.maximum(difference, jnp.zeros(len(rhs_values)))
+            - jnp.exp(convolved_log_probs) * constraint_mask,
+        )
+        # loss = jnp.sum(max_array) / jnp.sum(constraint_mask)
+        loss = jnp.linalg.norm(max_array, "2") / jnp.sum(constraint_mask)
+
         return loss
 
 
@@ -491,9 +551,58 @@ class LCG(SATRepresentation):
         #    np.exp(rhs_values) * constraint_mask,
         #    np.sum(np.exp(rhs_values) * constraint_mask),
         # )
+
+        # OLD:
         difference = (jnp.exp(lhs_values) - jnp.exp(rhs_values)) * constraint_mask
         max_array = jnp.maximum(difference, jnp.zeros(len(rhs_values)))
-        loss = jnp.sum(max_array) / jnp.sum(constraint_mask)
+        # loss = jnp.sum(max_array) / jnp.sum(constraint_mask)
+        loss = jnp.linalg.norm(max_array, "2") / jnp.sum(constraint_mask)
+
+        return loss
+
+    @staticmethod
+    def alt_local_lovasz_loss(
+        decoded_nodes, mask, graph, constraint_graph, constraint_mask
+    ):
+        if constraint_graph is None:
+            raise ValueError("Constraint graph is None. Cannot calculate Lovasz loss.")
+        n = jnp.shape(decoded_nodes)[0]
+        new_decoded_nodes = jnp.reshape(decoded_nodes, (-1, 2))
+        new_decoded_nodes = jnp.flip(new_decoded_nodes, axis=1)
+        log_probs = jax.nn.log_softmax(new_decoded_nodes)
+        log_probs = jnp.ravel(log_probs)
+        masked_log_probs = log_probs * mask
+        relevant_log_probs = masked_log_probs[graph.senders]
+        convolved_log_probs = utils.segment_sum(
+            relevant_log_probs, graph.receivers, num_segments=n
+        )
+
+        constraint_senders = jnp.array(constraint_graph.senders, int)
+        constraint_receivers = jnp.array(constraint_graph.receivers, int)
+        x_sigmoid = jnp.ravel(jax.nn.sigmoid(decoded_nodes))
+        relevant_x_sigmoid = x_sigmoid[constraint_senders]
+        prod_inclusive_neighborhood_values = utils.segment_prod(
+            data=jnp.ravel(1 - relevant_x_sigmoid),
+            segment_ids=constraint_receivers,
+            num_segments=n,
+        )
+        lhs_values = (
+            jnp.exp(convolved_log_probs)
+            / (prod_inclusive_neighborhood_values)
+            / (1 - x_sigmoid)
+        )
+        rhs_values = x_sigmoid / (1 - x_sigmoid)
+
+        # OLD:
+        difference = (lhs_values - rhs_values) * constraint_mask
+        max_array = jnp.maximum(
+            jnp.zeros(len(rhs_values)),
+            jnp.maximum(difference, jnp.zeros(len(rhs_values)))
+            - jnp.exp(convolved_log_probs) * constraint_mask,
+        )
+        # loss = jnp.sum(max_array) / jnp.sum(constraint_mask)
+        loss = jnp.linalg.norm(max_array, "2") / jnp.sum(constraint_mask)
+
         return loss
 
 

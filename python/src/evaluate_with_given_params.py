@@ -592,7 +592,7 @@ def load_model_and_test_moser2(
 
 
 def load_model_and_test_moser_single(
-    data_path, model_path, N_STEPS_MOSER, N_RUNS_MOSER, path_save=False, keep_traj = True
+    data_path, model_path, N_STEPS_MOSER, N_RUNS_MOSER, path_save=False, keep_traj=True
 ):
     energies_array_mean = []
     energies_array_median = []
@@ -695,22 +695,28 @@ def load_model_and_test_moser_single(
                 keep_traj,
             )
         total_steps.append(numstep)
-        #print("total_steps", total_steps)
-        if len(traj)!= 0:
+        # print("total_steps", total_steps)
+        if len(traj) != 0:
             traj = get_padded_trajs(traj, N_STEPS_MOSER)
             single_traj_mean.append(np.mean(traj, axis=0) / problem.params[1])
             single_traj_median.append(np.median(traj, axis=0) / problem.params[1])
-            #energies_array.append(energies_array)
+            # energies_array.append(energies_array)
             energies_array_mean.append(
-                np.pad(np.array(single_traj_mean)[0], (0, N_STEPS_MOSER - len(single_traj_mean[0])))
+                np.pad(
+                    np.array(single_traj_mean)[0],
+                    (0, N_STEPS_MOSER - len(single_traj_mean[0])),
+                )
             )  # += # single_energy / problem.params[1]
             energies_array_median.append(
-                np.pad(np.array(single_traj_median)[0], (0, N_STEPS_MOSER - len(single_traj_median[0])))
+                np.pad(
+                    np.array(single_traj_median)[0],
+                    (0, N_STEPS_MOSER - len(single_traj_median[0])),
+                )
             )
     total_steps = np.array(total_steps)
     print("total_steps", total_steps.shape)
-    #energies_array = np.array(energies_array_median) #, dtype=object)
-    #print("energies_final", energies_array.shape)
+    # energies_array = np.array(energies_array_median) #, dtype=object)
+    # print("energies_final", energies_array.shape)
     if energies_array_mean != []:
         energies_array_mean = np.mean(energies_array_mean, axis=0)
         energies_array_median = np.mean(energies_array_median, axis=0)
@@ -720,7 +726,7 @@ def load_model_and_test_moser_single(
         n_array,
         alpha_array,
         energies_array_mean,
-        energies_array_median, # _mean,
+        energies_array_median,  # _mean,
         total_steps,
     ]
     if path_save:
@@ -729,7 +735,7 @@ def load_model_and_test_moser_single(
 
 
 def load_model_and_test_probsat_single(
-    data_path, model_path, N_STEPS_MOSER, N_RUNS_MOSER, path_save=False, keep_traj = True
+    data_path, model_path, N_STEPS_MOSER, N_RUNS_MOSER, path_save=False, keep_traj=True
 ):
     energies_array_mean = []
     energies_array_median = []
@@ -832,22 +838,28 @@ def load_model_and_test_probsat_single(
                 keep_traj,
             )
         total_steps.append(numstep)
-        #print("total_steps", total_steps)
-        if len(traj)!= 0:
+        # print("total_steps", total_steps)
+        if len(traj) != 0:
             traj = get_padded_trajs(traj, N_STEPS_MOSER)
             single_traj_mean.append(np.mean(traj, axis=0) / problem.params[1])
             single_traj_median.append(np.median(traj, axis=0) / problem.params[1])
-            #energies_array.append(energies_array)
+            # energies_array.append(energies_array)
             energies_array_mean.append(
-                np.pad(np.array(single_traj_mean)[0], (0, N_STEPS_MOSER - len(single_traj_mean[0])))
+                np.pad(
+                    np.array(single_traj_mean)[0],
+                    (0, N_STEPS_MOSER - len(single_traj_mean[0])),
+                )
             )  # += # single_energy / problem.params[1]
             energies_array_median.append(
-                np.pad(np.array(single_traj_median)[0], (0, N_STEPS_MOSER - len(single_traj_median[0])))
+                np.pad(
+                    np.array(single_traj_median)[0],
+                    (0, N_STEPS_MOSER - len(single_traj_median[0])),
+                )
             )
     total_steps = np.array(total_steps)
     print("total_steps", total_steps.shape)
-    #energies_array = np.array(energies_array_median) #, dtype=object)
-    #print("energies_final", energies_array.shape)
+    # energies_array = np.array(energies_array_median) #, dtype=object)
+    # print("energies_final", energies_array.shape)
     if energies_array_mean != []:
         energies_array_mean = np.mean(energies_array_mean, axis=0)
         energies_array_median = np.mean(energies_array_median, axis=0)
@@ -857,12 +869,13 @@ def load_model_and_test_probsat_single(
         n_array,
         alpha_array,
         energies_array_mean,
-        energies_array_median, # _mean,
+        energies_array_median,  # _mean,
         total_steps,
     ]
     if path_save:
         np.save(path_save, np.array(total_array, dtype=object))
     return total_array
+
 
 # load_model_and_test_moser(
 #    data_path, model_paths, model_names, N_STEPS_MOSER_list, N_RUNS_MOSER, colors
@@ -870,7 +883,13 @@ def load_model_and_test_probsat_single(
 
 
 def load_model_and_test_probsat_single_two_models(
-    data_path, model_path_initialize, model_path_resample, N_STEPS_MOSER, N_RUNS_MOSER, path_save=False, keep_traj = True
+    data_path,
+    model_path_initialize,
+    model_path_resample,
+    N_STEPS_MOSER,
+    N_RUNS_MOSER,
+    path_save=False,
+    keep_traj=True,
 ):
     energies_array_mean = []
     energies_array_median = []
@@ -1014,22 +1033,28 @@ def load_model_and_test_probsat_single_two_models(
                 keep_traj,
             )
         total_steps.append(numstep)
-        #print("total_steps", total_steps)
-        if len(traj)!= 0:
+        # print("total_steps", total_steps)
+        if len(traj) != 0:
             traj = get_padded_trajs(traj, N_STEPS_MOSER)
             single_traj_mean.append(np.mean(traj, axis=0) / problem.params[1])
             single_traj_median.append(np.median(traj, axis=0) / problem.params[1])
-            #energies_array.append(energies_array)
+            # energies_array.append(energies_array)
             energies_array_mean.append(
-                np.pad(np.array(single_traj_mean)[0], (0, N_STEPS_MOSER - len(single_traj_mean[0])))
+                np.pad(
+                    np.array(single_traj_mean)[0],
+                    (0, N_STEPS_MOSER - len(single_traj_mean[0])),
+                )
             )  # += # single_energy / problem.params[1]
             energies_array_median.append(
-                np.pad(np.array(single_traj_median)[0], (0, N_STEPS_MOSER - len(single_traj_median[0])))
+                np.pad(
+                    np.array(single_traj_median)[0],
+                    (0, N_STEPS_MOSER - len(single_traj_median[0])),
+                )
             )
     total_steps = np.array(total_steps)
     print("total_steps", total_steps.shape)
-    #energies_array = np.array(energies_array_median) #, dtype=object)
-    #print("energies_final", energies_array.shape)
+    # energies_array = np.array(energies_array_median) #, dtype=object)
+    # print("energies_final", energies_array.shape)
     if energies_array_mean != []:
         energies_array_mean = np.mean(energies_array_mean, axis=0)
         energies_array_median = np.mean(energies_array_median, axis=0)
@@ -1039,15 +1064,22 @@ def load_model_and_test_probsat_single_two_models(
         n_array,
         alpha_array,
         energies_array_mean,
-        energies_array_median, # _mean,
+        energies_array_median,  # _mean,
         total_steps,
     ]
     if path_save:
         np.save(path_save, np.array(total_array, dtype=object))
     return total_array
 
+
 def load_model_and_test_moser_single_two_models(
-    data_path, model_path_initialize, model_path_resample, N_STEPS_MOSER, N_RUNS_MOSER, path_save=False, keep_traj = True
+    data_path,
+    model_path_initialize,
+    model_path_resample,
+    N_STEPS_MOSER,
+    N_RUNS_MOSER,
+    path_save=False,
+    keep_traj=True,
 ):
     energies_array_mean = []
     energies_array_median = []
@@ -1191,22 +1223,28 @@ def load_model_and_test_moser_single_two_models(
                 keep_traj,
             )
         total_steps.append(numstep)
-        #print("total_steps", total_steps)
-        if len(traj)!= 0:
+        # print("total_steps", total_steps)
+        if len(traj) != 0:
             traj = get_padded_trajs(traj, N_STEPS_MOSER)
             single_traj_mean.append(np.mean(traj, axis=0) / problem.params[1])
             single_traj_median.append(np.median(traj, axis=0) / problem.params[1])
-            #energies_array.append(energies_array)
+            # energies_array.append(energies_array)
             energies_array_mean.append(
-                np.pad(np.array(single_traj_mean)[0], (0, N_STEPS_MOSER - len(single_traj_mean[0])))
+                np.pad(
+                    np.array(single_traj_mean)[0],
+                    (0, N_STEPS_MOSER - len(single_traj_mean[0])),
+                )
             )  # += # single_energy / problem.params[1]
             energies_array_median.append(
-                np.pad(np.array(single_traj_median)[0], (0, N_STEPS_MOSER - len(single_traj_median[0])))
+                np.pad(
+                    np.array(single_traj_median)[0],
+                    (0, N_STEPS_MOSER - len(single_traj_median[0])),
+                )
             )
     total_steps = np.array(total_steps)
     print("total_steps", total_steps.shape)
-    #energies_array = np.array(energies_array_median) #, dtype=object)
-    #print("energies_final", energies_array.shape)
+    # energies_array = np.array(energies_array_median) #, dtype=object)
+    # print("energies_final", energies_array.shape)
     if energies_array_mean != []:
         energies_array_mean = np.mean(energies_array_mean, axis=0)
         energies_array_median = np.mean(energies_array_median, axis=0)
@@ -1216,12 +1254,14 @@ def load_model_and_test_moser_single_two_models(
         n_array,
         alpha_array,
         energies_array_mean,
-        energies_array_median, # _mean,
+        energies_array_median,  # _mean,
         total_steps,
     ]
     if path_save:
         np.save(path_save, np.array(total_array, dtype=object))
     return total_array
+
+
 """"
 N_STEPS_MOSER = 100000
 

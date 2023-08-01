@@ -28,15 +28,20 @@ def initiate_eval_objects_loss(
         text + " loss Deepmind", [], False, [f, alpha, 0, 0], rep, loader
     )
     eval_lll = EvalResults(text + " loss LLL", [], False, [f, 0, beta, 0], rep, loader)
-    eval_entropy = EvalResults(
-        text + " loss entropy", [], False, [f, 0, 0, gamma], rep, loader
+    # eval_entropy = EvalResults(
+    #    text + " loss entropy", [], False, [f, 0, 0, gamma], rep, loader
+    # )
+
+    eval_alt_lll = EvalResults(
+        text + " loss alt_LLL", [], False, [f, 0, 0, gamma], rep, loader
     )
 
     eval_objects_loss = [
         eval_total,
         eval_dm,
         eval_lll,
-        eval_entropy,
+        # eval_entropy,
+        eval_alt_lll,
     ]
 
     return eval_objects_loss
