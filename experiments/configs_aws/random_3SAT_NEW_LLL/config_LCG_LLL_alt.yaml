@@ -1,11 +1,11 @@
 MODEL_REGISTRY: mlrun_save
-EXPERIMENT_NAME: LLL_alt_5_norm_bs_50
-batch_size: 50
+EXPERIMENT_NAME: LLL_alt_2_norm_bs_1
+batch_size: 1
 inv_temp: 1
 alpha: 0
 beta: 0
 gamma: 1
-NUM_EPOCHS: 15
+NUM_EPOCHS: 25
 N_STEPS_MOSER: 100
 N_RUNS_MOSER: 5
 data_path: ../data_random_3SAT
