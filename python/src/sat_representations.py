@@ -297,9 +297,9 @@ class VCG(SATRepresentation):
         log_neighborhood = log_neighborhood + log_probs[:, 1]
 
         lhs_values = (
-            jnp.exp(convolved_log_probs) / jnp.exp(log_neighborhood) / log_probs[:, 1]
-        ) * contraint_mask
-        rhs_values = (log_probs[:, 0] / log_probs[:, 1]) * constraint_mask
+            jnp.exp(convolved_log_probs) / jnp.exp(log_neighborhood) / jnp.exp(log_probs[:, 1])
+        ) * constraint_mask
+        rhs_values = jnp.exp((log_probs[:, 0] - log_probs[:, 1])) * constraint_mask
 
         # OLD:
         difference = (lhs_values - rhs_values) * constraint_mask
@@ -581,14 +581,14 @@ class LCG(SATRepresentation):
         constraint_receivers = jnp.array(constraint_graph.receivers, int)
         x_sigmoid = jnp.ravel(jax.nn.sigmoid(decoded_nodes))
         relevant_x_sigmoid = x_sigmoid[constraint_senders]
-        prod_inclusive_neighborhood_values = utils.segment_prod(
-            data=jnp.ravel(1 - relevant_x_sigmoid),
+        prod_inclusive_neighborhood_values = utils.segment_sum(
+            data=jnp.ravel(jnp.log(1 - relevant_x_sigmoid)),
             segment_ids=constraint_receivers,
             num_segments=n,
         )
         lhs_values = (
             jnp.exp(convolved_log_probs)
-            / (prod_inclusive_neighborhood_values)
+            / jnp.exp((prod_inclusive_neighborhood_values))
             / (1 - x_sigmoid)
         )
         rhs_values = x_sigmoid / (1 - x_sigmoid)
