@@ -260,7 +260,7 @@ class VCG(SATRepresentation):
         difference = (jnp.exp(lhs_values) - jnp.exp(rhs_values)) * constraint_mask
         max_array = jnp.maximum(difference, jnp.zeros(len(rhs_values)))
         # loss = jnp.sum(max_array) / jnp.sum(constraint_mask)
-        loss = jnp.linalg.norm(max_array, 5) #/ jnp.sum(constraint_mask)
+        loss = jnp.linalg.norm(max_array, 2) #/ jnp.sum(constraint_mask)
         # loss = jnp.sum(jnp.exp(lhs_values) * (lhs_values - rhs_values))/ jnp.sum(constraint_mask) #KL-div
         # loss = jnp.max(max_array) #inf norm
         # NEW:
@@ -297,22 +297,20 @@ class VCG(SATRepresentation):
         log_neighborhood = log_neighborhood + log_probs[:, 1]
 
         lhs_values = (
-            jnp.exp(convolved_log_probs)
-            / jnp.exp(log_neighborhood)
-            / jnp.exp(log_probs[:, 1])
+            jnp.exp(convolved_log_probs - log_neighborhood - log_probs[:, 1])
         ) * constraint_mask
         rhs_values = jnp.exp((log_probs[:, 0] - log_probs[:, 1])) * constraint_mask
 
         # OLD:
-        difference = (lhs_values - rhs_values) * constraint_mask
-        inner_max = jnp.maximum(difference, jnp.zeros(len(rhs_values)))
-        max_array = jnp.maximum(
-            jnp.zeros(len(rhs_values)),
-            inner_max
-            - jnp.exp(convolved_log_probs) * constraint_mask,
-        )
+        difference = (lhs_values - rhs_values)
+        max_array = jnp.maximum(difference, jnp.zeros(len(rhs_values)))
+        #max_array = jnp.maximum(
+        #    jnp.zeros(len(rhs_values)),
+        #    inner_max
+        #    - jnp.exp(convolved_log_probs) * constraint_mask,
+        #)
         # loss = jnp.sum(max_array) / jnp.sum(constraint_mask)
-        loss = jnp.linalg.norm(max_array, 5) #/ jnp.sum(constraint_mask)
+        loss = jnp.linalg.norm(max_array, 2) #/ jnp.sum(constraint_mask)
 
         return loss
 
@@ -559,7 +557,7 @@ class LCG(SATRepresentation):
         difference = (jnp.exp(lhs_values) - jnp.exp(rhs_values)) * constraint_mask
         max_array = jnp.maximum(difference, jnp.zeros(len(rhs_values)))
         # loss = jnp.sum(max_array) / jnp.sum(constraint_mask)
-        loss = jnp.linalg.norm(max_array, 5) #/ jnp.sum(constraint_mask)
+        loss = jnp.linalg.norm(max_array, 2) #/ jnp.sum(constraint_mask)
 
         return loss
 
@@ -591,21 +589,21 @@ class LCG(SATRepresentation):
         )
         lhs_values = (
             jnp.exp(convolved_log_probs - prod_inclusive_neighborhood_values)
-            # / (1 - x_sigmoid)
+            / (1 - x_sigmoid)
         )
-        rhs_values = x_sigmoid  # / (1 - x_sigmoid)
+        rhs_values = x_sigmoid  / (1 - x_sigmoid)
 
         # OLD:
         difference = (lhs_values - rhs_values) * constraint_mask
-        inner_max = jnp.maximum(difference, jnp.zeros(len(difference)))
-        max_array = jnp.maximum(
-            jnp.zeros(len(difference)),
-            (
-                inner_max - (jnp.exp(convolved_log_probs) / (1 - x_sigmoid) * constraint_mask)
-            ),
-        )
+        max_array = jnp.maximum(difference, jnp.zeros(len(difference)))
+        #max_array = jnp.maximum(
+        #    jnp.zeros(len(difference)),
+        #    (
+        #        inner_max - (jnp.exp(convolved_log_probs) / (1 - x_sigmoid) * constraint_mask)
+        #    ),
+        #)
         # loss = jnp.sum(max_array) / jnp.sum(constraint_mask)
-        loss = jnp.linalg.norm(max_array, 5) #/ jnp.sum(constraint_mask)
+        loss = jnp.linalg.norm(max_array, 2) #/ jnp.sum(constraint_mask)
 
         return loss
 
