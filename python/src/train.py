@@ -147,7 +147,6 @@ def train(
 
     @jax.jit
     def update(params, batch, opt_state):
-        print()
         g = jax.grad(total_loss)(
             params, batch, inv_temp, alpha, beta, gamma, graph_representation
         )
