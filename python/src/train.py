@@ -52,7 +52,7 @@ def train(
     final_learning_rate=0.001,
 ):
     include_constraint_graph = (
-        beta + gamma > 0 
+        beta + gamma > 0
     )  # we calculate the constraint graphs only if we use it to calculate the llloss
 
     sat_data = SATTrainingDataset(
