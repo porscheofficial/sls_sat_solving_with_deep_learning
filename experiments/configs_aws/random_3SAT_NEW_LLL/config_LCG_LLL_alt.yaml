@@ -1,6 +1,6 @@
 MODEL_REGISTRY: mlrun_save
-EXPERIMENT_NAME: LLL_alt_2_norm_bs_1
-batch_size: 1
+EXPERIMENT_NAME: LLL_alt_2_norm_bs_5_5_NEW_DS
+batch_size: 5
 inv_temp: 1
 alpha: 0
 beta: 0

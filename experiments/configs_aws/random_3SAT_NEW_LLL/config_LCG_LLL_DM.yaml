@@ -1,6 +1,6 @@
 MODEL_REGISTRY: mlrun_save
-EXPERIMENT_NAME: DM_LLL_2_norm_bs_1
-batch_size: 1
+EXPERIMENT_NAME: DM_LLL_2_norm_bs_5_NEW_DS
+batch_size: 5
 inv_temp: 1
 alpha: 1
 beta: 1
@@ -8,7 +8,7 @@ gamma: 0
 NUM_EPOCHS: 20
 N_STEPS_MOSER: 100
 N_RUNS_MOSER: 5
-data_path: ../data_random_3SAT
+data_path: ../data_random_3SAT_NEW
 graph_representation: LCG
 network_type: interaction
 mlp_layers: [200,200]
