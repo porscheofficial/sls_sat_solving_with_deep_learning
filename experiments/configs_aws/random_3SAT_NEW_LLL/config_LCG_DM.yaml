@@ -1,10 +1,10 @@
 MODEL_REGISTRY: mlrun_save
-EXPERIMENT_NAME: LLL_alt_2_norm_bs_1
+EXPERIMENT_NAME: DM_2_norm_bs_1
 batch_size: 1
 inv_temp: 1
-alpha: 0
+alpha: 1
 beta: 0
-gamma: 1
+gamma: 0
 NUM_EPOCHS: 50
 N_STEPS_MOSER: 100
 N_RUNS_MOSER: 5
