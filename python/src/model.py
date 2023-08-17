@@ -40,10 +40,6 @@ def apply_interaction(
             update_node_fn=update_fn,
             include_sent_messages_in_node_update=True,
         )
-        # update_edge_fn: a function mapping a single edge update inputs to a single edge feature.
-        # update_node_fn: a function mapping a single node update input to a single node feature.
-        # aggregate_edges_for_nodes_fn: function used to aggregate messages to each node.
-        # include_sent_messages_in_node_update: pass edge features for which a node is a sender to the node update function.
         graph = gn(graph)
     return graph
 
