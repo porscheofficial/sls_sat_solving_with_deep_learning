@@ -5,14 +5,13 @@ sys.path.append("../../")
 from collections import namedtuple
 from os.path import join, exists, basename
 from os import mkdir
-from functools import partial
+
 import glob
 import gzip
 import jraph
 import nnf
 import numpy as np
 import pickle
-import jax
 import jax.numpy as jnp
 from func_timeout import func_timeout, FunctionTimedOut
 from jax import vmap
@@ -20,12 +19,8 @@ from pysat.formula import CNF
 from torch.utils import data
 
 from python.src.sat_instances import SATProblem, SATRepresentation
-
-
 from python.src.sat_representations import SATRepresentation
 from python.src.sat_instances import get_problem_from_cnf
-
-# from python.src.random_walk import number_of_violated_constraints
 
 MAX_TIME = 20
 
@@ -207,7 +202,7 @@ def number_of_violated_constraints(
 def number_of_violated_constraints_VCG(problem: SATProblem, assignment):
     # currently not implemented
     pass
-    # return np.sum(violated_constraints(problem, assignment).astype(int), axis=0)
+    return np.sum(violated_constraints(problem, assignment).astype(int), axis=0)
 
 
 @partial(jax.jit, static_argnames=("problem",))
