@@ -33,6 +33,16 @@ Now we can install the requirements in the current environment. To do so, type
 pip install -r requirements.txt
 '''
 
+Note that if you want to use a GPU for training, you should run
+'''
+pip install "jax[cuda]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+'''
+to install the GPU version of jax. In case of a TPU, use the following command
+'''
+pip install "jax[tpu]" -f https://storage.googleapis.com/jax-releases/libtpu_releases.html
+'''
+
+
 2. Compile the rust code
 
 The MT algorithm and WalkSAT are implemented in Rust because of performance reasons. Start by installing Rust by typing
@@ -52,5 +62,11 @@ To replicate the experiments, you can either take the trained models or rerun th
 
 To use the existing models, simply run the tutorial notebook. 
 
-To train, run the "run all experiments" config file, and then point the tutorial to those model files saved in there. 
-
+To train, run the "run all experiments" config file, and then point the tutorial to those model files saved in there. You start running the experiments by typing 
+'''
+ chmod +x run_all_experiments.sh 
+'''
+and then
+'''
+./run_all_experiments.sh 
+'''
