@@ -95,3 +95,5 @@ and then
 `
 ./run_all_experiments.sh 
 `
+
+To evaluate the experiments, you can use the tutorial notebook but you have to point to your trained models instead of our pre-trained ones.
