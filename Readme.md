@@ -1,9 +1,9 @@
 # GNN-based oracle factories for SLS solvers.
 
-This is the code to accmpany the submission "Using deep learning to construct Stochastic Local Search SAT solvers with performance bounds". 
+This is the code to accompany the submission "Using deep learning to construct Stochastic Local Search SAT solvers with performance bounds". 
 
 ## Setup
-**0. Clone the repository**
+<!-- **0. Clone the repository**
 
 Clone the repository via
 
@@ -15,7 +15,7 @@ and navigate to the repository using
 
 `
 cd <repo>
-`
+` -->
 
 **1. Create virtual environment and install all the requirements in the virtual environment**
 
@@ -49,7 +49,7 @@ Note that if you want to use a GPU for training, you should run
 pip install "jax[cuda]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 `
 
-afterwards to install the GPU version of Jax. In you use a TPU, use the following command:
+afterwards to install the GPU version of Jax. If you use a TPU, use the following command:
 
 `
 pip install "jax[tpu]" -f https://storage.googleapis.com/jax-releases/libtpu_releases.html

@@ -5,7 +5,7 @@ sys.path.append("../../")
 from collections import namedtuple
 from os.path import join, exists, basename
 from os import mkdir
-
+from functools import partial
 import glob
 import gzip
 import jraph
