@@ -82,7 +82,7 @@ pytest
 
 To replicate the experiments, you can either **take the trained models or rerun the training**. 
 
-1. To **use the existing models**, simply run the tutorial notebook. 
+1. To **use the existing models**, simply run the tutorial notebook. It might take some time to generate the trajectories.
 
 2. To **train**, run the "run_all_experiments" config file, and then point the tutorial to those model files saved in there. You start running the experiments by typing 
 
@@ -97,3 +97,7 @@ and then
 `
 
 To evaluate the experiments, you can use the tutorial notebook but you have to point to your trained models instead of our pre-trained ones.
+
+## Additional information
+
+In case you are also interested to generate your own datasets containing instances, solutions and candidates, please have a look at the instance_sampling notebook.

@@ -9,6 +9,7 @@ from functools import partial
 import glob
 import gzip
 import jraph
+import jax
 import nnf
 import numpy as np
 import pickle
