@@ -19,16 +19,20 @@ cd <repo>
 
 **1. Create virtual environment and install all the requirements in the virtual environment**
 
-To start with, install virtualenv (if you have not done so already) by running
+This app has been run and tested with Python 3.10. To start with, ensure you have a version of Python3.10 installed locally. To install virtualenv
 
 `
-pip install virtualenv
+pip3.10 install virtualenv
 `
 
 Run
 
 `
 virtualenv venv
+`
+or 
+`
+python3.10 -m virtualenv venv
 `
 
 to create a new virtual environment environment and activate it by typing
@@ -58,7 +62,7 @@ pip install "jax[tpu]" -f https://storage.googleapis.com/jax-releases/libtpu_rel
 
 **2. Compile the rust code**
 
-The MT algorithm and WalkSAT are implemented in Rust because of performance reasons. Start by installing Rust by typing
+The MT algorithm and WalkSAT are implemented in Rust (we used rustc version 1.66.0) because of performance reasons. Start by installing Rust via rustup by typing
 
 `
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
@@ -70,6 +74,8 @@ and run
 maturin develop -r
 `
 
+If you experience problems with the compilation process, check the compiler version (using `rustc -V`) and try downgrading (`rustup install 1.66`).
+
 **3. (optional) run tests**
 
 There are dedicated test files for the code. To run them, type
@@ -80,11 +86,23 @@ pytest
 
 ## Usage
 
+### Files from document
+
+The plots from the experiments can be found under `Data/plots`, the pre-trained models
+
+
+### Run GNN-boosted SLS solvers
+
+
+### Using existing model
+
 To replicate the experiments, you can either **take the trained models or rerun the training**. 
 
-1. To **use the existing models**, simply run the tutorial notebook. It might take some time to generate the trajectories.
+1. To **use the existing models**, simply run the tutorial notebook. 
 
-2. To **train**, run the "run_all_experiments" config file, and then point the tutorial to those model files saved in there. You start running the experiments by typing 
+### Using retrained models
+
+1. Run the "run_all_experiments" config file by typing 
 
 `
  chmod +x run_all_experiments.sh 
@@ -96,8 +114,8 @@ and then
 ./run_all_experiments.sh 
 `
 
-To evaluate the experiments, you can use the tutorial notebook but you have to point to your trained models instead of our pre-trained ones.
+2. Point the tutorial notebook to those model files saved in there (by default, the model files will be stored under "experiments/params_save"). You can do this in the first cell of the tutorial notebook. 
 
-## Additional information
+### Generating datasets
 
-In case you are also interested to generate your own datasets containing instances, solutions and candidates, please have a look at the instance_sampling notebook.
+We provide the dataset used for the experiments reported in the submission alongside the code. However, to genereate new datasets, use the notebook  `python/src/instace_sampling.ipynb`.
