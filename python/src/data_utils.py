@@ -20,7 +20,6 @@ from torch.utils import data
 
 from python.src.sat_representations import SATRepresentation
 from python.src.sat_instances import get_problem_from_cnf
-from python.src.random_walk import number_of_violated_constraints
 
 MAX_TIME = 20
 
