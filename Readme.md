@@ -72,6 +72,12 @@ maturin develop -r
 
 **3. (optional) run tests**
 
+There are dedicated test files for the code. To run them, type
+
+`
+pytest
+`
+
 ## Usage
 
 To replicate the experiments, you can either **take the trained models or rerun the training**. 
