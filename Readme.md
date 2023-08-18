@@ -3,12 +3,48 @@
 This is the code to accmpany the submission "Using deep learning to construct Stochastic Local Search SAT solvers with performance bounds". 
 
 ## Setup
+0. Clone the repository
 
+Clone the repository via
+'''ruby
+git clone <repo>
+'''
+and navigate to the repository using
+'''ruby
+cd <repo>
+'''
 
-1. Create new conda environment
-2. Install all requirements
-3. Compile the rust code
-4. (optional) run tests
+1. Create virtual environment and install all the requirements in the virtual environment
+
+To start with, install virtualenv (if you have not done so already) by running
+'''ruby
+pip install virtualenv
+'''
+Run 
+'''ruby
+virtualenv venv
+'''
+to create a new virtual environment environment and activate it by typing
+'''ruby
+source venv/bin/activate
+'''
+Now we can install the requirements in the current environment. To do so, type
+'''ruby
+pip install -r requirements.txt
+'''
+
+2. Compile the rust code
+
+The MT algorithm and WalkSAT are implemented in Rust because of performance reasons. Start by installing Rust by typing
+'''ruby
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+'''
+and run
+'''ruby
+maturin develop -r
+'''
+
+3. (optional) run tests
 
 ## Usage
 
