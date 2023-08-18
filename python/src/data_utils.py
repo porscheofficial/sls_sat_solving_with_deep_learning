@@ -5,22 +5,27 @@ sys.path.append("../../")
 from collections import namedtuple
 from os.path import join, exists, basename
 from os import mkdir
-
+from functools import partial
 import glob
 import gzip
 import jraph
 import nnf
 import numpy as np
 import pickle
+import jax
 import jax.numpy as jnp
 from func_timeout import func_timeout, FunctionTimedOut
 from jax import vmap
 from pysat.formula import CNF
 from torch.utils import data
 
+from python.src.sat_instances import SATProblem, SATRepresentation
+
+
 from python.src.sat_representations import SATRepresentation
 from python.src.sat_instances import get_problem_from_cnf
-from python.src.random_walk import number_of_violated_constraints
+
+# from python.src.random_walk import number_of_violated_constraints
 
 MAX_TIME = 20
 
@@ -187,6 +192,43 @@ class JraphDataLoader(data.DataLoader):
             timeout=timeout,
             worker_init_fn=worker_init_fn,
         )
+
+
+def number_of_violated_constraints(
+    problem: SATProblem, assignment, representation: SATRepresentation
+):
+    match representation:
+        case SATRepresentation.VCG:
+            return number_of_violated_constraints_VCG(problem, assignment)
+        case SATRepresentation.LCG:
+            return number_of_violated_constraints_LCG(problem, assignment)
+
+
+def number_of_violated_constraints_VCG(problem: SATProblem, assignment):
+    # currently not implemented
+    pass
+    # return np.sum(violated_constraints(problem, assignment).astype(int), axis=0)
+
+
+@partial(jax.jit, static_argnames=("problem",))
+def number_of_violated_constraints_LCG(problem: SATProblem, assignment):
+    def one_hot(x, k, dtype=jnp.float32):
+        """Create a one-hot encoding of x of size k."""
+        return jnp.array(x[:, None] == jnp.arange(k), dtype)
+
+    graph = problem.graph
+    n, m, k = problem.params
+    senders = graph.senders[:-n]
+    receivers = graph.receivers[:-n]
+    new_assignment = jnp.ravel(one_hot(assignment, 2))
+    edge_is_satisfied = jnp.ravel(
+        new_assignment[None].T[senders].T
+    )  # + np.ones(len(senders)), 2)
+    number_of_literals_satisfied = utils.segment_sum(
+        data=edge_is_satisfied, segment_ids=receivers, num_segments=2 * n + m
+    )[2 * n :]
+    clause_is_unsat = jnp.where(number_of_literals_satisfied > 0, 0, 1)
+    return jnp.sum(clause_is_unsat)
 
 
 def timed_solve(max_time, p):
