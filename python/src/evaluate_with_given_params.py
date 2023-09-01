@@ -108,7 +108,7 @@ def load_model_and_test(
         n_array.append(problem.params[0])
         alpha_array.append(problem.params[1] / problem.params[0])
         if model_path != "uniform":
-            decoded_nodes = network.apply(params, problem.graph)
+            decoded_nodes = network.apply(params, problem.graph)  # type: ignore[attr-defined]
             n = problem.params[0]
             model_probabilities = graph_representation.get_model_probabilities(
                 decoded_nodes, n
@@ -283,7 +283,7 @@ def load_model_and_test_two_models(
         n_array.append(problem.params[0])
         alpha_array.append(problem.params[1] / problem.params[0])
         if model_path_initialize != "uniform":
-            decoded_nodes = network_i.apply(params_i, problem.graph)
+            decoded_nodes = network_i.apply(params_i, problem.graph)  # type: ignore[attr-defined]
             n = problem.params[0]
             model_probabilities_i = graph_representation_i.get_model_probabilities(
                 decoded_nodes, n
@@ -292,7 +292,7 @@ def load_model_and_test_two_models(
         else:
             model_probabilities_i = np.ones(problem.params[0]) / 2
         if model_path_resample != "uniform":
-            decoded_nodes = network_r.apply(params_r, problem.graph)
+            decoded_nodes = network_r.apply(params_r, problem.graph)  # type: ignore[attr-defined]
             n = problem.params[0]
             model_probabilities_r = graph_representation_r.get_model_probabilities(
                 decoded_nodes, n

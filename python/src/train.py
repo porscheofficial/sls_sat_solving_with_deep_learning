@@ -102,7 +102,7 @@ def train(
     )
     network_definition = partial(network_definition, mlp_layers=mlp_layers)
     network = hk.without_apply_rng(hk.transform(network_definition))
-    params = network.init(jax.random.PRNGKey(42), sat_data[0][0].graph)
+    params = network.init(jax.random.PRNGKey(42), sat_data[0][0].graph)  # type: ignore[attr-defined]
 
     # use a schedule function for the ADAM optimizer
     tot_steps = int(NUM_EPOCHS * np.ceil(len(train_data) / batch_size))
@@ -137,7 +137,7 @@ def train(
         rep,
     ):
         (mask, graph, constraint_graph, constraint_mask), (candidates, energies) = batch
-        decoded_nodes = network.apply(params, graph)
+        decoded_nodes = network.apply(params, graph)  # type: ignore[attr-defined]
         prediction_loss = (
             alpha
             * rep.prediction_loss(decoded_nodes, mask, candidates, energies, inv_temp)
@@ -307,7 +307,7 @@ def experiment_tracking_train(
     N_STEPS_MOSER: int,
     N_RUNS_MOSER: int,
     data_path: str,
-    graph_representation: str,
+    graph_representation,
     mlp_layers: list[int],
     network_type: str = "interaction",
     return_candidates=True,
@@ -342,12 +342,12 @@ def experiment_tracking_train(
     """
     match graph_representation:
         case "LCG":
-            rep = LCG
+            graph_representation = LCG
         case "VCG":
-            rep = VCG
+            graph_representation = VCG
 
     network_definition = get_network_definition(
-        network_type=network_type, graph_representation=rep
+        network_type=network_type, graph_representation=graph_representation
     )
 
     MODEL_REGISTRY_path = Path(MODEL_REGISTRY)
@@ -399,7 +399,7 @@ def experiment_tracking_train(
             img_path=img_path,
             model_path=model_path,
             experiment_tracking=True,
-            graph_representation=rep,
+            graph_representation=graph_representation,
             network_type=network_type,
             return_candidates=return_candidates,
             initial_learning_rate=initial_learning_rate,
