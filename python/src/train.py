@@ -339,7 +339,7 @@ def experiment_tracking_train(
     """
     if graph_representation == "LCG":
         rep = LCG
-    if graph_representation == "VCG":
+    elif graph_representation == "VCG":
         rep = VCG
 
     network_definition = get_network_definition(

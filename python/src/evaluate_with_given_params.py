@@ -58,7 +58,7 @@ def load_model_and_test(
 
     n_array = []
     alpha_array = []
-    total_steps = []
+    total_steps = list([])
     if model_path != "uniform":
         params, model_details = np.load(model_path, allow_pickle=True)
         (
@@ -148,7 +148,8 @@ def load_model_and_test(
                     (0, N_STEPS - len(single_traj_median[0])),
                 )
             )
-    total_steps = np.asarray(total_steps)
+    if type(total_steps) == list:
+        total_steps = np.asarray(total_steps)
 
     if energies_array_mean != []:
         energies_array_mean = np.mean(energies_array_mean, axis=0)
@@ -206,7 +207,7 @@ def load_model_and_test_two_models(
 
     n_array = []
     alpha_array = []
-    total_steps = []
+    total_steps = list([])
     if model_path_initialize != "uniform":
         params_i, model_details_i = np.load(model_path_initialize, allow_pickle=True)
         (
@@ -332,7 +333,8 @@ def load_model_and_test_two_models(
                     (0, N_STEPS - len(single_traj_median[0])),
                 )
             )
-    total_steps = np.asarray(total_steps)
+    if type(total_steps) == list:
+        total_steps = np.asarray(total_steps)
     if energies_array_mean != []:
         energies_array_mean = np.mean(energies_array_mean, axis=0)
         energies_array_median = np.mean(energies_array_median, axis=0)

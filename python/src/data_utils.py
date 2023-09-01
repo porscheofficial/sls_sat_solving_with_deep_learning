@@ -237,7 +237,7 @@ def number_of_violated_constraints_VCG(problem: SATProblem, assignment):
     # currently not implemented
     pass
     return np.sum(
-        VCG.violated_constraints(problem, assignment).astype(int),
+        VCG.get_violated_constraints(problem, assignment).astype(int),
         axis=0,
     )
 
