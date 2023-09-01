@@ -63,7 +63,7 @@ def train(
         N_STEPS_MOSER (int): number of steps used in MT algorithm statistics
         N_RUNS_MOSER (int): number of runs used in MT algorithm statistics
         path (str): path pointing to training dataset (this is split into train and test set)
-        graph_representation (SATRepresentation): SATRepresentation used. Either LCG or VCG
+        graph_representation (SATRepresentation): SATRepresentation used. Either LCG or VCG. Note: here you have to use the SATRepresentation!!!
         network_type (str): either "interaction" for interaction network or "GCN" for Graph convolutional network (not tested!)
         mlp_layers (array): size of mlp_layers. For example: [200,200]
         img_path (bool, optional): path where the plot is saved that contains the loss function plot as a function of the epochs. Defaults to False.
