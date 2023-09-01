@@ -100,7 +100,7 @@ class SATTrainingDataset(data.Dataset):
             if type(solution_dict) == dict:
                 print("dict", solution_dict)
                 solution_dict = [x for (_, x) in solution_dict.items()]
-            if type(solution_dict) == (list or np.array):
+            if type(solution_dict) == list or type(solution_dict) == np.array:
                 if 2 in solution_dict or -2 in solution_dict:
                     solution_dict = np.array(solution_dict, dtype=float)
                     solution_dict = [int(np.sign(x) + 1) / 2 for x in solution_dict]
@@ -237,7 +237,7 @@ def number_of_violated_constraints_VCG(problem: SATProblem, assignment):
     # currently not implemented
     pass
     return np.sum(
-        SATRepresentation.VCG.violated_constraints(problem, assignment).astype(int),
+        VCG.violated_constraints(problem, assignment).astype(int),
         axis=0,
     )
 

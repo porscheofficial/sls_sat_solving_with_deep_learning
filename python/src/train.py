@@ -41,7 +41,7 @@ def train(
     N_STEPS_MOSER: int,
     N_RUNS_MOSER: int,
     data_path,
-    graph_representation: SATRepresentation,
+    graph_representation,
     network_type,
     mlp_layers,
     img_path=False,
@@ -134,7 +134,7 @@ def train(
         alpha: float,
         beta: float,
         gamma: float,
-        rep: SATRepresentation,
+        rep,
     ):
         (mask, graph, constraint_graph, constraint_mask), (candidates, energies) = batch
         decoded_nodes = network.apply(params, graph)
@@ -346,8 +346,8 @@ def experiment_tracking_train(
         network_type=network_type, graph_representation=rep
     )
 
-    MODEL_REGISTRY = Path(MODEL_REGISTRY)
-    MODEL_REGISTRY.mkdir(exist_ok=True)  # create experiments dir
+    MODEL_REGISTRY_path = Path(MODEL_REGISTRY)
+    MODEL_REGISTRY_path.mkdir(exist_ok=True)  # create experiments dir
 
     timestr = time.strftime("%Y%m%d-%H%M%S")
     params_save = Path("experiments", "params_save")
@@ -355,7 +355,7 @@ def experiment_tracking_train(
     model_path = os.path.join(params_save, EXPERIMENT_NAME + timestr)
     img_path = model_path + "_plot"
 
-    mlflow.set_tracking_uri("file://" + str(MODEL_REGISTRY.absolute()))
+    mlflow.set_tracking_uri("file://" + str(MODEL_REGISTRY_path.absolute()))
     mlflow.set_experiment(EXPERIMENT_NAME)
     with mlflow.start_run():
         # log key hyperparameters

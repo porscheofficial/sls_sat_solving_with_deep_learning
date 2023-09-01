@@ -154,7 +154,7 @@ def network_definition_convolution_LCG(
     return hk.Linear(1)(graph.nodes)
 
 
-def get_network_definition(network_type, graph_representation: SATRepresentation):
+def get_network_definition(network_type, graph_representation):
     """helper function to get proper network definition from (network_type, graph_representation).
 
     Args:
