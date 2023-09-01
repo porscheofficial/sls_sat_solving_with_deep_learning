@@ -29,7 +29,7 @@ SATInstanceMeta = namedtuple("SATInstanceMeta", ("name", "n", "m"))
 
 
 class SATTrainingDataset(data.Dataset):
-    """SAT training dataset class"""
+    """SAT training dataset class."""
 
     def __init__(
         self,
