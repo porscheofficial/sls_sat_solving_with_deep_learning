@@ -21,17 +21,27 @@ def initiate_eval_objects_loss(
     rep: SATRepresentation,
     loader,
 ):
+    """helper function to create loss function evaluation object
+
+    Args:
+        text (str): description of loss type as str (typically "test" and "train")
+        f (float): inverse temperature
+        alpha (float): used pre-factor for the Gibbs loss
+        beta (float): used pre-factor for the LLL loss
+        gamma (float): used pre-factor for the alternative LLL loss
+        rep (SATRepresentation): SATRepresentation used here
+        loader (@TODO: specify type): _description_
+
+    Returns:
+        EvalResults: initialised EvalResults object for loss functions
+    """
     eval_total = EvalResults(
         text + " total loss", [], False, [f, alpha, beta, gamma], rep, loader
     )
     eval_dm = EvalResults(
-        text + " loss Deepmind", [], False, [f, alpha, 0, 0], rep, loader
+        text + " loss Gibbs", [], False, [f, alpha, 0, 0], rep, loader
     )
     eval_lll = EvalResults(text + " loss LLL", [], False, [f, 0, beta, 0], rep, loader)
-    # eval_entropy = EvalResults(
-    #    text + " loss entropy", [], False, [f, 0, 0, gamma], rep, loader
-    # )
-
     eval_alt_lll = EvalResults(
         text + " loss alt_LLL", [], False, [f, 0, 0, gamma], rep, loader
     )
@@ -55,6 +65,19 @@ def initiate_eval_moser_loss(
     data_subset,
     sat_data,
 ):
+    """helper function to create a moser_loss evaluation object
+
+    Args:
+        text (str): description of loss type as str (typically "test" and "train")
+        N_STEPS_MOSER (float): number of steps executed by MT algorithm for the loss
+        N_RUNS_MOSER (float): number of runs executed by MT algorithm for the loss
+        rep (SATRepresentation): SATRepresentation chosen here
+        data_subset (@TODO: specify type): subset of dataset we want to look at
+        sat_data (@TODO: specify type): full sat_data
+
+    Returns:
+        EvalResults: initialised EvalResults object for Moser loss
+    """
     moser_model = EvalResults(
         text + " loss model Moser",
         [],
@@ -78,6 +101,16 @@ def initiate_eval_moser_loss(
 
 
 def update_eval_objects_loss(params, loss, eval_objects_loss):
+    """helper function to update loss function evaluation object. This means, use the current params of the net and evaluate the loss terms
+
+    Args:
+        params (@TODO: specify type): current params of the net
+        loss (function): function we want to evaluate -> use the total loss function typically
+        eval_objects_loss (EvalResults): current EvalResults object that should be updated using this function
+
+    Returns:
+        EvalResults: updated EvalResults loss function object
+    """
     for i in range(len(eval_objects_loss)):
         eval_objects_loss[i].results.append(
             np.mean(
@@ -99,6 +132,16 @@ def update_eval_objects_loss(params, loss, eval_objects_loss):
 
 
 def update_eval_moser_loss(network, params, eval_moser_loss):
+    """helper function to update moser loss evaluation object. This means, use the current params of the net and evaluate the Moser loss terms
+
+    Args:
+        network (@TODO: specify type): network definition
+        params (@TODO: specify type): current params of the net
+        eval_moser_loss (EvalResults): current EvalResults object that should be updated using this function
+
+    Returns:
+        EvalResults: updated EvalResults Moser loss object
+    """
     for i in range(len(eval_moser_loss)):
         if (
             eval_moser_loss[i].loss_params[2] == "model"
@@ -123,6 +166,7 @@ def update_eval_moser_loss(network, params, eval_moser_loss):
 
 
 def plot_accuracy_fig(*eval_results):
+    """helper function to do a plot containing the losses as a function of the epochs."""
     ROLLING_WINDOW_SIZE = 1
     for eval_result in eval_results:
         results = np.array(eval_result.results)
@@ -151,6 +195,22 @@ def evaluate_moser_rust(
     N_RUNS_MOSER=1,
     SEED=0,
 ):
+    """Function to run MT algorithm in rust and get results. This is used above.
+
+    Args:
+        sat_data (@TODO: specify type): sat_data used as input problem
+        network (@TODO: specify type): network definition
+        params (@TODO: specify type): params of the net
+        data_subset (@TODO: specify type): data_subset used for evaluation
+        representation (SATRepresentation): SATRepresentation used here
+        mode_probabilities (str, optional): either "model" or "uniform" -> "model" means we use the model for the oracle and "uniform" means we use a uniform oracle in the MT algorithm. Defaults to "model".
+        N_STEPS_MOSER (int, optional): number of steps MT algorithm takes. Defaults to 100.
+        N_RUNS_MOSER (int, optional): number of runs MT algorithm takes. Defaults to 1.
+        SEED (int, optional): SEED used in MT algorithm. Defaults to 0.
+
+    Returns:
+        _type_: (np.mean(av_energies), np.mean(av_entropies)) -> mean energies = #violated clauses / #clause after N_STEPS_MOSER and mean entropy of the oracle probabilities
+    """
     av_energies = []
     av_entropies = []
 

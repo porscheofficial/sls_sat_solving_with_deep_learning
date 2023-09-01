@@ -32,15 +32,15 @@ from python.src.train_utils import (
 
 
 def train(
-    batch_size,
-    inv_temp,
-    alpha,
-    beta,
-    gamma,
-    NUM_EPOCHS,
-    N_STEPS_MOSER,
-    N_RUNS_MOSER,
-    path,
+    batch_size: int,
+    inv_temp: float,
+    alpha: float,
+    beta: float,
+    gamma: float,
+    NUM_EPOCHS: int,
+    N_STEPS_MOSER: int,
+    N_RUNS_MOSER: int,
+    data_path,
     graph_representation: SATRepresentation,
     network_type,
     mlp_layers,
@@ -51,12 +51,37 @@ def train(
     initial_learning_rate=0.001,
     final_learning_rate=0.001,
 ):
+    """Function used for training loop
+
+    Args:
+        batch_size (int): batch size that is used
+        inv_temp (float): inverse temperature used in Gibbs Loss
+        alpha (float): prefactor used for Gibbs loss
+        beta (float): prefactor used for LLL loss
+        gamma (float): prefactor used for alternative LLL loss
+        NUM_EPOCHS (int): _description_
+        N_STEPS_MOSER (int): number of steps used in MT algorithm statistics
+        N_RUNS_MOSER (int): number of runs used in MT algorithm statistics
+        path (str): path pointing to training dataset (this is split into train and test set)
+        graph_representation (SATRepresentation): SATRepresentation used. Either LCG or VCG
+        network_type (str): either "interaction" for interaction network or "GCN" for Graph convolutional network (not tested!)
+        mlp_layers (array): size of mlp_layers. For example: [200,200]
+        img_path (bool, optional): path where the plot is saved that contains the loss function plot as a function of the epochs. Defaults to False.
+        model_path (bool, optional): path where the model is saved. Defaults to False.
+        experiment_tracking (bool, optional): decide whether experiment tracking is done using MLflow. Defaults to False.
+        return_candidates (bool, optional): decide whether candidates are used for Gibbs loss or only the solution. Defaults to False.
+        initial_learning_rate (float, optional): initial learning rate that is chosen. Defaults to 0.001.
+        final_learning_rate (float, optional): final learning rate that is chosen. Note that the learning rate decays from the initial learing rate exponentially to the final learning rate over the epochs. Defaults to 0.001.
+
+    Returns:
+        @TODO: type: final params of the net
+    """
     include_constraint_graph = (
         beta + gamma > 0
-    )  # we calculate the constraint graphs only if we use it to calculate the llloss
+    )  # we calculate the constraint graphs only if we use it to calculate the lll loss
 
     sat_data = SATTrainingDataset(
-        path,
+        data_path,
         graph_representation,
         return_candidates=return_candidates,
         include_constraint_graph=include_constraint_graph,
@@ -80,9 +105,7 @@ def train(
     params = network.init(jax.random.PRNGKey(42), sat_data[0][0].graph)
 
     # use a schedule function for the ADAM optimizer
-    tot_steps = int(
-        NUM_EPOCHS * np.ceil(len(train_data) / batch_size)
-    )  # NUM_EPOCHS*(len(train_data)//batch_size) + NUM_EPOCHS
+    tot_steps = int(NUM_EPOCHS * np.ceil(len(train_data) / batch_size))
     decay_rate = final_learning_rate / initial_learning_rate
     exponential_decay_scheduler = optax.exponential_decay(
         init_value=initial_learning_rate,
@@ -129,9 +152,6 @@ def train(
             if beta > 0
             else 0.0
         )
-        # entropy_loss = (
-        #    gamma * rep.entropy_loss(decoded_nodes, mask) if gamma > 0 else 0.0
-        # )
         alt_local_lovasz_loss = (
             gamma
             * rep.alt_local_lovasz_loss(
@@ -175,7 +195,8 @@ def train(
     )
     eval_moser_loss = test_eval_moser_loss + train_eval_moser_loss
     eval_objects_loss = update_eval_objects_loss(params, total_loss, eval_objects_loss)
-    # eval_moser_loss = update_eval_moser_loss(network, params, eval_moser_loss)
+    if N_STEPS_MOSER != 0:
+        eval_moser_loss = update_eval_moser_loss(network, params, eval_moser_loss)
     for epoch in range(NUM_EPOCHS):
         print("epoch " + str(epoch + 1) + " of " + str(NUM_EPOCHS))
         start_time = time.time()
@@ -207,7 +228,8 @@ def train(
         eval_objects_loss = update_eval_objects_loss(
             params, total_loss, eval_objects_loss
         )
-        # eval_moser_loss = update_eval_moser_loss(network, params, eval_moser_loss)
+        if N_STEPS_MOSER != 0:
+            eval_moser_loss = update_eval_moser_loss(network, params, eval_moser_loss)
 
         loss_str = "Epoch {} in {:0.2f} sec".format(epoch + 1, epoch_time) + ";  "
         for eval_result in eval_objects_loss:
@@ -218,14 +240,17 @@ def train(
             )
             if experiment_tracking == True:
                 mlflow.log_metric(eval_result.name, eval_result.results[-1], step=epoch)
-        # for eval_result in eval_moser_loss:
-        #    loss_str = (
-        #        loss_str
-        #        + f"{eval_result.name}: {np.round(eval_result.results[-1],4)}"
-        #        + "; "
-        #    )
-        #    if experiment_tracking == True:
-        #        mlflow.log_metric(eval_result.name, eval_result.results[-1], step=epoch)
+        if N_STEPS_MOSER != 0:
+            for eval_result in eval_moser_loss:
+                loss_str = (
+                    loss_str
+                    + f"{eval_result.name}: {np.round(eval_result.results[-1],4)}"
+                    + "; "
+                )
+                if experiment_tracking == True:
+                    mlflow.log_metric(
+                        eval_result.name, eval_result.results[-1], step=epoch
+                    )
         print(loss_str)
         if epoch == 0:
             t2 = time.time()
@@ -289,11 +314,33 @@ def experiment_tracking_train(
     initial_learning_rate=0.001,
     final_learning_rate=0.001,
 ):
-    match graph_representation:
-        case "LCG":
-            rep = LCG
-        case "VCG":
-            rep = VCG
+    """Training loop that is tracked by MLflow.
+
+    Args:
+        MODEL_REGISTRY (str): path where experiment tracking is saved
+        EXPERIMENT_NAME (str): name of the experiment in MLflow
+
+        batch_size (int): batch size that is used
+        inv_temp (float): inverse temperature used in Gibbs Loss
+        alpha (float): prefactor used for Gibbs loss
+        beta (float): prefactor used for LLL loss
+        gamma (float): prefactor used for alternative LLL loss
+        NUM_EPOCHS (int): _description_
+        N_STEPS_MOSER (int): number of steps used in MT algorithm statistics
+        N_RUNS_MOSER (int): number of runs used in MT algorithm statistics
+        data_path (str): path pointing to training dataset (this is split into train and test set)
+        graph_representation (SATRepresentation): SATRepresentation used. Either LCG or VCG
+        mlp_layers (array): size of mlp_layers. For example: [200,200]
+        network_type (str): either "interaction" for interaction network or "GCN" for Graph convolutional network (not tested!)
+        img_path (bool, optional): path where the plot is saved that contains the loss function plot as a function of the epochs. Defaults to False.
+        return_candidates (bool, optional): decide whether candidates are used for Gibbs loss or only the solution. Defaults to False.
+        initial_learning_rate (float, optional): initial learning rate that is chosen. Defaults to 0.001.
+        final_learning_rate (float, optional): final learning rate that is chosen. Note that the learning rate decays from the initial learing rate exponentially to the final learning rate over the epochs. Defaults to 0.001.
+    """
+    if graph_representation == "LCG":
+        rep = LCG
+    if graph_representation == "VCG":
+        rep = VCG
 
     network_definition = get_network_definition(
         network_type=network_type, graph_representation=rep

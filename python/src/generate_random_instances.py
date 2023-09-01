@@ -9,6 +9,14 @@ from os.path import join
 
 
 def get_cnf_from_file(path):
+    """helper function to get a cnf object from a file
+
+    Args:
+        path (str): path of cnf object you want to load
+
+    Returns:
+        CNF: cnf object that was loaded
+    """
     if path[-2:] == "gz":
         cnf = CNF()
         cnf.from_file(path, compressed_with="gzip")
@@ -18,6 +26,13 @@ def get_cnf_from_file(path):
 
 
 def create_candidates_with_sol(data_dir, sample_size, threshold):
+    """helper function to create candidates from solution -> used for Gibbs Loss
+
+    Args:
+        data_dir (str): path to data directory where you want to create candidates
+        sample_size (int): number of candidates that are created
+        threshold (float): float ranging from 0 to 1. This is the probability that a spin flip is executed on a variable in the solution string
+    """
     solved_instances = glob.glob(join(data_dir, "*_sol.pkl"))
     for g in solved_instances:
         with open(g, "rb") as f:
@@ -40,6 +55,16 @@ def create_candidates_with_sol(data_dir, sample_size, threshold):
 
 
 def sample_candidates(original, sample_size, threshold):
+    """helper function to execute the sampling of one candidate
+
+    Args:
+        original: original solution string that is modified in this function
+        sample_size: number of candidates that are created
+        threshold: float ranging from 0 to 1. This is the probability that a spin flip is executed on a variable in the solution string
+
+    Returns:
+        np.array: returns a matrix containing a set of candidates and the solution itself
+    """
     np.random.seed(sum(original))
     condition = np.random.random((sample_size, original.shape[0])) < threshold
     return np.where(condition, np.invert(original), original)
@@ -241,35 +266,3 @@ def generate_dataset_VanDerWaerden(
                         path + "VanDerWaerden" + params + index,
                         TIMEOUT=TIMEOUT,
                     )
-
-
-"""
-path = "/Users/p403830/Library/CloudStorage/OneDrive-PorscheDigitalGmbH/programming/generateSAT/samples_n300/"
-
-k = 3
-alpha_3 = 4.17 * 1
-num_samples = 30
-n_list = [300]
-vary_percent = 0.05
-generate_dataset_random_KCNF(
-    n_list, alpha_3, num_samples, path, vary_percent=vary_percent, TIMEOUT=100
-)
-
-s_list = [10]
-k_list = [5]
-N_list = [12]
-num_samples = 1
-
-generate_dataset_Ramsey(s_list, k_list, N_list, num_samples, path, TIMEOUT = 100)
-
-N_list = [5]
-k1_list = [3]
-k2_list = [2]
-num_samples = 1
-generate_dataset_VanDerWaerden(N_list, k1_list, k2_list, num_samples, path, TIMEOUT = 100)
-
-
-sample_size = 10
-threshold = 0.03
-create_candidates_with_sol(path, sample_size, threshold)
-"""

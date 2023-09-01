@@ -15,12 +15,13 @@ import numpy as np
 import pickle
 import jax.numpy as jnp
 from func_timeout import func_timeout, FunctionTimedOut
+from jraph._src import utils
 from jax import vmap
 from pysat.formula import CNF
 from torch.utils import data
 
 from python.src.sat_instances import SATProblem, SATRepresentation
-from python.src.sat_representations import SATRepresentation
+from python.src.sat_representations import SATRepresentation, LCG, VCG
 from python.src.sat_instances import get_problem_from_cnf
 
 MAX_TIME = 20
@@ -99,7 +100,7 @@ class SATTrainingDataset(data.Dataset):
             if type(solution_dict) == dict:
                 print("dict", solution_dict)
                 solution_dict = [x for (_, x) in solution_dict.items()]
-            if type(solution_dict) == list or np.array:
+            if type(solution_dict) == (list or np.array):
                 if 2 in solution_dict or -2 in solution_dict:
                     solution_dict = np.array(solution_dict, dtype=float)
                     solution_dict = [int(np.sign(x) + 1) / 2 for x in solution_dict]
@@ -127,6 +128,28 @@ class SATTrainingDataset(data.Dataset):
 
 
 def collate_fn(batch):
+    """This function does batching. See description below what you input. It returns the batched data items as indicated below.
+
+    Args:
+        batch (_type_): batch consisting of (problems,tuples) = zip(*batch). Then (candidates, energies) = zip(*tuples) and masks, graphs, constraint_graphs, constraint_mask = zip(
+        *((p.mask, p.graph, p.constraint_graph, p.constraint_mask) for p in problems)
+    )
+
+    Raises:
+        ValueError: either all items must have a constraint graph or none of them. If this is not the case, a value error is raised.
+
+    Returns:
+        tuple: returns the following
+                (
+                    batched_masks,
+                    batched_graphs,
+                    batched_constraint_graphs,
+                    batched_constraint_masks,
+                ), (
+                    batched_candidates,
+                    batched_energies,
+                )
+    """
     problems, tuples = zip(*batch)
     candidates, energies = zip(*tuples)
     masks, graphs, constraint_graphs, constraint_mask = zip(
@@ -193,17 +216,30 @@ class JraphDataLoader(data.DataLoader):
 def number_of_violated_constraints(
     problem: SATProblem, assignment, representation: SATRepresentation
 ):
+    """helper function to get the number of violated constraints for a SATProblem and an assignment for a given SATRepresentation
+
+    Args:
+        problem (SATProblem): SAT problem we want to look at
+        assignment (array): current assignment of variables we want to check for
+        representation (SATRepresentation): SATRepresentation -> either LCG or VCG
+
+    Returns:
+        int: number of violated constraints by current assignment for the problem at hand
+    """
     match representation:
-        case SATRepresentation.VCG:
+        case VCG:
             return number_of_violated_constraints_VCG(problem, assignment)
-        case SATRepresentation.LCG:
+        case LCG:
             return number_of_violated_constraints_LCG(problem, assignment)
 
 
 def number_of_violated_constraints_VCG(problem: SATProblem, assignment):
     # currently not implemented
     pass
-    return np.sum(violated_constraints(problem, assignment).astype(int), axis=0)
+    return np.sum(
+        SATRepresentation.VCG.violated_constraints(problem, assignment).astype(int),
+        axis=0,
+    )
 
 
 @partial(jax.jit, static_argnames=("problem",))
@@ -267,12 +303,28 @@ def create_solutions(path, time_limit, suffix, open_util):
                     print(f"written solution for {root}")
 
 
-def create_candidates(data_dir, sample_size, threshold):
+def create_candidates(data_dir, sample_size: int, threshold):
+    """helper function to create candidates from solution -> used for Gibbs Loss
+
+    Args:
+        data_dir (str): path to data directory where you want to create candidates
+        sample_size (int): number of candidates that are created
+        threshold (float): float ranging from 0 to 1. This is the probability that a spin flip is executed on a variable in the solution string
+    """
     solved_instances = glob.glob(join(data_dir, "*_sol.pkl"))
     for g in solved_instances:
         with open(g, "rb") as f:
             p = pickle.load(f)
-        n = np.array(list(p.values()), dtype=bool)
+        if type(p) == dict:
+            print("dict", p)
+            p = [x for (_, x) in p.items()]
+        if type(p) == list or type(p) == np.array:
+            if 2 in p or -2 in p:
+                p = np.array(p, dtype=float)
+                p = [int(np.sign(x) + 1) / 2 for x in p]
+        print(p)
+        n = np.array(p, dtype=bool)
+        print(n)
         samples = sample_candidates(n, sample_size - 1, threshold)
         samples = np.concatenate((np.reshape(n, (1, len(n))), samples), axis=0)
         name = g.split("_sol.pkl")[0]
@@ -281,6 +333,16 @@ def create_candidates(data_dir, sample_size, threshold):
 
 
 def sample_candidates(original, sample_size, threshold):
+    """helper function to execute the sampling of one candidate
+
+    Args:
+        original: original solution string that is modified in this function
+        sample_size: number of candidates that are created
+        threshold: float ranging from 0 to 1. This is the probability that a spin flip is executed on a variable in the solution string
+
+    Returns:
+        np.array: returns a matrix containing a set of candidates and the solution itself
+    """
     np.random.seed(sum(original))
     condition = np.random.random((sample_size, original.shape[0])) < threshold
     return np.where(condition, np.invert(original), original)
