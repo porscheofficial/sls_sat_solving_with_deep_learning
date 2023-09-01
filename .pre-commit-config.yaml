@@ -18,7 +18,9 @@ repos:
 #  - repo: https://github.com/PyCQA/pydocstyle
 #    rev: 6.3.0
 #    hooks:
-#      - id: pydocstyle
+#        - id: pydocstyle
+#          args:
+#          - --ignore=D104
 
 #  - repo: https://github.com/pre-commit/mirrors-pylint
 #    rev: v3.0.0a3
