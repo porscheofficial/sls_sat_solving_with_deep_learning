@@ -148,8 +148,7 @@ def load_model_and_test(
                     (0, N_STEPS - len(single_traj_median[0])),
                 )
             )
-    if type(total_steps) == list:
-        total_steps = np.asarray(total_steps)
+    total_steps_array = np.asarray(total_steps)
 
     if energies_array_mean != []:
         energies_array_mean = np.mean(energies_array_mean, axis=0)
@@ -161,7 +160,7 @@ def load_model_and_test(
         alpha_array,
         energies_array_mean,
         energies_array_median,
-        total_steps,
+        total_steps_array,
     ]
     if path_save:
         np.save(path_save, np.array(total_array, dtype=object))
@@ -333,8 +332,7 @@ def load_model_and_test_two_models(
                     (0, N_STEPS - len(single_traj_median[0])),
                 )
             )
-    if type(total_steps) == list:
-        total_steps = np.asarray(total_steps)
+    total_steps_array = np.asarray(total_steps)
     if energies_array_mean != []:
         energies_array_mean = np.mean(energies_array_mean, axis=0)
         energies_array_median = np.mean(energies_array_median, axis=0)
@@ -345,7 +343,7 @@ def load_model_and_test_two_models(
         alpha_array,
         energies_array_mean,
         energies_array_median,
-        total_steps,
+        total_steps_array,
     ]
     if path_save:
         np.save(path_save, np.array(total_array, dtype=object))
