@@ -1,3 +1,4 @@
+"""Definition of SATRepresentations and the corresponding helper functions. Namely, this is done for LCG and VCG representation."""
 from abc import ABC, abstractmethod
 import numpy as np
 import jax.numpy as jnp
@@ -18,7 +19,7 @@ class SATRepresentation(ABC):
     @staticmethod
     @abstractmethod
     def get_graph(n, m, clauses, clause_lengths):
-        """Returns the graph items: nodes, senders, receivers, edges, n_node, n_edge for input n = number of variables, m = number of clauses, clauses = clauses to embedd in the graph, clause_length = containing length of clauses.
+        """Return the graph items: nodes, senders, receivers, edges, n_node, n_edge for input n = number of variables, m = number of clauses, clauses = clauses to embedd in the graph, clause_length = containing length of clauses.
 
         Args:
             n (int): number of variables
@@ -31,7 +32,7 @@ class SATRepresentation(ABC):
     @staticmethod
     @abstractmethod
     def get_constraint_graph(n, m, senders, receivers) -> jraph.GraphsTuple:
-        """computes the constraint graph from n = number of variables, m = number of clauses and senders, receivers from the graph (encoding variable occurence in clauses). This constraint graph has edges between clauses whenever they share variables. This is used for the Lovasz Local Lemma Loss.
+        """Compute the constraint graph from n = number of variables, m = number of clauses and senders, receivers from the graph (encoding variable occurence in clauses). This constraint graph has edges between clauses whenever they share variables. This is used for the Lovasz Local Lemma Loss.
 
         Args:
             n (int): number of variables
@@ -61,7 +62,7 @@ class SATRepresentation(ABC):
     @staticmethod
     @abstractmethod
     def get_mask(n, n_node):
-        """returns mask encoding which nodes are variable nodes ("1" for nodes that are variable nodes and "0" for nodes that are not variable nodes (i.e. padding nodes or constraint nodes))
+        """Return mask encoding which nodes are variable nodes ("1" for nodes that are variable nodes and "0" for nodes that are not variable nodes (i.e. padding nodes or constraint nodes)).
 
         Args:
             n (int): number of variables
@@ -75,7 +76,7 @@ class SATRepresentation(ABC):
     @staticmethod
     @abstractmethod
     def get_n_nodes(cnf: CNF):
-        """returns number of nodes for the input cnf formula
+        """Return number of nodes for the input cnf formula.
 
         Args:
             cnf (CNF): input cnf formula
@@ -88,7 +89,7 @@ class SATRepresentation(ABC):
     @staticmethod
     @abstractmethod
     def get_n_edges(cnf: CNF):
-        """returns number of edges
+        """Return number of edges.
 
         Args:
             cnf (CNF): input cnf formula
@@ -101,7 +102,7 @@ class SATRepresentation(ABC):
     @staticmethod
     @abstractmethod
     def get_padded_candidate(solution_dict, n_nodes):
-        """padding of the candidates is done here: we pad the solution (containing n = number of variables elements on one axis and c = number of candidates on the other axis) and pad it on the number of nodes n_nodes in the graph with zeros.
+        """Pad the candidates: we pad the solution (containing n = number of variables elements on one axis and c = number of candidates on the other axis) and pad it on the number of nodes n_nodes in the graph with zeros.
 
         Args:
             solution_dict (list/array): solution string of the given graph
@@ -115,26 +116,28 @@ class SATRepresentation(ABC):
     @staticmethod
     @abstractmethod
     def get_model_probabilities(decoded_nodes, n):
-        """
-        Helper method that returns, for each, problem variable, the Bernoulli parameter of the model for this variable.
+        """Return, for each, problem variable, the Bernoulli parameter of the model for this variable.
+
         That is, the ith value of the returned array is the probability with which the model will assign 1 to the
-        ith variable.
-
-        The reasoning for choosing the first, rather than the zeroth, column of the model output below is as follows:
-
-        - When evaluating the loss function, candidates are one-hot encoded, which means that when a satisfying assignment
+        ith variable. The reasoning for choosing the first, rather than the zeroth, column of the model output below is as follows: When evaluating the loss function, candidates are one-hot encoded, which means that when a satisfying assignment
         for a problem sets variable i to 1, then this will increase the likelihood that the model will set this variable to
         1, meaning, all else being equal, a larger Bernoulli weight in element [i,1] of the model output. As a result the
         right column of the softmax of the model output equals the models likelihood for setting variables to 1, which is
         what we seek.
+
+        Args:
+            decoded_nodes (array): decoded nodes output of the model which is two-dimensional for VCG.
+            n (int): number of variables
+
+        Returns:
+            array: probability vector encoding probability for every variable to sample a one according to the Neural Network oracle.
         """
         pass
 
     @staticmethod
     @abstractmethod
     def prediction_loss(decoded_nodes, mask, candidates, energies, inv_temp: float):
-        """Loss term inspired by https://arxiv.org/abs/2012.13349. Returns the Gibbs-Loss.
-
+        """Return loss term inspired by https://arxiv.org/abs/2012.13349. Returns the Gibbs-Loss.
 
         Args:
             decoded_nodes (array): GNN output for all the nodes
@@ -153,7 +156,7 @@ class SATRepresentation(ABC):
     def local_lovasz_loss(
         decoded_nodes, mask, graph, constraint_graph, constraint_mask
     ):
-        """Local Lovasz Lemma term inspired by the famous Local Lovasz Lemma (see https://arxiv.org/abs/0903.0544) -> expression zero means that Moser's algorithm will return solution efficiently.
+        """Return Local Lovasz Lemma term inspired by the famous Local Lovasz Lemma (see https://arxiv.org/abs/0903.0544) -> expression zero means that Moser's algorithm will return solution efficiently.
 
         Args:
             decoded_nodes (array): GNN output for all the nodes
@@ -175,7 +178,7 @@ class SATRepresentation(ABC):
     def alt_local_lovasz_loss(
         decoded_nodes, mask, graph, constraint_graph, constraint_mask
     ):
-        """Local Lovasz Lemma term inspired by the famous Local Lovasz Lemma (see https://arxiv.org/abs/0903.0544) -> expression zero means that Moser's algorithm will return solution efficiently. We use here a slightly modiefied version of the Lemma. Please have a look at our paper for the details.
+        """Return Local Lovasz Lemma term inspired by the famous Local Lovasz Lemma (see https://arxiv.org/abs/0903.0544) -> expression zero means that Moser's algorithm will return solution efficiently. We use here a slightly modiefied version of the Lemma. Please have a look at our paper for the details.
 
         Args:
             decoded_nodes (array): GNN output for all the nodes
@@ -195,7 +198,7 @@ class SATRepresentation(ABC):
     @staticmethod
     @abstractmethod
     def entropy_loss(decoded_nodes, mask):
-        """Entropy loss term making sure that oracle does not get too deterministic
+        """Return entropy loss term making sure that oracle does not get too deterministic.
 
         Args:
             decoded_nodes (array): GNN output for all the nodes
@@ -208,10 +211,12 @@ class SATRepresentation(ABC):
 
 
 class VCG(SATRepresentation):
+    """class for VCG encoding."""
+
     @staticmethod
     @abstractmethod
     def get_n_nodes(cnf: CNF):
-        """returns number of nodes for the input cnf formula
+        """Return number of nodes for the input cnf formula.
 
         Args:
             cnf (CNF): input cnf formula
@@ -226,7 +231,7 @@ class VCG(SATRepresentation):
     @staticmethod
     @abstractmethod
     def get_n_edges(cnf: CNF):
-        """returns number of edges
+        """Return number of edges.
 
         Args:
             cnf (CNF): input cnf formula
@@ -239,7 +244,7 @@ class VCG(SATRepresentation):
     @staticmethod
     @abstractmethod
     def get_padded_candidate(solution_dict, n_nodes):
-        """padding of the candidates is done here: we pad the solution (containing n = number of variables elements on one axis and c = number of candidates on the other axis) and pad it on the number of nodes n_nodes in the graph with zeros.
+        """Pad the candidates here: we pad the solution (containing n = number of variables elements on one axis and c = number of candidates on the other axis) and pad it on the number of nodes n_nodes in the graph with zeros.
 
         Args:
             solution_dict (list/array): solution string of the given graph
@@ -258,7 +263,7 @@ class VCG(SATRepresentation):
 
     @staticmethod
     def get_graph(n, m, clauses, clause_lengths):
-        """Returns the graph items: nodes, senders, receivers, edges, n_node, n_edge for input n = number of variables, m = number of clauses, clauses = clauses to embedd in the graph, clause_length = containing length of clauses.
+        """Return the graph items: nodes, senders, receivers, edges, n_node, n_edge for input n = number of variables, m = number of clauses, clauses = clauses to embedd in the graph, clause_length = containing length of clauses.
 
         Args:
             n (int): number of variables
@@ -274,7 +279,6 @@ class VCG(SATRepresentation):
             n_node (int): number of nodes in the graph
             n_edge (int): number of edges in the graph
         """
-
         n_node = n + m
         n_edge = sum(clause_lengths)
 
@@ -298,7 +302,7 @@ class VCG(SATRepresentation):
 
     @staticmethod
     def get_constraint_graph(n, m, senders, receivers) -> jraph.GraphsTuple:
-        """computes the constraint graph from n = number of variables, m = number of clauses and senders, receivers from the graph (encoding variable occurence in clauses). This constraint graph has edges between clauses whenever they share variables. This is used for the Lovasz Local Lemma Loss.
+        """Compute the constraint graph from n = number of variables, m = number of clauses and senders, receivers from the graph (encoding variable occurence in clauses). This constraint graph has edges between clauses whenever they share variables. This is used for the Lovasz Local Lemma Loss.
 
         Args:
             n (int): number of variables
@@ -367,7 +371,7 @@ class VCG(SATRepresentation):
 
     @staticmethod
     def get_mask(n, n_node):
-        """returns mask encoding which nodes are variable nodes ("1" for nodes that are variable nodes and "0" for nodes that are not variable nodes (i.e. padding nodes or constraint nodes))
+        """Return mask encoding which nodes are variable nodes ("1" for nodes that are variable nodes and "0" for nodes that are not variable nodes (i.e. padding nodes or constraint nodes)).
 
         Args:
             n (int): number of variables
@@ -380,13 +384,11 @@ class VCG(SATRepresentation):
 
     @staticmethod
     def get_model_probabilities(decoded_nodes, n):
-        """Helper method that returns, for each, problem variable, the Bernoulli parameter of the model for this variable.
+        """Return, for each, problem variable, the Bernoulli parameter of the model for this variable.
+
         That is, the ith value of the returned array is the probability with which the model will assign 1 to the
-        ith variable.
-
-        The reasoning for choosing the first, rather than the zeroth, column of the model output below is as follows:
-
-        - When evaluating the loss function, candidates are one-hot encoded, which means that when a satisfying assignment
+        ith variable. The reasoning for choosing the first, rather than the zeroth, column of the model output below is as follows:
+        When evaluating the loss function, candidates are one-hot encoded, which means that when a satisfying assignment
         for a problem sets variable i to 1, then this will increase the likelihood that the model will set this variable to
         1, meaning, all else being equal, a larger Bernoulli weight in element [i,1] of the model output. As a result the
         right column of the softmax of the model output equals the models likelihood for setting variables to 1, which is
@@ -403,8 +405,7 @@ class VCG(SATRepresentation):
 
     @staticmethod
     def prediction_loss(decoded_nodes, mask, candidates, energies, inv_temp: float):
-        """Loss term inspired by https://arxiv.org/abs/2012.13349. Returns the Gibbs-Loss.
-
+        """Return Loss term inspired by https://arxiv.org/abs/2012.13349 -> Returns the Gibbs-Loss.
 
         Args:
             decoded_nodes (array): GNN output for all the nodes
@@ -429,7 +430,7 @@ class VCG(SATRepresentation):
 
     @staticmethod
     def entropy_loss(decoded_nodes, mask):
-        """Entropy loss term making sure that oracle does not get too deterministic
+        """Return Entropy loss term making sure that oracle does not get too deterministic.
 
         Args:
             decoded_nodes (array): GNN output for all the nodes
@@ -448,7 +449,7 @@ class VCG(SATRepresentation):
     def local_lovasz_loss(
         decoded_nodes, mask, graph, constraint_graph, constraint_mask
     ):
-        """Local Lovasz Lemma term inspired by the famous Local Lovasz Lemma (see https://arxiv.org/abs/0903.0544)-> expression zero means that Moser's algorithm will return solution efficiently.
+        """Return Local Lovasz Lemma term inspired by the famous Local Lovasz Lemma (see https://arxiv.org/abs/0903.0544)-> expression zero means that Moser's algorithm will return solution efficiently.
 
         Args:
             decoded_nodes (array): GNN output for all the nodes
@@ -495,7 +496,7 @@ class VCG(SATRepresentation):
     def alt_local_lovasz_loss(
         decoded_nodes, mask, graph, constraint_graph, constraint_mask
     ):
-        """Local Lovasz Lemma term inspired by the famous Local Lovasz Lemma (see https://arxiv.org/abs/0903.0544) -> expression zero means that Moser's algorithm will return solution efficiently. We use here a slightly modiefied version of the Lemma. Please have a look at our paper for the details.
+        """Return Local Lovasz Lemma term inspired by the famous Local Lovasz Lemma (see https://arxiv.org/abs/0903.0544) -> expression zero means that Moser's algorithm will return solution efficiently. We use here a slightly modiefied version of the Lemma. Please have a look at our paper for the details.
 
         Args:
             decoded_nodes (array): GNN output for all the nodes
@@ -546,10 +547,12 @@ class VCG(SATRepresentation):
 
 
 class LCG(SATRepresentation):
+    """class of LCG representation."""
+
     @staticmethod
     @abstractmethod
     def get_n_nodes(cnf: CNF):
-        """returns number of nodes for the input cnf formula
+        """Return number of nodes for the input cnf formula.
 
         Args:
             cnf (CNF): input cnf formula
@@ -564,7 +567,9 @@ class LCG(SATRepresentation):
     @staticmethod
     @abstractmethod
     def get_n_edges(cnf: CNF):
-        """Returns number of edges. In LCG, there is one edge for each literal in each clause, plus one
+        """Return number of edges.
+
+        In LCG, there is one edge for each literal in each clause, plus one
         edge for each variable that connects the positive and negative literal
         node.
 
@@ -579,7 +584,7 @@ class LCG(SATRepresentation):
     @staticmethod
     @abstractmethod
     def get_padded_candidate(solution_dict, n_nodes):
-        """padding of the candidates is done here: we pad the solution (containing n = number of variables elements on one axis and c = number of candidates on the other axis) and pad it on the number of nodes n_nodes in the graph with zeros.
+        """Pad the candidates here: we pad the solution (containing n = number of variables elements on one axis and c = number of candidates on the other axis) and pad it on the number of nodes n_nodes in the graph with zeros.
 
         Args:
             solution_dict (list/array): solution string of the given graph
@@ -598,7 +603,7 @@ class LCG(SATRepresentation):
 
     @staticmethod
     def get_graph(n, m, clauses, clause_lengths):
-        """Returns the graph items: nodes, senders, receivers, edges, n_node, n_edge for input n = number of variables, m = number of clauses, clauses = clauses to embedd in the graph, clause_length = containing length of clauses.
+        """Return the graph items: nodes, senders, receivers, edges, n_node, n_edge for input n = number of variables, m = number of clauses, clauses = clauses to embedd in the graph, clause_length = containing length of clauses.
 
         Args:
             n (int): number of variables
@@ -659,7 +664,7 @@ class LCG(SATRepresentation):
 
     @staticmethod
     def get_constraint_graph(n, m, senders, receivers):
-        """computes the constraint graph from n = number of variables, m = number of clauses and senders, receivers from the graph (encoding variable occurence in clauses). This constraint graph has edges between clauses whenever they share variables. This is used for the Lovasz Local Lemma Loss.
+        """Compute the constraint graph from n = number of variables, m = number of clauses and senders, receivers from the graph (encoding variable occurence in clauses). This constraint graph has edges between clauses whenever they share variables. This is used for the Lovasz Local Lemma Loss.
 
         Args:
             n (int): number of variables
@@ -737,7 +742,7 @@ class LCG(SATRepresentation):
 
     @staticmethod
     def get_mask(n, n_node):
-        """returns mask encoding which nodes are variable nodes ("1" for nodes that are variable nodes and "0" for nodes that are not variable nodes (i.e. padding nodes or constraint nodes))
+        """Return mask encoding which nodes are variable nodes ("1" for nodes that are variable nodes and "0" for nodes that are not variable nodes (i.e. padding nodes or constraint nodes)).
 
         Args:
             n (int): number of variables
@@ -750,19 +755,15 @@ class LCG(SATRepresentation):
 
     @staticmethod
     def get_model_probabilities(decoded_nodes, n):
-        """Helper method that returns, for each, problem variable, the Bernoulli parameter of the model for this variable.
+        """Return, for each, problem variable, the Bernoulli parameter of the model for this variable.
+
         That is, the ith value of the returned array is the probability with which the model will assign 1 to the
-        ith variable.
-
-        The reasoning for choosing the first, rather than the zeroth, column of the model output below is as follows:
-
-        - When evaluating the loss function, candidates are one-hot encoded, which means that when a satisfying assignment
+        ith variable. The reasoning for choosing the first, rather than the zeroth, column of the model output below is as follows:
+        When evaluating the loss function, candidates are one-hot encoded, which means that when a satisfying assignment
         for a problem sets variable i to 1, then this will increase the likelihood that the model will set this variable to
         1, meaning, all else being equal, a larger Bernoulli weight in element [i,1] of the model output. As a result the
         right column of the softmax of the model output equals the models likelihood for setting variables to 1, which is
-        what we seek.
-
-        In LCG this is a bit more complicated for LCG compared to VCG since every literal has one node and we first need to concatenate the output for the positive and negative node to take the softmax then.
+        what we seek. In LCG this is a bit more complicated for LCG compared to VCG since every literal has one node and we first need to concatenate the output for the positive and negative node to take the softmax then.
 
         Args:
             decoded_nodes (array): decoded nodes output of the model which is one-dimensional for LCG.
@@ -780,8 +781,7 @@ class LCG(SATRepresentation):
 
     @staticmethod
     def prediction_loss(decoded_nodes, mask, candidates, energies, inv_temp: float):
-        """Loss term inspired by https://arxiv.org/abs/2012.13349. Returns the Gibbs-Loss.
-
+        """Return Loss term inspired by https://arxiv.org/abs/2012.13349 -> Returns the Gibbs-Loss.
 
         Args:
             decoded_nodes (array): GNN output for all the nodes
@@ -809,7 +809,7 @@ class LCG(SATRepresentation):
 
     @staticmethod
     def entropy_loss(decoded_nodes, mask):
-        """Entropy loss term making sure that oracle does not get too deterministic
+        """Return Entropy loss term making sure that oracle does not get too deterministic.
 
         Args:
             decoded_nodes (array): GNN output for all the nodes
@@ -829,7 +829,7 @@ class LCG(SATRepresentation):
     def local_lovasz_loss(
         decoded_nodes, mask, graph, constraint_graph, constraint_mask
     ):
-        """Local Lovasz Lemma term inspired by the famous Local Lovasz Lemma (see https://arxiv.org/abs/0903.0544) -> expression zero means that Moser's algorithm will return solution efficiently. Again, it is a bit more complicated for the LCG case since each literal has a node and to get the probability (or the log of it to be precise) for the variable nodes. We concatenate those (positive and negative literal) and then take the softmax. We take the sigmoid of decoded nodes of the constraint nodes for the x(c_i) assignment used for the Lovasz Local Lemma Theorem.
+        """Return Local Lovasz Lemma term inspired by the famous Local Lovasz Lemma (see https://arxiv.org/abs/0903.0544) -> expression zero means that Moser's algorithm will return solution efficiently. Again, it is a bit more complicated for the LCG case since each literal has a node and to get the probability (or the log of it to be precise) for the variable nodes. We concatenate those (positive and negative literal) and then take the softmax. We take the sigmoid of decoded nodes of the constraint nodes for the x(c_i) assignment used for the Lovasz Local Lemma Theorem.
 
         Args:
             decoded_nodes (array): GNN output for all the nodes
@@ -879,7 +879,7 @@ class LCG(SATRepresentation):
     def alt_local_lovasz_loss(
         decoded_nodes, mask, graph, constraint_graph, constraint_mask
     ):
-        """Local Lovasz Lemma term inspired by the famous Local Lovasz Lemma (see https://arxiv.org/abs/0903.0544) -> expression zero means that Moser's algorithm will return solution efficiently. We use here a slightly modiefied version of the Lemma. Please have a look at our paper for the details.
+        """Return Local Lovasz Lemma term inspired by the famous Local Lovasz Lemma (see https://arxiv.org/abs/0903.0544) -> expression zero means that Moser's algorithm will return solution efficiently. We use here a slightly modiefied version of the Lemma. Please have a look at our paper for the details.
 
         Args:
             decoded_nodes (array): GNN output for all the nodes
@@ -949,7 +949,7 @@ vmap_one_hot = jax.vmap(one_hot, in_axes=(0, None), out_axes=0)
 
 
 def compute_log_probs(decoded_nodes, mask, candidate):
-    """helper function for computing the logarithm of probabilities from decoded nodes
+    """Compute the logarithm of probabilities from decoded nodes.
 
     Args:
         decoded_nodes (array): GNN output for all the nodes

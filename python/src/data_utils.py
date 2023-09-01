@@ -1,7 +1,6 @@
 import sys
 
 sys.path.append("../../")
-
 from collections import namedtuple
 from os.path import join, exists, basename
 from os import mkdir
@@ -30,6 +29,8 @@ SATInstanceMeta = namedtuple("SATInstanceMeta", ("name", "n", "m"))
 
 
 class SATTrainingDataset(data.Dataset):
+    """SAT training dataset class"""
+
     def __init__(
         self,
         data_dir,
@@ -105,16 +106,6 @@ class SATTrainingDataset(data.Dataset):
                     solution_dict = np.array(solution_dict, dtype=float)
                     solution_dict = [int(np.sign(x) + 1) / 2 for x in solution_dict]
             candidates = np.array([solution_dict])
-            # with open(target_name, "rb") as f:
-            #    solution_dict = pickle.load(f)
-            #    if type(solution_dict) == dict:
-            #        candidates = np.array(
-            #            list(solution_dict.values()), dtype=int
-            #        ).reshape(
-            #            1, -1
-            #        )  # (1, n_node)
-            #    else:
-            #        candidates = np.array([solution_dict])
 
         padded_candidates = self.representation.get_padded_candidate(
             candidates, self.max_n_node
@@ -185,6 +176,8 @@ def collate_fn(batch):
 
 
 class JraphDataLoader(data.DataLoader):
+    """Jraph data loader definition"""
+
     def __init__(
         self,
         dataset,
@@ -216,7 +209,7 @@ class JraphDataLoader(data.DataLoader):
 def number_of_violated_constraints(
     problem: SATProblem, assignment, representation: SATRepresentation
 ):
-    """helper function to get the number of violated constraints for a SATProblem and an assignment for a given SATRepresentation
+    """Get the number of violated constraints for a SATProblem and an assignment for a given SATRepresentation
 
     Args:
         problem (SATProblem): SAT problem we want to look at
@@ -234,6 +227,7 @@ def number_of_violated_constraints(
 
 
 def number_of_violated_constraints_VCG(problem: SATProblem, assignment):
+    """Get number of violated constraints by current assignment for VCG representation"""
     # currently not implemented
     pass
     return np.sum(
@@ -244,6 +238,8 @@ def number_of_violated_constraints_VCG(problem: SATProblem, assignment):
 
 @partial(jax.jit, static_argnames=("problem",))
 def number_of_violated_constraints_LCG(problem: SATProblem, assignment):
+    """Get number of violated constraints by current assignment for LCG representation"""
+
     def one_hot(x, k, dtype=jnp.float32):
         """Create a one-hot encoding of x of size k."""
         return jnp.array(x[:, None] == jnp.arange(k), dtype)
@@ -264,6 +260,7 @@ def number_of_violated_constraints_LCG(problem: SATProblem, assignment):
 
 
 def timed_solve(max_time, p):
+    """Try to solve an instance within some time using kissat solver."""
     try:
         return func_timeout(max_time, nnf.kissat.solve, args=(p,))
     except FunctionTimedOut:
@@ -272,14 +269,17 @@ def timed_solve(max_time, p):
 
 
 def create_solutions_from_cnf(path, time_limit=MAX_TIME):
+    """Create solutions from *.cnf files."""
     return create_solutions(path, time_limit, suffix="*.cnf", open_util=open)
 
 
 def create_solutions_from_gzip(path, time_limit=MAX_TIME):
+    """Create solutions from *.cnf.gz files."""
     return create_solutions(path, time_limit, suffix="*.cnf.gz", open_util=gzip.open)
 
 
 def create_solutions(path, time_limit, suffix, open_util):
+    """Create solutions."""
     regex = join(path, suffix)
     for f in glob.glob(regex):
         print(f"processing {f}")
@@ -304,7 +304,7 @@ def create_solutions(path, time_limit, suffix, open_util):
 
 
 def create_candidates(data_dir, sample_size: int, threshold):
-    """helper function to create candidates from solution -> used for Gibbs Loss
+    """Create candidates from solution -> used for Gibbs Loss.
 
     Args:
         data_dir (str): path to data directory where you want to create candidates
@@ -333,7 +333,7 @@ def create_candidates(data_dir, sample_size: int, threshold):
 
 
 def sample_candidates(original, sample_size, threshold):
-    """helper function to execute the sampling of one candidate
+    """Execute the sampling of one candidate.
 
     Args:
         original: original solution string that is modified in this function

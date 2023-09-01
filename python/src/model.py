@@ -1,3 +1,4 @@
+"""Definition of Graph Neural Network (GNN) models."""
 import haiku as hk
 import jax
 import jraph
@@ -8,6 +9,7 @@ from typing import Any
 
 
 def get_embedding(graph: jraph.GraphsTuple):
+    """Get embedded graph."""
     embedding = jraph.GraphMapFeatures(
         embed_edge_fn=jax.vmap(hk.Linear(output_size=32)),
         embed_node_fn=jax.vmap(hk.Linear(output_size=32)),
@@ -21,7 +23,7 @@ def apply_interaction(
     graph: jraph.GraphsTuple,
     num_message_passing_steps: int = 5,
 ):
-    """helper function to apply an interaction net on a graph
+    """Apply an interaction net on a graph.
 
     Args:
         mlp_layers (list[int]): mlp_layer dimensions
@@ -55,7 +57,7 @@ def apply_interaction(
 def apply_convolution(
     mlp_layers: list[int], graph: jraph.GraphsTuple, num_message_passing_steps: int = 5
 ):
-    """helper function to apply a convolution net on a graph
+    """Apply a convolution net on a graph.
 
     Args:
         mlp_layers (list[int]): mlp_layer dimensions
@@ -95,7 +97,8 @@ def apply_convolution(
 def network_definition_interaction_VCG(
     graph: jraph.GraphsTuple, mlp_layers: list[int], num_message_passing_steps: int = 5
 ) -> jraph.ArrayTree:
-    """Defines a graph neural network.
+    """Define a graph neural network for interaction net and VCG.
+
     Args:
       graph: Graphstuple the network processes.
       num_message_passing_steps: number of message passing steps = number of layers.
@@ -112,7 +115,8 @@ def network_definition_interaction_LCG(
     mlp_layers: list[int],
     num_message_passing_steps: int = 5,
 ) -> jraph.ArrayTree:
-    """Defines a graph neural network.
+    """Define a graph neural network for interaction net and LCG.
+
     Args:
       graph: Graphstuple the network processes.
       num_message_passing_steps: number of message passing steps = number of layers.
@@ -127,7 +131,8 @@ def network_definition_interaction_LCG(
 def network_definition_convolution_VCG(
     graph: jraph.GraphsTuple, mlp_layers: list[int], num_message_passing_steps: int = 5
 ) -> jraph.ArrayTree:
-    """Defines a graph neural network.
+    """Define a graph neural network for GCN and LCG.
+
     Args:
       graph: Graphstuple the network processes.
       num_message_passing_steps: number of message passing steps = number of layers.
@@ -142,7 +147,8 @@ def network_definition_convolution_VCG(
 def network_definition_convolution_LCG(
     graph: jraph.GraphsTuple, mlp_layers: list[int], num_message_passing_steps: int = 5
 ) -> jraph.ArrayTree:
-    """Defines a graph neural network.
+    """Define a graph neural network for GCN and LCG.
+
     Args:
       graph: Graphstuple the network processes.
       num_message_passing_steps: number of message passing steps = number of layers.
@@ -155,7 +161,7 @@ def network_definition_convolution_LCG(
 
 
 def get_network_definition(network_type, graph_representation):
-    """helper function to get proper network definition from (network_type, graph_representation).
+    """Get proper network definition from (network_type, graph_representation).
 
     Args:
         network_type (str): either "GCN" or "interaction". Note: only "interaction" is properly tested...

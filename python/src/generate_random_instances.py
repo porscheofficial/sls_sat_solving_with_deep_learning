@@ -1,3 +1,4 @@
+"""Contains functions to generate random SAT instances."""
 import numpy as np
 import cnfgen
 from pysat.formula import CNF
@@ -9,7 +10,7 @@ from os.path import join
 
 
 def get_cnf_from_file(path):
-    """helper function to get a cnf object from a file
+    """Get a cnf object from a file.
 
     Args:
         path (str): path of cnf object you want to load
@@ -26,7 +27,7 @@ def get_cnf_from_file(path):
 
 
 def create_candidates_with_sol(data_dir, sample_size, threshold):
-    """helper function to create candidates from solution -> used for Gibbs Loss
+    """Create candidates from solution -> used for Gibbs Loss.
 
     Args:
         data_dir (str): path to data directory where you want to create candidates
@@ -55,7 +56,7 @@ def create_candidates_with_sol(data_dir, sample_size, threshold):
 
 
 def sample_candidates(original, sample_size, threshold):
-    """helper function to execute the sampling of one candidate
+    """Execute the sampling of one candidate.
 
     Args:
         original: original solution string that is modified in this function
@@ -71,7 +72,7 @@ def sample_candidates(original, sample_size, threshold):
 
 
 def generate_random_KCNF(k, n, m, path, TIMEOUT=100):
-    """generate a single random_KCNF formula
+    """Generate a single random_KCNF formula.
 
     Args:
         k (int): locality of instance
@@ -109,7 +110,7 @@ def generate_random_KCNF(k, n, m, path, TIMEOUT=100):
 def generate_dataset_random_KCNF(
     k, n_list, alpha, num_samples, path, vary_percent=0, TIMEOUT=100
 ):
-    """This function generates a random_KCNF dataset.
+    """Generate a random_KCNF dataset.
 
     Args:
         n_list (list): list of number of variables that should be used for generating
@@ -131,7 +132,7 @@ def generate_dataset_random_KCNF(
 
 
 def generate_Ramsey(s, k, N, path, TIMEOUT=100):
-    """generate a single Ramsey formula
+    """Generate a single Ramsey formula.
 
     Ramsey number r(s,k) > N
     This formula, given s, k, and N, claims that there is some graph with N vertices which has neither
@@ -173,7 +174,7 @@ def generate_Ramsey(s, k, N, path, TIMEOUT=100):
 
 
 def generate_dataset_Ramsey(s_list, k_list, N_list, num_samples, path, TIMEOUT=100):
-    """This function generates a random_KCNF dataset.
+    """Generate a Ramsey dataset.
 
     Ramsey number r(s,k) > N
     This formula, given s, k, and N, claims that there is some graph with N vertices which has neither
@@ -201,7 +202,7 @@ def generate_dataset_Ramsey(s_list, k_list, N_list, num_samples, path, TIMEOUT=1
 
 
 def generate_VanDerWaerden(N, k1, k2, path, TIMEOUT=100):
-    """generate a single VanDerWaerden formula
+    """Generate a single VanDerWaerden formula.
 
     NOTE: tbf with details
 
@@ -241,7 +242,7 @@ def generate_VanDerWaerden(N, k1, k2, path, TIMEOUT=100):
 def generate_dataset_VanDerWaerden(
     N_list, k1_list, k2_list, num_samples, path, TIMEOUT=100
 ):
-    """This function generates a sa dataset containing VanDerWaerden formulas
+    """Generate a dataset containing VanDerWaerden formulas.
 
     NOTE: tbf with details
 

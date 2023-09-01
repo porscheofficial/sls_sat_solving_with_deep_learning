@@ -1,3 +1,4 @@
+"""File containing useful functions to handle sat-instances."""
 import collections
 import jraph
 import numpy as np
@@ -10,7 +11,10 @@ SATProblem = collections.namedtuple(
 
 
 class HashableSATProblem(SATProblem):
+    """Class to define HashableSATProblem."""
+
     def __hash__(self):
+        """Define hash."""
         return hash(
             (
                 self.graph.senders.tostring(),
@@ -21,10 +25,12 @@ class HashableSATProblem(SATProblem):
         )
 
     def __eq__(self, other):
+        """Define equality of self and other."""
         return self.__hash__() == other.__hash__()
 
 
 def all_bitstrings(size):
+    """Return all possible vitstrings for some size."""
     bitstrings = np.ndarray((2**size, size), dtype=int)
     for i in range(size):
         bitstrings[:, i] = np.tile(
@@ -40,6 +46,7 @@ def get_problem_from_cnf(
     pad_nodes=0,
     pad_edges=0,
 ) -> HashableSATProblem:
+    """Get a problem and the corresponding graph embedding from cnf."""
     clauses = [c for c in cnf.clauses if len(c) > 0]
     n = cnf.nv
     m = len(clauses)

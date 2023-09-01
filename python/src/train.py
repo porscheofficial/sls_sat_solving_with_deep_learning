@@ -1,3 +1,4 @@
+"""Train the graph neural network using the method in this file."""
 from functools import partial
 import sys
 import time
@@ -51,7 +52,7 @@ def train(
     initial_learning_rate=0.001,
     final_learning_rate=0.001,
 ):
-    """Function used for training loop
+    """Execute the training loop.
 
     Args:
         batch_size (int): batch size that is used

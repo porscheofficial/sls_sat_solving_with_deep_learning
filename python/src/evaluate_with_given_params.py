@@ -1,3 +1,4 @@
+"""This code lets you use trained models as oracles for SAT solving in the MT and the WalkSAT algorithm."""
 import sys
 
 sys.path.append("../../")
@@ -17,6 +18,7 @@ SEED = 0
 
 
 def get_padded_trajs(traj, N_STEPS):
+    """Do padding for trajectories with zeros if it has found a solution before N_STEPS was reached."""
     array_traj = []
     for i in range(len(traj)):
         array_traj.append(np.pad(traj[i], (0, N_STEPS - len(traj[i]))))
@@ -32,7 +34,7 @@ def load_model_and_test(
     path_save=False,
     keep_traj=True,
 ):
-    """Function to run oracle versions of MT and Walksat algorithm on a dataset to evaluate the performance
+    """Run oracle versions of MT and Walksat algorithm on a dataset to evaluate the performance.
 
     Args:
         data_path (str): path pointing to dataset used for evaluation
@@ -177,9 +179,9 @@ def load_model_and_test_two_models(
     path_save=False,
     keep_traj=True,
 ):
-    """Function to run oracle versions of MT and Walksat algorithm on a dataset to evaluate the performance.
+    """Run oracle versions of MT and Walksat algorithm on a dataset to evaluate the performance.
 
-        Here you have the additional freedom to use different models for initialization and resampling in the algorithms
+    Here you have the additional freedom to use different models for initialization and resampling in the algorithms
 
     Args:
         data_path (str): path pointing to dataset used for evaluation

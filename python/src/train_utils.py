@@ -1,3 +1,4 @@
+"""Utility functions used in train.py."""
 import collections
 import numpy as np
 import matplotlib.pyplot as plt
@@ -21,7 +22,7 @@ def initiate_eval_objects_loss(
     rep: SATRepresentation,
     loader,
 ):
-    """helper function to create loss function evaluation object
+    """Create loss function evaluation object.
 
     Args:
         text (str): description of loss type as str (typically "test" and "train")
@@ -65,7 +66,7 @@ def initiate_eval_moser_loss(
     data_subset,
     sat_data,
 ):
-    """helper function to create a moser_loss evaluation object
+    """Create a moser_loss evaluation object.
 
     Args:
         text (str): description of loss type as str (typically "test" and "train")
@@ -101,7 +102,7 @@ def initiate_eval_moser_loss(
 
 
 def update_eval_objects_loss(params, loss, eval_objects_loss):
-    """helper function to update loss function evaluation object. This means, use the current params of the net and evaluate the loss terms
+    """Update loss function evaluation object. This means, use the current params of the net and evaluate the loss terms.
 
     Args:
         params (@TODO: specify type): current params of the net
@@ -132,7 +133,7 @@ def update_eval_objects_loss(params, loss, eval_objects_loss):
 
 
 def update_eval_moser_loss(network, params, eval_moser_loss):
-    """helper function to update moser loss evaluation object. This means, use the current params of the net and evaluate the Moser loss terms
+    """Update moser loss evaluation object. This means, use the current params of the net and evaluate the Moser loss terms.
 
     Args:
         network (@TODO: specify type): network definition
@@ -166,7 +167,7 @@ def update_eval_moser_loss(network, params, eval_moser_loss):
 
 
 def plot_accuracy_fig(*eval_results):
-    """helper function to do a plot containing the losses as a function of the epochs."""
+    """Do a plot containing the losses as a function of the epochs."""
     ROLLING_WINDOW_SIZE = 1
     for eval_result in eval_results:
         results = np.array(eval_result.results)
@@ -195,7 +196,7 @@ def evaluate_moser_rust(
     N_RUNS_MOSER=1,
     SEED=0,
 ):
-    """Function to run MT algorithm in rust and get results. This is used above.
+    """Run MT algorithm in rust and get results. This is used above.
 
     Args:
         sat_data (@TODO: specify type): sat_data used as input problem
