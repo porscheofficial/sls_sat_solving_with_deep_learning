@@ -84,10 +84,14 @@ def get_problem_from_cnf(
         graph = jraph.pad_with_graphs(graph, n_node, n_edge)
 
     if include_constraint_graph:
-        constraint_graph = jraph.pad_with_graphs(
-            constraint_graph, n_node, constraint_graph.n_edge
-        )
-        constraint_mask = np.pad(constraint_mask, (0, n_node - len(constraint_mask)))
+        if constraint_graph:
+            constraint_graph = jraph.pad_with_graphs(
+                constraint_graph, n_node, constraint_graph.n_edge
+            )
+        if constraint_mask:
+            constraint_mask = np.pad(
+                constraint_mask, (0, n_node - len(constraint_mask))
+            )
 
     # mask
     mask = representation.get_mask(n, n_node).astype(np.int32)

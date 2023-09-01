@@ -8,7 +8,7 @@ import pandas as pd
 from python.src.sat_representations import SATRepresentation
 
 EvalResults = collections.namedtuple(
-    "EvalResult", ("name", "results", "normalize", "loss_params", "rep", "loader")
+    "EvalResults", ("name", "results", "normalize", "loss_params", "rep", "loader")
 )
 
 

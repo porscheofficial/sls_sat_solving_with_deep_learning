@@ -25,7 +25,7 @@ def create_candidates_with_sol(data_dir, sample_size, threshold):
         if type(p) == dict:
             print("dict", p)
             p = [x for (_, x) in p.items()]
-        if type(p) == list or np.array:
+        if type(p) == list or type(p) == np.array:
             if 2 in p or -2 in p:
                 p = np.array(p, dtype=float)
                 p = [int(np.sign(x) + 1) / 2 for x in p]
