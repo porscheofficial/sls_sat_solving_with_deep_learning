@@ -329,18 +329,22 @@ def experiment_tracking_train(
         N_STEPS_MOSER (int): number of steps used in MT algorithm statistics
         N_RUNS_MOSER (int): number of runs used in MT algorithm statistics
         data_path (str): path pointing to training dataset (this is split into train and test set)
-        graph_representation (SATRepresentation): SATRepresentation used. Either LCG or VCG
+        graph_representation (str): Representation used. Either "LCG" or "VCG"
         mlp_layers (array): size of mlp_layers. For example: [200,200]
         network_type (str): either "interaction" for interaction network or "GCN" for Graph convolutional network (not tested!)
         img_path (bool, optional): path where the plot is saved that contains the loss function plot as a function of the epochs. Defaults to False.
         return_candidates (bool, optional): decide whether candidates are used for Gibbs loss or only the solution. Defaults to False.
         initial_learning_rate (float, optional): initial learning rate that is chosen. Defaults to 0.001.
         final_learning_rate (float, optional): final learning rate that is chosen. Note that the learning rate decays from the initial learing rate exponentially to the final learning rate over the epochs. Defaults to 0.001.
+
+    Raises:
+            ValueError: if no proper graph representation is chosen, raise a value error
     """
-    if graph_representation == "LCG":
-        rep = LCG
-    elif graph_representation == "VCG":
-        rep = VCG
+    match graph_representation:
+        case "LCG":
+            rep = LCG
+        case "VCG":
+            rep = VCG
 
     network_definition = get_network_definition(
         network_type=network_type, graph_representation=rep
