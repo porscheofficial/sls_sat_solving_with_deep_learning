@@ -6,8 +6,8 @@ alpha: 1
 beta: 0
 gamma: 1
 NUM_EPOCHS: 1
-N_STEPS_MOSER: 100
-N_RUNS_MOSER: 5
+N_STEPS_MOSER: 0
+N_RUNS_MOSER: 0
 data_path: Data/random_sat_data/training
 graph_representation: LCG
 network_type: interaction
