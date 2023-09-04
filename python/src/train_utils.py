@@ -210,7 +210,7 @@ def evaluate_moser_rust(
         SEED (int, optional): SEED used in MT algorithm. Defaults to 0.
 
     Returns:
-        _type_: (np.mean(av_energies), np.mean(av_entropies)) -> mean energies = #violated clauses / #clause after N_STEPS_MOSER and mean entropy of the oracle probabilities
+        (@TODO:specify type): (np.mean(av_energies), np.mean(av_entropies)) -> mean energies = #violated clauses / #clause after N_STEPS_MOSER and mean entropy of the oracle probabilities
     """
     av_energies = []
     av_entropies = []

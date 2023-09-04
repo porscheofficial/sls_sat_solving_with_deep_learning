@@ -9,7 +9,7 @@ from typing import Any
 
 
 def get_embedding(graph: jraph.GraphsTuple):
-    """Get embedded graph from original graph."""
+    """Get embedded graph."""
     embedding = jraph.GraphMapFeatures(
         embed_edge_fn=jax.vmap(hk.Linear(output_size=32)),
         embed_node_fn=jax.vmap(hk.Linear(output_size=32)),
@@ -29,9 +29,13 @@ def apply_interaction(
         mlp_layers (list[int]): mlp_layer dimensions
         graph (jraph.GraphsTuple): graph we want to apply an interaction net on
         num_message_passing_steps (int, optional): number of message passing steps = number of layers. Defaults to 5.
+
+    Returns:
+        graph after application of interaction.
     """
 
     def mlp(dims):
+        """Define an MLP."""
         net = []
         for d in dims:
             net.extend([hk.Linear(d), jax.nn.relu])
@@ -40,6 +44,7 @@ def apply_interaction(
     @jax.vmap
     @jraph.concatenated_args
     def update_fn(features):
+        """Define an update function including a layer norm feature."""
         ln = hk.LayerNorm(axis=-1, param_axis=-1, create_scale=True, create_offset=True)
         net = mlp(mlp_layers)
         return ln(net(features))
@@ -63,9 +68,13 @@ def apply_convolution(
         mlp_layers (list[int]): mlp_layer dimensions
         graph (jraph.GraphsTuple): graph we want to apply a convoution net on
         num_message_passing_steps (int, optional): number of message passing steps = number of layers. Defaults to 5.
+
+    Returns:
+        graph after convolution.
     """
 
     def mlp(dims):
+        """Define an MLP."""
         net = []
         for d in dims:
             net.extend([hk.Linear(d), jax.nn.relu])
@@ -74,6 +83,7 @@ def apply_convolution(
     @jax.vmap
     @jraph.concatenated_args
     def update_fn(features):
+        """Define an update function."""
         net = mlp(mlp_layers)
         return net(features)
 
@@ -100,10 +110,12 @@ def network_definition_interaction_VCG(
     """Define a graph neural network for interaction net and VCG.
 
     Args:
-      graph: Graphstuple the network processes.
-      num_message_passing_steps: number of message passing steps = number of layers.
+        graph (jraph.GraphsTuple): Graphstuple the network processes.
+        mlp_layers (list[int]): dimension of mlp layers, e.g. [200,200]
+        num_message_passing_steps (int, optional): number of message passing steps = number of layers.
+
     Returns:
-      Decoded nodes.
+        jraph.ArrayTree: nodes after application of the net
     """
     graph = get_embedding(graph)
     graph = apply_interaction(mlp_layers, graph, num_message_passing_steps)
@@ -118,10 +130,12 @@ def network_definition_interaction_LCG(
     """Define a graph neural network for interaction net and LCG.
 
     Args:
-      graph: Graphstuple the network processes.
-      num_message_passing_steps: number of message passing steps = number of layers.
+        graph (jraph.GraphsTuple): Graphstuple the network processes.
+        mlp_layers (list[int]): dimension of mlp layers, e.g. [200,200]
+        num_message_passing_steps (int, optional): number of message passing steps = number of layers. Defaults to 5.
+
     Returns:
-      Decoded nodes.
+        jraph.ArrayTree: nodes after application of the net
     """
     graph = get_embedding(graph)
     graph = apply_interaction(mlp_layers, graph, num_message_passing_steps)
@@ -131,13 +145,15 @@ def network_definition_interaction_LCG(
 def network_definition_convolution_VCG(
     graph: jraph.GraphsTuple, mlp_layers: list[int], num_message_passing_steps: int = 5
 ) -> jraph.ArrayTree:
-    """Define a graph neural network for GCN and LCG.
+    """Define a graph neural network for GCN and VCG.
 
     Args:
-      graph: Graphstuple the network processes.
-      num_message_passing_steps: number of message passing steps = number of layers.
+        graph (jraph.GraphsTuple): Graphstuple the network processes.
+        mlp_layers (list[int]): dimension of mlp layers, e.g. [200,200]
+        num_message_passing_steps (int, optional): number of message passing steps = number of layers. Defaults to 5.
+
     Returns:
-      Decoded nodes.
+        jraph.ArrayTree: nodes after application of the net
     """
     graph = get_embedding(graph)
     graph = apply_convolution(mlp_layers, graph, num_message_passing_steps)
@@ -150,10 +166,12 @@ def network_definition_convolution_LCG(
     """Define a graph neural network for GCN and LCG.
 
     Args:
-      graph: Graphstuple the network processes.
-      num_message_passing_steps: number of message passing steps = number of layers.
+        graph (jraph.GraphsTuple): Graphstuple the network processes.
+        mlp_layers (list[int]): dimension of mlp layers, e.g. [200,200]
+        num_message_passing_steps (int, optional): number of message passing steps = number of layers. Defaults to 5.
+
     Returns:
-      Decoded nodes.
+        jraph.ArrayTree: nodes after application of the net
     """
     graph = get_embedding(graph)
     graph = apply_convolution(mlp_layers, graph, num_message_passing_steps)
