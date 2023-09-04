@@ -9,7 +9,7 @@ from typing import Any
 
 
 def get_embedding(graph: jraph.GraphsTuple):
-    """Get embedded graph."""
+    """Get embedded graph from original graph."""
     embedding = jraph.GraphMapFeatures(
         embed_edge_fn=jax.vmap(hk.Linear(output_size=32)),
         embed_node_fn=jax.vmap(hk.Linear(output_size=32)),
