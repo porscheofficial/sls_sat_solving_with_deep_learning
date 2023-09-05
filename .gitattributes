@@ -1,6 +1,6 @@
-*.npy filter=lfs diff=lfs merge=lfs -text
-*.pdf filter=lfs diff=lfs merge=lfs -text
-*.png filter=lfs diff=lfs merge=lfs -text
-*.sol filter=lfs diff=lfs merge=lfs -text
-*.cnf filter=lfs diff=lfs merge=lfs -text
-*.pkl filter=lfs diff=lfs merge=lfs -text
+Data/*.npy filter=lfs diff=lfs merge=lfs -text
+Data/*.pdf filter=lfs diff=lfs merge=lfs -text
+Data/*.png filter=lfs diff=lfs merge=lfs -text
+Data/*.sol filter=lfs diff=lfs merge=lfs -text
+Data/*.cnf filter=lfs diff=lfs merge=lfs -text
+Data/*.pkl filter=lfs diff=lfs merge=lfs -text
