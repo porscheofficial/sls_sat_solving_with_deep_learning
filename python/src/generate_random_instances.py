@@ -232,8 +232,8 @@ def generate_van_der_waerden(
 
     Args:
         interval_size (int): size of interval
-        k1 (int): length of arithmetic progressions of color 1
-        k2 (int): length of arithmetic progressions of color 2
+        k1_parameter (int): length of arithmetic progressions of color 1
+        k2_parameter (int): length of arithmetic progressions of color 2
         path (str): path and name how instance should be saved
         timeout (int, optional): how often we try to generate a satisfying formula until we return no instance. Defaults to 100.
     """
