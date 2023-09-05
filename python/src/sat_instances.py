@@ -48,13 +48,13 @@ def get_problem_from_cnf(
 ) -> HashableSATProblem:
     """Get a problem and the corresponding graph embedding from cnf."""
     clauses = [c for c in cnf.clauses if len(c) > 0]
-    n = cnf.nv
-    m = len(clauses)
+    n_variables = cnf.nv
+    n_clauses = len(clauses)
     clause_lengths = [len(c) for c in clauses]
     k = max(clause_lengths)
 
     nodes, senders, receivers, edges, n_node, n_edge = representation.get_graph(
-        n, m, clauses, clause_lengths
+        n_variables, n_clauses, clauses, clause_lengths
     )
 
     assert len(nodes) == n_node
@@ -74,12 +74,14 @@ def get_problem_from_cnf(
 
     # constraint graph
     constraint_graph = (
-        representation.get_constraint_graph(n, m, senders, receivers)
+        representation.get_constraint_graph(n_variables, n_clauses, senders, receivers)
         if include_constraint_graph
         else None
     )
     constraint_mask = (
-        np.array(np.logical_not(representation.get_mask(n, n_node)), dtype=int)
+        np.array(
+            np.logical_not(representation.get_mask(n_variables, n_node)), dtype=int
+        )
         if include_constraint_graph
         else None
     )
@@ -101,12 +103,12 @@ def get_problem_from_cnf(
             )
 
     # mask
-    mask = representation.get_mask(n, n_node).astype(np.int32)
+    mask = representation.get_mask(n_variables, n_node).astype(np.int32)
 
     return HashableSATProblem(
         graph=graph,
         mask=mask,
         constraint_mask=constraint_mask,
         constraint_graph=constraint_graph,
-        params=(n, m, k),
+        params=(n_variables, n_clauses, k),
     )
