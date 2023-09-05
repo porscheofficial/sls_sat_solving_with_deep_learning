@@ -1,12 +1,12 @@
 """Contains functions to generate random SAT instances."""
+from os.path import join
+import pickle
+import random
+import glob
 import numpy as np
 import cnfgen
 from pysat.formula import CNF
 from pysat.solvers import Glucose3
-import pickle
-import random
-import glob
-from os.path import join
 
 
 def get_cnf_from_file(path):
@@ -38,10 +38,10 @@ def create_candidates_with_sol(data_dir, sample_size, threshold):
     for solved_instance in solved_instances:
         with open(solved_instance, "rb") as file:
             solution = pickle.load(file)
-        if type(solution) == dict:
+        if isinstance(solution, dict):
             print("dict", solution)
             solution = [assignment_x for (_, assignment_x) in solution.items()]
-        if type(solution) == list or type(solution) == np.array:
+        if isinstance(solution, (list, np.ndarray)):
             if 2 in solution or -2 in solution:
                 solution = np.array(solution, dtype=float)
                 solution = [
@@ -75,7 +75,7 @@ def sample_candidates(original, sample_size, threshold):
     return np.where(condition, np.invert(original), original)
 
 
-def generate_random_KCNF(k_locality, n_variables, n_clauses, path, timeout=100):
+def generate_random_kcnf(k_locality, n_variables, n_clauses, path, timeout=100):
     """Generate a single random_KCNF formula.
 
     Args:
@@ -87,19 +87,19 @@ def generate_random_KCNF(k_locality, n_variables, n_clauses, path, timeout=100):
     """
     current_time = 0
     sol = False
-    while current_time <= timeout and sol == False:
+    while current_time <= timeout and not sol:
         current_time += 1
         # print(t)
         cnf = cnfgen.RandomKCNF(k_locality, n_variables, n_clauses)
         cnf = cnf.to_dimacs()
         cnf = CNF(from_string=cnf)
         solver_result = Glucose3(cnf)
-        if solver_result.solve() == True:
+        if solver_result.solve():
             sol = solver_result.get_model()
             cnf.to_file(path + ".cnf")
             with open(path + "_sol.pkl", "wb") as file:
                 pickle.dump(sol, file)
-    if sol == False:
+    if not sol:
         print(
             "no satisfiable random_KCNF problem found for (n,k,m)=("
             + str(n_variables)
@@ -111,8 +111,8 @@ def generate_random_KCNF(k_locality, n_variables, n_clauses, path, timeout=100):
         )
 
 
-def generate_dataset_random_KCNF(
-    k_locality, n_variables_list, alpha, num_samples, path, vary_percent=0, TIMEOUT=100
+def generate_dataset_random_kcnf(
+    k_locality, n_variables_list, alpha, num_samples, path, vary_percent=0, timeout=100
 ):
     """Generate a random_KCNF dataset.
 
@@ -123,7 +123,7 @@ def generate_dataset_random_KCNF(
         num_samples (int): number of samples generated per value in n_list
         path (str): path of where dataset should be saved
         vary_percent (float, optional): describes by how much we vary m at maximum
-        TIMEOUT (int, optional): how often we try to generate a satisfying formula until we return no instance. Defaults to 100.
+        timeout (int, optional): how often we try to generate a satisfying formula until we return no instance. Defaults to 100.
     """
     for n_variables in n_variables_list:
         for _ in range(num_samples):
@@ -133,16 +133,16 @@ def generate_dataset_random_KCNF(
             params = (
                 str(k_locality) + "_" + str(n_variables) + "_" + str(n_clauses) + "_"
             )
-            generate_random_KCNF(
+            generate_random_kcnf(
                 k_locality,
                 n_variables,
                 n_clauses,
                 path=path + "random_KCNF" + params + index,
-                timeout=TIMEOUT,
+                timeout=timeout,
             )
 
 
-def generate_Ramsey(s, k, N, path, TIMEOUT=100):
+def generate_ramsey(s_parameter, k_parameter, n_parameter, path, timeout=100):
     """Generate a single Ramsey formula.
 
     Ramsey number r(s,k) > N
@@ -152,39 +152,39 @@ def generate_Ramsey(s, k, N, path, TIMEOUT=100):
     contain either one or the other. Hence the generated formula is satisfiable if and only if r(s,k)>N
 
     Args:
-        s (int): independent set size
-        k (int): clique size
-        N (int): number of vertices
+        s_parameter (int): independent set size
+        k_parameter (int): clique size
+        n_parameter (int): number of vertices
         path (str): path and name how instance should be saved
-        TIMEOUT (int, optional): how often we try to generate a satisfying formula until we return no instance. Defaults to 100.
+        timeout (int, optional): how often we try to generate a satisfying formula until we return no instance. Defaults to 100.
     """
-    t = 0
+    time = 0
     sol = False
-    while t <= TIMEOUT and sol == False:
-        t += 1
+    while time <= timeout and not sol:
+        time += 1
         # print(t)
-        cnf = cnfgen.RamseyNumber(s, k, N)
+        cnf = cnfgen.RamseyNumber(s_parameter, k_parameter, n_parameter)
         cnf = cnf.to_dimacs()
         cnf = CNF(from_string=cnf)
-        g = Glucose3(cnf)
-        if g.solve() == True:
-            sol = g.get_model()
+        solver_result = Glucose3(cnf)
+        if solver_result.solve():
+            sol = solver_result.get_model()
             cnf.to_file(path + ".cnf")
-            with open(path + "_sol.pkl", "wb") as f:
-                pickle.dump(sol, f)
-    if sol == False:
+            with open(path + "_sol.pkl", "wb") as file:
+                pickle.dump(sol, file)
+    if not sol:
         print(
             "no satisfiable Ramsey problem found for (s,k,N)=("
-            + str(s)
+            + str(s_parameter)
             + ","
-            + str(k)
+            + str(k_parameter)
             + ","
-            + str(N)
+            + str(n_parameter)
             + ")"
         )
 
 
-def generate_dataset_Ramsey(s_list, k_list, N_list, num_samples, path, TIMEOUT=100):
+def generate_dataset_ramsey(s_list, k_list, n_list, num_samples, path, timeout=100):
     """Generate a Ramsey dataset.
 
     Ramsey number r(s,k) > N
@@ -194,87 +194,107 @@ def generate_dataset_Ramsey(s_list, k_list, N_list, num_samples, path, TIMEOUT=1
     contain either one or the other. Hence the generated formula is satisfiable if and only if r(s,k)>N
 
     Args:
-        s (int): independent set size
-        k (int): clique size
-        N (int): number of vertices
+        s_list (int): independent set size
+        k_list (int): clique size
+        n_list (int): number of vertices
         num_samples (int): number of samples generated per set of parameters
         path (str): path and name how instance should be saved
-        TIMEOUT (int, optional): how often we try to generate a satisfying formula until we return no instance. Defaults to 100.
+        timeout (int, optional): how often we try to generate a satisfying formula until we return no instance. Defaults to 100.
     """
-    for s in s_list:
-        for k in k_list:
-            for N in N_list:
+    for s_parameter in s_list:
+        for k_parameter in k_list:
+            for n_parameter in n_list:
                 for _ in range(num_samples):
                     index = str(random.randint(0, 10000000))
-                    params = str(s) + "_" + str(k) + "_" + str(N) + "_"
-                    generate_Ramsey(
-                        s, k, N, path + "ramsey" + params + index, TIMEOUT=100
+                    params = (
+                        str(s_parameter)
+                        + "_"
+                        + str(k_parameter)
+                        + "_"
+                        + str(n_parameter)
+                        + "_"
+                    )
+                    generate_ramsey(
+                        s_parameter,
+                        k_parameter,
+                        n_parameter,
+                        path + "ramsey" + params + index,
+                        timeout=timeout,
                     )
 
 
-def generate_VanDerWaerden(N, k1, k2, path, TIMEOUT=100):
+def generate_van_der_waerden(
+    interval_size, k1_parameter, k2_parameter, path, timeout=100
+):
     """Generate a single VanDerWaerden formula.
 
     NOTE: tbf with details
 
     Args:
-        N (int): size of interval
+        interval_size (int): size of interval
         k1 (int): length of arithmetic progressions of color 1
         k2 (int): length of arithmetic progressions of color 2
         path (str): path and name how instance should be saved
-        TIMEOUT (int, optional): how often we try to generate a satisfying formula until we return no instance. Defaults to 100.
+        timeout (int, optional): how often we try to generate a satisfying formula until we return no instance. Defaults to 100.
     """
-    t = 0
+    time = 0
     sol = False
-    while t <= TIMEOUT and sol == False:
-        t += 1
+    while time <= timeout and not sol:
+        time += 1
         # print(t)
-        cnf = cnfgen.VanDerWaerden(N, k1, k2)
+        cnf = cnfgen.VanDerWaerden(interval_size, k1_parameter, k2_parameter)
         cnf = cnf.to_dimacs()
         cnf = CNF(from_string=cnf)
-        g = Glucose3(cnf)
-        if g.solve() == True:
-            sol = g.get_model()
+        solver_result = Glucose3(cnf)
+        if solver_result.solve():
+            sol = solver_result.get_model()
             cnf.to_file(path + ".cnf")
-            with open(path + "_sol.pkl", "wb") as f:
-                pickle.dump(sol, f)
-    if sol == False:
+            with open(path + "_sol.pkl", "wb") as file:
+                pickle.dump(sol, file)
+    if not sol:
         print(
             "no satisfiable VanDerWaerden problem found for (N, k1, k2)=("
-            + str(N)
+            + str(interval_size)
             + ","
-            + str(k1)
+            + str(k1_parameter)
             + ","
-            + str(k2)
+            + str(k2_parameter)
             + ")"
         )
 
 
-def generate_dataset_VanDerWaerden(
-    N_list, k1_list, k2_list, num_samples, path, TIMEOUT=100
+def generate_dataset_van_der_waerden(
+    interval_size_list, k1_list, k2_list, num_samples, path, timeout=100
 ):
     """Generate a dataset containing VanDerWaerden formulas.
 
     NOTE: tbf with details
 
     Args:
-        N_list (list): list of size of interval
-        k1 (list): list of length of arithmetic progressions of color 1
-        k2 (list): list of length of arithmetic progressions of color 2
+        interval_size_list (list): list of size of interval
+        k1_list (list): list of length of arithmetic progressions of color 1
+        k2_list (list): list of length of arithmetic progressions of color 2
         num_samples (int): number of samples generated per set of parameters
         path (str): path and name how instance should be saved
         TIMEOUT (int, optional): how often we try to generate a satisfying formula until we return no instance. Defaults to 100.
     """
-    for N in N_list:
-        for k1 in k1_list:
-            for k2 in k2_list:
+    for interval_size in interval_size_list:
+        for k1_parameter in k1_list:
+            for k2_parameter in k2_list:
                 for _ in range(num_samples):
                     index = str(random.randint(0, 10000000))
-                    params = str(N) + "_" + str(k1) + "_" + str(k2) + "_"
-                    generate_VanDerWaerden(
-                        N,
-                        k1,
-                        k2,
+                    params = (
+                        str(interval_size)
+                        + "_"
+                        + str(k1_parameter)
+                        + "_"
+                        + str(k2_parameter)
+                        + "_"
+                    )
+                    generate_van_der_waerden(
+                        interval_size,
+                        k1_parameter,
+                        k2_parameter,
                         path + "VanDerWaerden" + params + index,
-                        TIMEOUT=TIMEOUT,
+                        timeout=timeout,
                     )
