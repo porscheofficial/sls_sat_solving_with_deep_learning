@@ -136,7 +136,7 @@ def generate_dataset_random_KCNF(
             generate_random_KCNF(
                 k_locality,
                 n_variables,
-                m,
+                n_clauses,
                 path=path + "random_KCNF" + params + index,
                 timeout=TIMEOUT,
             )
