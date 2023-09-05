@@ -1,27 +1,34 @@
+"""Contains useful functions to deal with data files (i.e. cnf files and their solutions in a dataset)."""
+
+from collections import namedtuple
+from os.path import join, exists  # ,basename
+
+# from os import mkdir
 import sys
 
-sys.path.append("../../")
-from collections import namedtuple
-from os.path import join, exists, basename
-from os import mkdir
-from functools import partial
+# from functools import partial
 import glob
 import gzip
+import pickle
 import jraph
-import jax
+
+# import jax
 import nnf
 import numpy as np
-import pickle
 import jax.numpy as jnp
 from func_timeout import func_timeout, FunctionTimedOut
-from jraph._src import utils
+
+# from jraph._src import utils
 from jax import vmap
 from pysat.formula import CNF
 from torch.utils import data
 
-from python.src.sat_instances import SATProblem, SATRepresentation
-from python.src.sat_representations import SATRepresentation, LCG, VCG
+# from python.src.sat_instances import SATProblem
+from python.src.sat_representations import SATRepresentation  # , LCG, VCG
 from python.src.sat_instances import get_problem_from_cnf
+
+sys.path.append("../../")
+
 
 MAX_TIME = 20
 
@@ -39,6 +46,7 @@ class SATTrainingDataset(data.Dataset):
         return_candidates=True,
         include_constraint_graph=False,
     ):
+        """Initialize."""
         self.return_candidates = return_candidates
         self.data_dir = data_dir
         self.already_unzipped = already_unzipped
@@ -49,28 +57,37 @@ class SATTrainingDataset(data.Dataset):
         self.instances = []
         edges_list = []
         n_nodes_list = []
-        for f in solved_instances:
-            name = f.split("_sol.pkl")[0]
+        for solutions in solved_instances:
+            name = solutions.split("_sol.pkl")[0]
             problem_file = self._get_problem_file(name)
             cnf = CNF(from_string=problem_file.read())
-            n, m = cnf.nv, len(cnf.clauses)
-            instance = SATInstanceMeta(name, n, m)
+            n_variables, n_clauses = cnf.nv, len(cnf.clauses)
+            instance = SATInstanceMeta(name, n_variables, n_clauses)
             n_nodes_list.append(self.representation.get_n_nodes(cnf))
             edges_list.append(self.representation.get_n_edges(cnf))
             self.instances.append(instance)
-        self.max_n_node = n + 2 if (n := max(n_nodes_list)) % 2 == 0 else n + 1
+        self.max_n_node = (
+            n_variables + 2
+            if (n_variables := max(n_nodes_list)) % 2 == 0
+            else n_variables + 1
+        )
         self.max_n_edge = max(edges_list)
 
     def __len__(self):
+        """Get length."""
         return len(self.instances)
 
     def _get_problem_file(self, name):
+        """Get problem file."""
         if self.already_unzipped:
-            return open(name + ".cnf", "rt")
+            with open(name + ".cnf", "rt") as problem:
+                return problem
         else:
-            return gzip.open(name + ".cnf.gz", "rt")
+            with gzip.open(name + ".cnf.gz", "rt") as problem:
+                return problem
 
     def get_unpadded_problem(self, idx):
+        """Get unpadded problem."""
         instance_name = self.instances[idx].name
         problem_file = self._get_problem_file(instance_name)
         return get_problem_from_cnf(
@@ -78,6 +95,7 @@ class SATTrainingDataset(data.Dataset):
         )
 
     def __getitem__(self, idx):
+        """Get item."""
         instance = self.instances[idx]
         instance_name = instance.name
         problem_file = self._get_problem_file(instance_name)
@@ -96,12 +114,12 @@ class SATTrainingDataset(data.Dataset):
         else:
             # return only solution
             target_name = instance_name + "_sol.pkl"
-            with open(target_name, "rb") as f:
-                solution_dict = pickle.load(f)
-            if type(solution_dict) == dict:
+            with open(target_name, "rb") as file:
+                solution_dict = pickle.load(file)
+            if isinstance(solution_dict, dict):
                 print("dict", solution_dict)
                 solution_dict = [x for (_, x) in solution_dict.items()]
-            if type(solution_dict) == list or type(solution_dict) == np.array:
+            if isinstance(solution_dict, (list, np.ndarray)):
                 if 2 in solution_dict or -2 in solution_dict:
                     solution_dict = np.array(solution_dict, dtype=float)
                     solution_dict = [int(np.sign(x) + 1) / 2 for x in solution_dict]
@@ -119,12 +137,13 @@ class SATTrainingDataset(data.Dataset):
 
 
 def collate_fn(batch):
-    """This function does batching. See description below what you input. It returns the batched data items as indicated below.
+    """Do batching. See description below what you input. It returns the batched data items as indicated below.
 
     Args:
-        batch (_type_): batch consisting of (problems,tuples) = zip(*batch). Then (candidates, energies) = zip(*tuples) and masks, graphs, constraint_graphs, constraint_mask = zip(
-        *((p.mask, p.graph, p.constraint_graph, p.constraint_mask) for p in problems)
-    )
+        batch (_type_): batch consisting of (problems,tuples) = zip(*batch). Then
+        (candidates, energies) = zip(*tuples) and
+        masks, graphs, constraint_graphs, constraint_mask = zip(
+        *((p.mask, p.graph, p.constraint_graph, p.constraint_mask) for p in problems))
 
     Raises:
         ValueError: either all items must have a constraint graph or none of them. If this is not the case, a value error is raised.
@@ -176,7 +195,7 @@ def collate_fn(batch):
 
 
 class JraphDataLoader(data.DataLoader):
-    """Jraph data loader definition"""
+    """Jraph data loader definition."""
 
     def __init__(
         self,
@@ -191,6 +210,7 @@ class JraphDataLoader(data.DataLoader):
         timeout=0,
         worker_init_fn=None,
     ):
+        """Initialize."""
         super(self.__class__, self).__init__(
             dataset,
             batch_size=batch_size,
@@ -206,6 +226,7 @@ class JraphDataLoader(data.DataLoader):
         )
 
 
+'''
 def number_of_violated_constraints(
     problem: SATProblem, assignment, representation: SATRepresentation
 ):
@@ -228,41 +249,43 @@ def number_of_violated_constraints(
 
 def number_of_violated_constraints_VCG(problem: SATProblem, assignment):
     """Get number of violated constraints by current assignment for VCG representation"""
-    # currently not implemented
-    pass
     return np.sum(
         VCG.get_violated_constraints(problem, assignment).astype(int),
         axis=0,
     )
 
 
+
 @partial(jax.jit, static_argnames=("problem",))
 def number_of_violated_constraints_LCG(problem: SATProblem, assignment):
     """Get number of violated constraints by current assignment for LCG representation"""
 
-    def one_hot(x, k, dtype=jnp.float32):
-        """Create a one-hot encoding of x of size k."""
-        return jnp.array(x[:, None] == jnp.arange(k), dtype)
+    def one_hot(x_string, k_size, dtype=jnp.float32):
+        """Create a one-hot encoding of x_string of size k_size."""
+        return jnp.array(x_string[:, None] == jnp.arange(k_size), dtype)
 
     graph = problem.graph
-    n, m, k = problem.params
-    senders = graph.senders[:-n]
-    receivers = graph.receivers[:-n]
+    n_variables, n_clauses, _ = problem.params
+    senders = graph.senders[:-n_variables]
+    receivers = graph.receivers[:-n_variables]
     new_assignment = jnp.ravel(one_hot(assignment, 2))
     edge_is_satisfied = jnp.ravel(
         new_assignment[None].T[senders].T
     )  # + np.ones(len(senders)), 2)
     number_of_literals_satisfied = utils.segment_sum(
-        data=edge_is_satisfied, segment_ids=receivers, num_segments=2 * n + m
-    )[2 * n :]
+        data=edge_is_satisfied,
+        segment_ids=receivers,
+        num_segments=2 * n_variables + n_clauses,
+    )[2 * n_clauses :]
     clause_is_unsat = jnp.where(number_of_literals_satisfied > 0, 0, 1)
     return jnp.sum(clause_is_unsat)
+'''
 
 
-def timed_solve(max_time, p):
+def timed_solve(max_time, problem):
     """Try to solve an instance within some time using kissat solver."""
     try:
-        return func_timeout(max_time, nnf.kissat.solve, args=(p,))
+        return func_timeout(max_time, nnf.kissat.solve, args=(problem,))
     except FunctionTimedOut:
         print(f"Could not be solved within time limit of {max_time} seconds")
     return None
@@ -281,9 +304,9 @@ def create_solutions_from_gzip(path, time_limit=MAX_TIME):
 def create_solutions(path, time_limit, suffix, open_util):
     """Create solutions."""
     regex = join(path, suffix)
-    for f in glob.glob(regex):
-        print(f"processing {f}")
-        root = f.split(".cnf")[0]
+    for file in glob.glob(regex):
+        print(f"processing {file}")
+        root = file.split(".cnf")[0]
         solved_target_name = root + "_sol.pkl"
         unsolved_target_name = root + "_unsol.pkl"
         solved_target_name = join(solved_target_name)
@@ -291,15 +314,15 @@ def create_solutions(path, time_limit, suffix, open_util):
         if exists(solved_target_name) or exists(unsolved_target_name):
             print("solution file already exists")
             continue
-        with open_util(f, mode="rt") as fl:
-            p = nnf.dimacs.load(fl)
-            s = timed_solve(time_limit, p)
-            if not s:
+        with open_util(file, mode="rt") as file_try:
+            problem = nnf.dimacs.load(file_try)
+            solution = timed_solve(time_limit, problem)
+            if not solution:
                 with open(unsolved_target_name, "wb") as out:
-                    pickle.dump(s, out)
+                    pickle.dump(solution, out)
             else:
                 with open(solved_target_name, "wb") as out:
-                    pickle.dump(s, out)
+                    pickle.dump(solution, out)
                     print(f"written solution for {root}")
 
 
@@ -312,24 +335,26 @@ def create_candidates(data_dir, sample_size: int, threshold):
         threshold (float): float ranging from 0 to 1. This is the probability that a spin flip is executed on a variable in the solution string
     """
     solved_instances = glob.glob(join(data_dir, "*_sol.pkl"))
-    for g in solved_instances:
-        with open(g, "rb") as f:
-            p = pickle.load(f)
-        if type(p) == dict:
-            print("dict", p)
-            p = [x for (_, x) in p.items()]
-        if type(p) == list or type(p) == np.array:
-            if 2 in p or -2 in p:
-                p = np.array(p, dtype=float)
-                p = [int(np.sign(x) + 1) / 2 for x in p]
-        print(p)
-        n = np.array(p, dtype=bool)
-        print(n)
-        samples = sample_candidates(n, sample_size - 1, threshold)
-        samples = np.concatenate((np.reshape(n, (1, len(n))), samples), axis=0)
-        name = g.split("_sol.pkl")[0]
-        with open(name + "_samples_sol.npy", "wb") as f:
-            np.save(f, samples)
+    for instance in solved_instances:
+        with open(instance, "rb") as file:
+            solution = pickle.load(file)
+        if isinstance(solution, dict):
+            print("dict", solution)
+            solution = [assignment_x for (_, assignment_x) in solution.items()]
+        if isinstance(solution, (list, np.ndarray)):
+            if 2 in solution or -2 in solution:
+                solution = np.array(solution, dtype=float)
+                solution = [
+                    int(np.sign(assignment_x) + 1) / 2 for assignment_x in solution
+                ]
+        solution_boolean = np.array(solution, dtype=bool)
+        samples = sample_candidates(solution_boolean, sample_size - 1, threshold)
+        samples = np.concatenate(
+            (np.reshape(solution_boolean, (1, len(solution_boolean))), samples), axis=0
+        )
+        name = instance.split("_sol.pkl")[0]
+        with open(name + "_samples_sol.npy", "wb") as file:
+            np.save(file, samples)
 
 
 def sample_candidates(original, sample_size, threshold):

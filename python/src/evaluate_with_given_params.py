@@ -1,35 +1,35 @@
 """This code lets you use trained models as oracles for SAT solving in the MT and the WalkSAT algorithm."""
 import sys
+from functools import partial
+import numpy as np
+import haiku as hk
+import moser_rust
+from python.src.data_utils import SATTrainingDataset
+from python.src.sat_representations import LCG
+from python.src.model import (
+    get_network_definition,
+)
+
 
 sys.path.append("../../")
 
-import numpy as np
-from data_utils import SATTrainingDataset, JraphDataLoader
-from sat_representations import VCG, LCG, SATRepresentation
-from model import (
-    get_network_definition,
-)
-from functools import partial
-import haiku as hk
-import moser_rust
-import matplotlib.pyplot as plt
 
 SEED = 0
 
 
-def get_padded_trajs(traj, N_STEPS):
+def get_padded_trajs(traj, n_steps):
     """Do padding for trajectories with zeros if it has found a solution before N_STEPS was reached."""
     array_traj = []
-    for i in range(len(traj)):
-        array_traj.append(np.pad(traj[i], (0, N_STEPS - len(traj[i]))))
+    for _, traj_i in enumerate(traj):
+        array_traj.append(np.pad(traj_i, (0, n_steps - len(traj_i))))
     return np.array(array_traj)
 
 
 def load_model_and_test(
     data_path,
     model_path,
-    N_STEPS: int,
-    N_RUNS: int,
+    n_steps: int,
+    n_runs: int,
     algo_type,
     path_save=False,
     keep_traj=True,
@@ -39,7 +39,7 @@ def load_model_and_test(
     Args:
         data_path (str): path pointing to dataset used for evaluation
         model_path (str): path of the model or "uniform" for running the uniform version
-        N_STEPS (int): number of steps taken by the algorithm
+        n_steps (int): number of steps taken by the algorithm
         N_RUNS (int): number of runs executed by the algorithm
         algo_type (str): either "moser" for MT algorithm or "probsat" for the oracle version of WalkSAT
         path_save (bool, optional): path where details of the experiment are saved. Defaults to False.
@@ -102,6 +102,7 @@ def load_model_and_test(
             data_path, LCG, return_candidates=False, include_constraint_graph=False
         )
         model_details_list = []
+
     for idx in range(len(sat_data)):
         print("problem ", idx + 1, "of ", len(sat_data))
         problem_path = sat_data.instances[idx].name + ".cnf"
@@ -111,9 +112,9 @@ def load_model_and_test(
         alpha_array.append(problem.params[1] / problem.params[0])
         if model_path != "uniform":
             decoded_nodes = network.apply(params, problem.graph)  # type: ignore[attr-defined]
-            n = problem.params[0]
+            n_variables = problem.params[0]
             model_probabilities = graph_representation.get_model_probabilities(
-                decoded_nodes, n
+                decoded_nodes, n_variables
             )
             model_probabilities = model_probabilities.ravel()
         else:
@@ -122,37 +123,37 @@ def load_model_and_test(
         single_traj_mean = []
         single_traj_median = []
         print(model_path)
-        _, _, final_energies, numstep, traj = moser_rust.run_sls_python(
+        _, _, _, numstep, traj = moser_rust.run_sls_python(
             algo_type,
             problem_path,
             model_probabilities,
             model_probabilities,
-            N_STEPS - 1,
-            N_RUNS,
+            n_steps - 1,
+            n_runs,
             SEED,
             keep_traj,
         )
 
         total_steps.append(numstep)
         if len(traj) != 0:
-            traj = get_padded_trajs(traj, N_STEPS)
+            traj = get_padded_trajs(traj, n_steps)
             single_traj_mean.append(np.mean(traj, axis=0) / problem.params[1])
             single_traj_median.append(np.median(traj, axis=0) / problem.params[1])
             energies_array_mean.append(
                 np.pad(
                     np.array(single_traj_mean)[0],
-                    (0, N_STEPS - len(single_traj_mean[0])),
+                    (0, n_steps - len(single_traj_mean[0])),
                 )
             )
             energies_array_median.append(
                 np.pad(
                     np.array(single_traj_median)[0],
-                    (0, N_STEPS - len(single_traj_median[0])),
+                    (0, n_steps - len(single_traj_median[0])),
                 )
             )
     total_steps_array = np.asarray(total_steps)
 
-    if energies_array_mean != []:
+    if energies_array_mean:
         energies_array_mean = np.mean(energies_array_mean, axis=0)
         energies_array_median = np.mean(energies_array_median, axis=0)
     total_array = [
@@ -173,8 +174,8 @@ def load_model_and_test_two_models(
     data_path,
     model_path_initialize,
     model_path_resample,
-    N_STEPS: int,
-    N_RUNS: int,
+    n_steps: int,
+    n_runs: int,
     algo_type,
     path_save=False,
     keep_traj=True,
@@ -187,8 +188,8 @@ def load_model_and_test_two_models(
         data_path (str): path pointing to dataset used for evaluation
         model_path_initialize (str): path of the model or "uniform" for running the uniform version. This is used for initialization.
         model_path_resample (str): path of the model or "uniform" for running the uniform version. This is used for resampling.
-        N_STEPS (int): number of steps taken by the algorithm
-        N_RUNS (int): number of runs executed by the algorithm
+        n_steps (int): number of steps taken by the algorithm
+        n_runs (int): number of runs executed by the algorithm
         algo_type (str): either "moser" for MT algorithm or "probsat" for the oracle version of WalkSAT
         path_save (bool, optional): path where details of the experiment are saved. Defaults to False.
         keep_traj (bool, optional): decide whether you want to keep the trajectories. Defaults to True.
@@ -286,18 +287,18 @@ def load_model_and_test_two_models(
         alpha_array.append(problem.params[1] / problem.params[0])
         if model_path_initialize != "uniform":
             decoded_nodes = network_i.apply(params_i, problem.graph)  # type: ignore[attr-defined]
-            n = problem.params[0]
+            n_variables = problem.params[0]
             model_probabilities_i = graph_representation_i.get_model_probabilities(
-                decoded_nodes, n
+                decoded_nodes, n_variables
             )
             model_probabilities_i = model_probabilities_i.ravel()
         else:
             model_probabilities_i = np.ones(problem.params[0]) / 2
         if model_path_resample != "uniform":
             decoded_nodes = network_r.apply(params_r, problem.graph)  # type: ignore[attr-defined]
-            n = problem.params[0]
+            n_variables = problem.params[0]
             model_probabilities_r = graph_representation_r.get_model_probabilities(
-                decoded_nodes, n
+                decoded_nodes, n_variables
             )
             model_probabilities_r = model_probabilities_r.ravel()
         else:
@@ -307,35 +308,35 @@ def load_model_and_test_two_models(
         print("model initialize", model_path_initialize)
         print("model resample", model_path_resample)
 
-        _, _, final_energies, numstep, traj = moser_rust.run_sls_python(
+        _, _, _, numstep, traj = moser_rust.run_sls_python(
             algo_type,
             problem_path,
             model_probabilities_i,
             model_probabilities_r,
-            N_STEPS - 1,
-            N_RUNS,
+            n_steps - 1,
+            n_runs,
             SEED,
             keep_traj,
         )
         total_steps.append(numstep)
         if len(traj) != 0:
-            traj = get_padded_trajs(traj, N_STEPS)
+            traj = get_padded_trajs(traj, n_steps)
             single_traj_mean.append(np.mean(traj, axis=0) / problem.params[1])
             single_traj_median.append(np.median(traj, axis=0) / problem.params[1])
             energies_array_mean.append(
                 np.pad(
                     np.array(single_traj_mean)[0],
-                    (0, N_STEPS - len(single_traj_mean[0])),
+                    (0, n_steps - len(single_traj_mean[0])),
                 )
             )
             energies_array_median.append(
                 np.pad(
                     np.array(single_traj_median)[0],
-                    (0, N_STEPS - len(single_traj_median[0])),
+                    (0, n_steps - len(single_traj_median[0])),
                 )
             )
     total_steps_array = np.asarray(total_steps)
-    if energies_array_mean != []:
+    if energies_array_mean:
         energies_array_mean = np.mean(energies_array_mean, axis=0)
         energies_array_median = np.mean(energies_array_median, axis=0)
     total_array = [

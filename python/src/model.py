@@ -107,7 +107,7 @@ def apply_convolution(
 def network_definition_interaction_VCG(
     graph: jraph.GraphsTuple, mlp_layers: list[int], num_message_passing_steps: int = 5
 ) -> jraph.ArrayTree:
-    """Define a graph neural network for interaction net and VCG.
+    """Define a graph neural network (GNN) for interaction net and VCG.
 
     Args:
         graph (jraph.GraphsTuple): Graphstuple the network processes.
@@ -127,7 +127,7 @@ def network_definition_interaction_LCG(
     mlp_layers: list[int],
     num_message_passing_steps: int = 5,
 ) -> jraph.ArrayTree:
-    """Define a graph neural network for interaction net and LCG.
+    """Define a graph neural network (GNN) for interaction net and LCG.
 
     Args:
         graph (jraph.GraphsTuple): Graphstuple the network processes.
@@ -145,7 +145,7 @@ def network_definition_interaction_LCG(
 def network_definition_convolution_VCG(
     graph: jraph.GraphsTuple, mlp_layers: list[int], num_message_passing_steps: int = 5
 ) -> jraph.ArrayTree:
-    """Define a graph neural network for GCN and VCG.
+    """Define a graph neural network (GNN) for GCN and VCG.
 
     Args:
         graph (jraph.GraphsTuple): Graphstuple the network processes.
@@ -163,7 +163,7 @@ def network_definition_convolution_VCG(
 def network_definition_convolution_LCG(
     graph: jraph.GraphsTuple, mlp_layers: list[int], num_message_passing_steps: int = 5
 ) -> jraph.ArrayTree:
-    """Define a graph neural network for GCN and LCG.
+    """Define a graph neural network (GNN) for GCN and LCG.
 
     Args:
         graph (jraph.GraphsTuple): Graphstuple the network processes.
