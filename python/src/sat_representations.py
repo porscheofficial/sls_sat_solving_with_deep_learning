@@ -18,12 +18,12 @@ class SATRepresentation(ABC):
 
     @staticmethod
     @abstractmethod
-    def get_graph(n, m, clauses, clause_lengths):
+    def get_graph(n_variables, n_clauses, clauses, clause_lengths):
         """Return the graph items: nodes, senders, receivers, edges, n_node, n_edge for input n = number of variables, m = number of clauses, clauses = clauses to embedd in the graph, clause_length = containing length of clauses.
 
         Args:
-            n (int): number of variables
-            m (int): number of clauses
+            n_variables (int): number of variables
+            n_clauses (int): number of clauses
             clauses (array): clauses of the formula in CNF-form
             clause_lengths (array / list): array containing the length of clauses
         """
@@ -61,11 +61,11 @@ class SATRepresentation(ABC):
 
     @staticmethod
     @abstractmethod
-    def get_mask(n, n_node):
+    def get_mask(n_variables, n_node):
         """Return mask encoding which nodes are variable nodes ("1" for nodes that are variable nodes and "0" for nodes that are not variable nodes (i.e. padding nodes or constraint nodes)).
 
         Args:
-            n (int): number of variables
+            n_variables (int): number of variables
             n_node (int): number of nodes in the graph
 
         Returns:
@@ -115,7 +115,7 @@ class SATRepresentation(ABC):
 
     @staticmethod
     @abstractmethod
-    def get_model_probabilities(decoded_nodes, n):
+    def get_model_probabilities(decoded_nodes, n_variables):
         """Return, for each, problem variable, the Bernoulli parameter of the model for this variable.
 
         That is, the ith value of the returned array is the probability with which the model will assign 1 to the
@@ -127,7 +127,7 @@ class SATRepresentation(ABC):
 
         Args:
             decoded_nodes (array): decoded nodes output of the model which is two-dimensional for VCG.
-            n (int): number of variables
+            n_variables (int): number of variables
 
         Returns:
             array: probability vector encoding probability for every variable to sample a one according to the Neural Network oracle.
@@ -222,11 +222,11 @@ class VCG(SATRepresentation):
             cnf (CNF): input cnf formula
 
         Returns:
-            int: number of nodes in the graph in VCG representation = n+m
+            int: number of nodes in the graph in VCG representation = n_claues+n_variables
         """
-        n = cnf.nv
-        m = len(cnf.clauses)
-        return n + m
+        n_variables = cnf.nv
+        n_clauses = len(cnf.clauses)
+        return n_variables + n_clauses
 
     @staticmethod
     @abstractmethod
@@ -239,7 +239,7 @@ class VCG(SATRepresentation):
         Returns:
             int: number of edges in the graph in VCG representation
         """
-        return sum([len(c) for c in cnf.clauses])
+        return sum([len(clause) for clause in cnf.clauses])
 
     @staticmethod
     @abstractmethod
@@ -262,12 +262,12 @@ class VCG(SATRepresentation):
         )
 
     @staticmethod
-    def get_graph(n, m, clauses, clause_lengths):
+    def get_graph(n_variables, n_clauses, clauses, clause_lengths):
         """Return the graph items: nodes, senders, receivers, edges, n_node, n_edge for input n = number of variables, m = number of clauses, clauses = clauses to embedd in the graph, clause_length = containing length of clauses.
 
         Args:
-            n (int): number of variables
-            m (int): number of clauses
+            n_variables (int): number of variables
+            n_clauses (int): number of clauses
             clauses (array): clauses of the formula in CNF-form
             clause_lengths (array / list): array containing the length of clauses
 
@@ -279,34 +279,36 @@ class VCG(SATRepresentation):
             n_node (int): number of nodes in the graph
             n_edge (int): number of edges in the graph
         """
-        n_node = n + m
+        n_node = n_variables + n_clauses
         n_edge = sum(clause_lengths)
 
         edges = []
         senders = []
         receivers = []
-        nodes = [0 if i < n else 1 for i in range(n_node)]
-        for j, c in enumerate(clauses):
-            support = [(abs(literal) - 1) for literal in c]
+        nodes = [0 if i < n_variables else 1 for i in range(n_node)]
+        for j, clause in enumerate(clauses):
+            support = [(abs(literal) - 1) for literal in clause]
             assert len(support) == len(
                 set(support)
             ), "Multiple occurrences of single variable in constraint"
 
-            vals = ((np.sign(c) + 1) // 2).astype(np.int32)
+            vals = ((np.sign(clause) + 1) // 2).astype(np.int32)
 
             senders.extend(support)
             edges.extend(vals)
-            receivers.extend(np.repeat(j + n, len(c)))
+            receivers.extend(np.repeat(j + n_variables, len(clause)))
 
         return nodes, senders, receivers, edges, n_node, n_edge
 
     @staticmethod
-    def get_constraint_graph(n, m, senders, receivers) -> jraph.GraphsTuple:
+    def get_constraint_graph(
+        n_variables, n_clauses, senders, receivers
+    ) -> jraph.GraphsTuple:
         """Compute the constraint graph from n = number of variables, m = number of clauses and senders, receivers from the graph (encoding variable occurence in clauses). This constraint graph has edges between clauses whenever they share variables. This is used for the Lovasz Local Lemma Loss.
 
         Args:
-            n (int): number of variables
-            m (int): number of clauses
+            n_variables (int): number of variables
+            n_clauses (int): number of clauses
             senders (array): sending nodes (variable nodes)
             receivers (array): receiving nodes (clause nodes)
 
@@ -314,31 +316,31 @@ class VCG(SATRepresentation):
             jraph.GraphsTuple: constraint graph encoding the neighborhood of clauses
         """
         row_ind = np.asarray(senders)
-        col_ind = np.asarray(receivers) - n * np.ones(len(receivers))
+        col_ind = np.asarray(receivers) - n_variables * np.ones(len(receivers))
         data = np.ones(len(row_ind))
         sparse_clause_matrix = scipy.sparse.csr_matrix(
-            (data, (row_ind, col_ind)), (n, m)
+            (data, (row_ind, col_ind)), (n_variables, n_clauses)
         )
         adj_matrix = sparse_clause_matrix.transpose() @ sparse_clause_matrix
-        major_dimension, minor_dimension = adj_matrix.shape
+        major_dimension, _ = adj_matrix.shape
         minor_indices = adj_matrix.indices
         major_indices = np.empty(len(minor_indices), dtype=adj_matrix.indices.dtype)
         scipy.sparse._sparsetools.expandptr(
             major_dimension, adj_matrix.indptr, major_indices
         )
-        x, y = np.array(
+        dummy_x, dummy_y = np.array(
             np.where(
                 minor_indices - major_indices != 0,
-                [minor_indices + n, major_indices + n],
+                [minor_indices + n_variables, major_indices + n_variables],
                 0,
             )
         )
-        x = x[x != 0]
-        y = y[y != 0]
-        neighbors_list = np.vstack((y, x))
+        dummy_x = dummy_x[dummy_x != 0]
+        dummy_y = dummy_y[dummy_y != 0]
+        neighbors_list = np.vstack((dummy_y, dummy_x))
         graph = jraph.GraphsTuple(
-            n_node=np.asarray([m]),
-            n_edge=np.asarray([len(x)]),
+            n_node=np.asarray([n_clauses]),
+            n_edge=np.asarray([len(dummy_x)]),
             senders=neighbors_list[0],
             receivers=neighbors_list[1],
             globals=None,
@@ -682,7 +684,7 @@ class LCG(SATRepresentation):
             (data, (row_ind, col_ind)), (n, m)
         )
         adj_matrix = sparse_clause_matrix.transpose() @ sparse_clause_matrix
-        major_dimension, minor_dimension = adj_matrix.shape
+        major_dimension, _ = adj_matrix.shape
         minor_indices = adj_matrix.indices
         major_indices = np.empty(len(minor_indices), dtype=adj_matrix.indices.dtype)
         scipy.sparse._sparsetools.expandptr(
@@ -723,11 +725,6 @@ class LCG(SATRepresentation):
         Returns:
             jnp.array: array encoding whether assignment violates the clauses ("1" for clause is violated and "0" for clause is not violated by current assignment).
         """
-
-        def one_hot(x, k, dtype=jnp.float32):
-            """Create a one-hot encoding of x of size k."""
-            return jnp.array(x[:, None] == jnp.arange(k), dtype)
-
         graph = problem.graph
         n, m, _ = problem.params
         # this is required because we added edges to connect literal nodes

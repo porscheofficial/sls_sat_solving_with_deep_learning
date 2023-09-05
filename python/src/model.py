@@ -3,9 +3,9 @@ import haiku as hk
 import jax
 import jraph
 from jraph._src import utils
-import jax
-from python.src.sat_representations import SATRepresentation, VCG, LCG
-from typing import Any
+from python.src.sat_representations import VCG, LCG
+
+# from typing import Any
 
 
 def get_embedding(graph: jraph.GraphsTuple):
@@ -37,25 +37,27 @@ def apply_interaction(
     def mlp(dims):
         """Define an MLP."""
         net = []
-        for d in dims:
-            net.extend([hk.Linear(d), jax.nn.relu])
+        for dim in dims:
+            net.extend([hk.Linear(dim), jax.nn.relu])
         return hk.Sequential(net)
 
     @jax.vmap
     @jraph.concatenated_args
     def update_fn(features):
         """Define an update function including a layer norm feature."""
-        ln = hk.LayerNorm(axis=-1, param_axis=-1, create_scale=True, create_offset=True)
+        layer_norm = hk.LayerNorm(
+            axis=-1, param_axis=-1, create_scale=True, create_offset=True
+        )
         net = mlp(mlp_layers)
-        return ln(net(features))
+        return layer_norm(net(features))
 
     for _ in range(num_message_passing_steps):
-        gn = jraph.InteractionNetwork(
+        interaction_layer = jraph.InteractionNetwork(
             update_edge_fn=update_fn,
             update_node_fn=update_fn,
             include_sent_messages_in_node_update=True,
         )
-        graph = gn(graph)
+        graph = interaction_layer(graph)
     return graph
 
 
@@ -76,8 +78,8 @@ def apply_convolution(
     def mlp(dims):
         """Define an MLP."""
         net = []
-        for d in dims:
-            net.extend([hk.Linear(d), jax.nn.relu])
+        for dim in dims:
+            net.extend([hk.Linear(dim), jax.nn.relu])
         return hk.Sequential(net)
 
     @jax.vmap
@@ -88,14 +90,14 @@ def apply_convolution(
         return net(features)
 
     for _ in range(num_message_passing_steps):
-        gn = jraph.GraphConvolution(
+        convolution_layer = jraph.GraphConvolution(
             update_node_fn=update_fn,
             add_self_edges=False,
             aggregate_nodes_fn=utils.segment_sum,
         )
         # NOTE: implementation does not add an activation after aggregation; if we
         # stack layers, we might want to add an activation between each layer
-        graph = gn(graph)
+        graph = convolution_layer(graph)
         # graph = graph._replace(nodes=jax.nn.relu(graph.nodes))
         # gn = jraph.GraphConvolution(
         #    update_node_fn=update_fn,
@@ -104,7 +106,7 @@ def apply_convolution(
     return graph
 
 
-def network_definition_interaction_VCG(
+def network_definition_interaction_vcg(
     graph: jraph.GraphsTuple, mlp_layers: list[int], num_message_passing_steps: int = 5
 ) -> jraph.ArrayTree:
     """Define a graph neural network (GNN) for interaction net and VCG.
@@ -122,7 +124,7 @@ def network_definition_interaction_VCG(
     return hk.Linear(2)(graph.nodes)
 
 
-def network_definition_interaction_LCG(
+def network_definition_interaction_lcg(
     graph: jraph.GraphsTuple,
     mlp_layers: list[int],
     num_message_passing_steps: int = 5,
@@ -142,7 +144,7 @@ def network_definition_interaction_LCG(
     return hk.Linear(1)(graph.nodes)
 
 
-def network_definition_convolution_VCG(
+def network_definition_convolution_vcg(
     graph: jraph.GraphsTuple, mlp_layers: list[int], num_message_passing_steps: int = 5
 ) -> jraph.ArrayTree:
     """Define a graph neural network (GNN) for GCN and VCG.
@@ -160,7 +162,7 @@ def network_definition_convolution_VCG(
     return hk.Linear(2)(graph.nodes)
 
 
-def network_definition_convolution_LCG(
+def network_definition_convolution_lcg(
     graph: jraph.GraphsTuple, mlp_layers: list[int], num_message_passing_steps: int = 5
 ) -> jraph.ArrayTree:
     """Define a graph neural network (GNN) for GCN and LCG.
@@ -192,12 +194,13 @@ def get_network_definition(network_type, graph_representation):
         returns network definition for the chosen input
     """
     if network_type == "GCN" and graph_representation == VCG:
-        return network_definition_convolution_VCG
+        function = network_definition_convolution_vcg
     elif network_type == "GCN" and graph_representation == LCG:
-        return network_definition_convolution_LCG
+        function = network_definition_convolution_lcg
     elif network_type == "interaction" and graph_representation == VCG:
-        return network_definition_interaction_VCG
+        function = network_definition_interaction_vcg
     elif network_type == "interaction" and graph_representation == LCG:
-        return network_definition_interaction_LCG
+        function = network_definition_interaction_lcg
     else:
         raise ValueError("Invalid network_type or graph_representation")
+    return function
