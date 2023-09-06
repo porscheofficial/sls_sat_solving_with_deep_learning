@@ -328,7 +328,7 @@ def experiment_tracking_train(
         final_learning_rate (float, optional): final learning rate that is chosen. Note that the learning rate decays from the initial learing rate exponentially to the final learning rate over the epochs. Defaults to 0.001.
 
     Raises:
-            ValueError: if no proper graph representation is chosen, raise a value error
+            ValueError: if no proper graph representation is chosen, raise a value error.
     """
     match graph_representation:
         case "LCG":
@@ -396,9 +396,9 @@ def experiment_tracking_train(
             final_learning_rate=final_learning_rate,
         )
         # log params which are a result of learning
-        with tempfile.TemporaryDirectory() as dump_object:
-            joblib.dump(artifacts["params"], Path(dump_object, "params.pkl"))
-            mlflow.log_artifact(dump_object)
+        with tempfile.TemporaryDirectory() as dp:
+            joblib.dump(artifacts["params"], Path(dp, "params.pkl"))
+            mlflow.log_artifact(dp)
 
 
 if __name__ == "__main__":
