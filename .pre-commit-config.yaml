@@ -11,7 +11,7 @@ repos:
     rev: v0.990 #v0.902 
     hooks:
       - id: mypy
-        #files: ^python/src/
+        #files: ^python/src/.
         exclude: ^tests/
         args: [--ignore-missing-imports, --allow-redefinition, --show-traceback]
 
@@ -27,7 +27,9 @@ repos:
     rev: v3.0.0a3
     hooks:
       - id: pylint
+        #exclude: ^tests/
+        files: ^python/src/.
         args: 
         - --enable=unused-import
-        - --disable=C0301,E0401,R0912,R0913,R0914,R0915, 
+        - --disable=C0301,E0401,R0902,R0903,R0912,R0913,R0914,R0915,W0212
         - --max-line-length=120

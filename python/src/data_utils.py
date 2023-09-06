@@ -1,29 +1,19 @@
 """Contains useful functions to deal with data files (i.e. cnf files and their solutions in a dataset)."""
 
 from collections import namedtuple
-from os.path import join, exists  # ,basename
-
-# from os import mkdir
+from os.path import join, exists
 import sys
-
-# from functools import partial
 import glob
 import gzip
 import pickle
 import jraph
-
-# import jax
 import nnf
 import numpy as np
 import jax.numpy as jnp
 from func_timeout import func_timeout, FunctionTimedOut
-
-# from jraph._src import utils
 from jax import vmap
 from pysat.formula import CNF
 from torch.utils import data
-
-# from python.src.sat_instances import SATProblem
 from python.src.sat_representations import SATRepresentation  # , LCG, VCG
 from python.src.sat_instances import get_problem_from_cnf
 
@@ -211,7 +201,8 @@ class JraphDataLoader(data.DataLoader):
         worker_init_fn=None,
     ):
         """Initialize."""
-        super(self.__class__, self).__init__(
+        # super(self.__class__, self).__init__(
+        super(data.DataLoader, self).__init__(
             dataset,
             batch_size=batch_size,
             shuffle=shuffle,
@@ -224,62 +215,6 @@ class JraphDataLoader(data.DataLoader):
             timeout=timeout,
             worker_init_fn=worker_init_fn,
         )
-
-
-'''
-def number_of_violated_constraints(
-    problem: SATProblem, assignment, representation: SATRepresentation
-):
-    """Get the number of violated constraints for a SATProblem and an assignment for a given SATRepresentation
-
-    Args:
-        problem (SATProblem): SAT problem we want to look at
-        assignment (array): current assignment of variables we want to check for
-        representation (SATRepresentation): SATRepresentation -> either LCG or VCG
-
-    Returns:
-        int: number of violated constraints by current assignment for the problem at hand
-    """
-    match representation:
-        case VCG:
-            return number_of_violated_constraints_VCG(problem, assignment)
-        case LCG:
-            return number_of_violated_constraints_LCG(problem, assignment)
-
-
-def number_of_violated_constraints_VCG(problem: SATProblem, assignment):
-    """Get number of violated constraints by current assignment for VCG representation"""
-    return np.sum(
-        VCG.get_violated_constraints(problem, assignment).astype(int),
-        axis=0,
-    )
-
-
-
-@partial(jax.jit, static_argnames=("problem",))
-def number_of_violated_constraints_LCG(problem: SATProblem, assignment):
-    """Get number of violated constraints by current assignment for LCG representation"""
-
-    def one_hot(x_string, k_size, dtype=jnp.float32):
-        """Create a one-hot encoding of x_string of size k_size."""
-        return jnp.array(x_string[:, None] == jnp.arange(k_size), dtype)
-
-    graph = problem.graph
-    n_variables, n_clauses, _ = problem.params
-    senders = graph.senders[:-n_variables]
-    receivers = graph.receivers[:-n_variables]
-    new_assignment = jnp.ravel(one_hot(assignment, 2))
-    edge_is_satisfied = jnp.ravel(
-        new_assignment[None].T[senders].T
-    )  # + np.ones(len(senders)), 2)
-    number_of_literals_satisfied = utils.segment_sum(
-        data=edge_is_satisfied,
-        segment_ids=receivers,
-        num_segments=2 * n_variables + n_clauses,
-    )[2 * n_clauses :]
-    clause_is_unsat = jnp.where(number_of_literals_satisfied > 0, 0, 1)
-    return jnp.sum(clause_is_unsat)
-'''
 
 
 def timed_solve(max_time, problem):
