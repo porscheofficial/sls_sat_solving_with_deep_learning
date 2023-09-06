@@ -1,9 +1,0 @@
-python/tests/test_instances/multiple_instances/huge.cnf
-python/tests/test_instances/multiple_instances/huge_samples_sol.npy
-python/tests/test_instances/multiple_instances/huge_sol.pkl
-python/tests/test_instances/multiple_instances/medium.cnf
-python/tests/test_instances/multiple_instances/medium_samples_sol.npy
-python/tests/test_instances/multiple_instances/medium_sol.pkl
-python/tests/test_instances/single_instance/medium.cnf
-python/tests/test_instances/single_instance/medium_samples_sol.npy
-python/tests/test_instances/single_instance/medium_sol.pkl
