@@ -7,6 +7,7 @@ from jraph._src import utils
 from pysat.formula import CNF
 import scipy
 import jraph
+from scipy.sparse._sparsetools import expandptr
 
 
 class SATRepresentation(ABC):
@@ -327,9 +328,7 @@ class VCG(SATRepresentation):
         major_dimension, _ = adj_matrix.shape
         minor_indices = adj_matrix.indices
         major_indices = np.empty(len(minor_indices), dtype=adj_matrix.indices.dtype)
-        scipy.sparse._sparsetools.expandptr(
-            major_dimension, adj_matrix.indptr, major_indices
-        )
+        expandptr(major_dimension, adj_matrix.indptr, major_indices)
         dummy_x, dummy_y = np.array(
             np.where(
                 minor_indices - major_indices != 0,
@@ -691,9 +690,7 @@ class LCG(SATRepresentation):
         major_dimension, _ = adj_matrix.shape
         minor_indices = adj_matrix.indices
         major_indices = np.empty(len(minor_indices), dtype=adj_matrix.indices.dtype)
-        scipy.sparse._sparsetools.expandptr(
-            major_dimension, adj_matrix.indptr, major_indices
-        )
+        expandptr(major_dimension, adj_matrix.indptr, major_indices)
         dummy_x, dummy_y = np.array(
             np.where(
                 minor_indices - major_indices != 0,
