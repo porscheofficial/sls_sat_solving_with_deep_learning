@@ -70,7 +70,7 @@ class TestParameterized(object):
             num_epochs=NUM_EPOCHS,
             n_steps_moser=N_STEPS_MOSER,
             n_runs_moser=N_RUNS_MOSER,
-            path=data_dir,
+            data_path=data_dir,
             graph_representation=representation,
             network_type=network_type,
             return_candidates=return_candidates,
