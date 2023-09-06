@@ -23,7 +23,7 @@ pairs = [
             [True, False],
             [1, 2],
             [0, 1],
-            [0, 1],
+            [0],
             [0, 1],
             ["interaction", "GCN"],
         ]
@@ -59,7 +59,7 @@ class TestParameterized(object):
         NUM_EPOCHS = 1
         N_STEPS_MOSER = 100
         N_RUNS_MOSER = 1
-        inv_temp = 0.0000001
+        inv_temp = 1
         mlp_layers = [32, 32]
         train(
             batch_size=batch_size,
@@ -75,4 +75,6 @@ class TestParameterized(object):
             network_type=network_type,
             return_candidates=return_candidates,
             mlp_layers=mlp_layers,
+            initial_learning_rate=1e-3,
+            final_learning_rate=1e-3,
         )

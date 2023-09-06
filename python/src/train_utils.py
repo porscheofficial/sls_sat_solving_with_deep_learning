@@ -293,9 +293,10 @@ def evaluate_moser_rust(
             model_probabilities.shape,
         )
 
-        _, _, final_energies, _, _, _ = moser_rust.run_sls_python(
+        _, _, final_energies, _, _ = moser_rust.run_sls_python(
             "moser",
             problem_path,
+            model_probabilities,
             model_probabilities,
             n_steps_moser,
             n_runs_moser,
