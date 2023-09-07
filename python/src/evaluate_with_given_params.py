@@ -3,16 +3,15 @@ import sys
 from functools import partial
 import numpy as np
 import haiku as hk
-import moser_rust
-from python.src.data_utils import SATTrainingDataset
-from python.src.sat_representations import LCG
-from python.src.model import (
-    get_network_definition,
-)
 
 
 sys.path.append("../../")
-
+import moser_rust
+from data_utils import SATTrainingDataset
+from sat_representations import LCG
+from model import (
+    get_network_definition,
+)
 
 SEED = 0
 

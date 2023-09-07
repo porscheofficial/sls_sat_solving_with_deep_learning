@@ -31,5 +31,5 @@ repos:
         files: ^python/src/.
         args: 
         - --enable=unused-import
-        - --disable=C0301,E0401,R0902,R0903,R0912,R0913,R0914,R0915,R1705, R1732, E1003
+        - --disable=C0301,C0413,E0401,R0902,R0903,R0912,R0913,R0914,R0915,R1705, R1732, E1003
         - --max-line-length=120
