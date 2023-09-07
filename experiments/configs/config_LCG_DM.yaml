@@ -5,7 +5,7 @@ inv_temp: 1
 alpha: 1
 beta: 0
 gamma: 0
-num_epochs: 1
+num_epochs: 50
 n_steps_moser: 0
 n_runs_moser: 0
 data_path: Data/random_sat_data/training
