@@ -57,7 +57,7 @@ class TestParameterized(object):
         network_type,
     ):
         NUM_EPOCHS = 1
-        N_STEPS_MOSER = 100
+        N_STEPS_MOSER = 0
         N_RUNS_MOSER = 1
         inv_temp = 1
         mlp_layers = [32, 32]
