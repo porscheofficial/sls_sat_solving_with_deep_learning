@@ -74,13 +74,6 @@ class SATTrainingDataset(data.Dataset):
         else:
             return gzip.open(name + ".cnf.gz", "rt")
 
-        # if self.already_unzipped:
-        #    with open(name + ".cnf", "rt") as problem:
-        #        return problem
-        # else:
-        #   with gzip.open(name + ".cnf.gz", "rt") as problem:
-        #       return problem
-
     def get_unpadded_problem(self, idx):
         """Get unpadded problem."""
         instance_name = self.instances[idx].name
@@ -111,12 +104,12 @@ class SATTrainingDataset(data.Dataset):
             target_name = instance_name + "_sol.pkl"
             with open(target_name, "rb") as file:
                 solution_dict = pickle.load(file)
-            # if isinstance(solution_dict, dict):
-            if type(solution_dict) == dict:
+            if isinstance(solution_dict, dict):
+                # if type(solution_dict) == dict:
                 print("dict", solution_dict)
                 solution_dict = [x for (_, x) in solution_dict.items()]
-            # if isinstance(solution_dict, (list, np.ndarray)):
-            if type(solution_dict) == list or type(solution_dict) == np.ndarray:
+            if isinstance(solution_dict, (list, np.ndarray)):
+                # if type(solution_dict) == list or type(solution_dict) == np.ndarray:
                 if 2 in solution_dict or -2 in solution_dict:
                     solution_dict = np.array(solution_dict, dtype=float)
                     solution_dict = [int(np.sign(x) + 1) / 2 for x in solution_dict]
@@ -280,12 +273,12 @@ def create_candidates(data_dir, sample_size: int, threshold):
     for instance in solved_instances:
         with open(instance, "rb") as file:
             solution = pickle.load(file)
-        # if isinstance(solution, dict):
-        if type(solution) == dict:
+        if isinstance(solution, dict):
+            # if type(solution) == dict:
             print("dict", solution)
             solution = [assignment_x for (_, assignment_x) in solution.items()]
-        # if isinstance(solution, (list, np.ndarray)):
-        if type(solution) == list or type(solution) == np.ndarray:
+        if isinstance(solution, (list, np.ndarray)):
+            # if type(solution) == list or type(solution) == np.ndarray:
             if 2 in solution or -2 in solution:
                 solution = np.array(solution, dtype=float)
                 solution = [
