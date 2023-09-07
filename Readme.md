@@ -3,7 +3,7 @@
 This is the code to accompany the submission "Using deep learning to construct Stochastic Local Search SAT solvers with performance bounds". 
 
 ## Setup
-<!-- **0. Clone the repository**
+**0. Clone the repository**
 
 Clone the repository via
 
@@ -15,11 +15,11 @@ and navigate to the repository using
 
 `
 cd <repo>
-` -->
+`
 
 **1. Create virtual environment and install all the requirements in the virtual environment**
 
-This app has been run and tested with Python 3.10. To start with, ensure you have a version of Python3.10 installed locally. To install virtualenv
+This app has been run and tested with Python 3.10. To start with, ensure you have a version of Python3.10 installed locally. To install virtualenv type
 
 `
 pip3.10 install virtualenv
@@ -119,3 +119,34 @@ and then
 ### Generating datasets
 
 We provide the dataset used for the experiments reported in the submission alongside the code. However, to genereate new datasets, use the notebook  `python/src/instace_sampling.ipynb`.
+
+## How to cite
+
+Please consider citing our paper if you use our code in your project.
+
+Maximilian J. Kramer, Paul Boes. (2023). ["Using deep learning to construct Stochastic Local Search SAT solvers with performance bounds"] (https://arxiv.org/abs/XXXXX). arXiv preprint arXiv:XXXXXXX
+
+```
+@bibtex_ref{}
+```
+
+## Contributing
+
+This GNN-based oracle factory is openly developed in the wild and contributions (both internal and external) are highly appreciated.
+See [CONTRIBUTING.md](./CONTRIBUTING.md) on how to get started.
+
+If you have feedback or want to propose a new feature, please [open an issue](https://github.com/porscheofficial/porscheofficial.github.io/issues).
+Thank you! 😊
+
+## Acknowledgements
+
+This project is part of the AI research of [Porsche Digital](https://www.porsche.digital/). ✨
+
+
+## License
+
+Copyright © 2023 Porsche Digital GmbH
+
+Porsche Digital GmbH publishes this open source software and accompanied documentation (if any) subject to the terms of the [MIT license](./LICENSE.md). All rights not explicitly granted to you under the MIT license remain the sole and exclusive property of Porsche Digital GmbH.
+
+Apart from the software and documentation described above, the texts, images, graphics, animations, video and audio files as well as all other contents on this website are subject to the legal provisions of copyright law and, where applicable, other intellectual property rights. The aforementioned proprietary content of this website may not be duplicated, distributed, reproduced, made publicly accessible or otherwise used without the prior consent of the right holder.
