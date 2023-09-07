@@ -71,7 +71,7 @@ class TestParameterized(object):
             n_steps_moser=N_STEPS_MOSER,
             n_runs_moser=N_RUNS_MOSER,
             data_path=data_dir,
-            graph_representation=representation,
+            graph_representation_rep=representation,
             network_type=network_type,
             return_candidates=return_candidates,
             mlp_layers=mlp_layers,

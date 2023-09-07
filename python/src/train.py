@@ -5,6 +5,7 @@ import time
 from pathlib import Path
 import tempfile
 import os
+from typing import Any
 import joblib
 import mlflow
 import haiku as hk
@@ -16,6 +17,7 @@ from torch import Generator
 from torch.utils import data
 import matplotlib.pyplot as plt
 from jsonargparse import CLI
+
 
 from python.src.data_utils import SATTrainingDataset, JraphDataLoader
 from python.src.sat_representations import VCG, LCG
@@ -41,7 +43,7 @@ def train(
     n_steps_moser: int,
     n_runs_moser: int,
     data_path,
-    graph_representation,
+    graph_representation: str,
     network_type,
     mlp_layers,
     img_path=False,
@@ -76,13 +78,19 @@ def train(
     Returns:
         @TODO: type: final params of the net
     """
+    match graph_representation:
+        case "LCG":
+            graph_representation_rep: Any = LCG
+        case "VCG":
+            graph_representation_rep = VCG
+
     include_constraint_graph = (
         beta + gamma > 0
     )  # we calculate the constraint graphs only if we use it to calculate the lll loss
 
     sat_data = SATTrainingDataset(
         data_path,
-        graph_representation,
+        graph_representation_rep,
         return_candidates=return_candidates,
         include_constraint_graph=include_constraint_graph,
     )
@@ -97,7 +105,7 @@ def train(
     train_eval_loader = JraphDataLoader(train_eval_data, batch_size=batch_size)
 
     network_definition = get_network_definition(
-        network_type=network_type, graph_representation=graph_representation
+        network_type=network_type, graph_representation=graph_representation_rep
     )
     network_definition = partial(network_definition, mlp_layers=mlp_layers)
     network = hk.without_apply_rng(hk.transform(network_definition))
@@ -162,7 +170,7 @@ def train(
     @jax.jit
     def update(params, batch, opt_state):
         gradient = jax.grad(total_loss)(
-            params, batch, inv_temp, alpha, beta, gamma, graph_representation
+            params, batch, inv_temp, alpha, beta, gamma, graph_representation_rep
         )
         updates, opt_state = opt_update(gradient, opt_state)
         return optax.apply_updates(params, updates), opt_state
@@ -174,14 +182,14 @@ def train(
         alpha,
         beta,
         gamma,
-        graph_representation,
+        graph_representation_rep,
         test_loader,
         train_eval_loader,
     )
     eval_moser_loss = initiate_eval_moser_train_test(
         n_steps_moser,
         n_runs_moser,
-        graph_representation,
+        graph_representation_rep,
         test_data,
         train_eval_data,
         sat_data,
@@ -208,7 +216,7 @@ def train(
                             beta,
                             gamma,
                             mlp_layers,
-                            graph_representation,
+                            graph_representation_rep,
                             network_type,
                             return_candidates,
                         ],
@@ -257,7 +265,7 @@ def train(
                         beta,
                         gamma,
                         mlp_layers,
-                        graph_representation,
+                        graph_representation_rep,
                         network_type,
                         return_candidates,
                     ],
@@ -297,7 +305,7 @@ def experiment_tracking_train(
     n_steps_moser: int,
     n_runs_moser: int,
     data_path: str,
-    graph_representation,
+    graph_representation: str,
     mlp_layers: list[int],
     network_type: str = "interaction",
     return_candidates=True,
@@ -330,14 +338,19 @@ def experiment_tracking_train(
     Raises:
             ValueError: if no proper graph representation is chosen, raise a value error
     """
-    match graph_representation:
-        case "LCG":
-            graph_representation = LCG
-        case "VCG":
-            graph_representation = VCG
+    # match graph_representation:
+    #    case "LCG":
+    #        graph_representation_rep = LCG
+    #   case "VCG":
+    #        graph_representation_rep = VCG
+
+    if graph_representation == "LCG":
+        graph_representation_rep: Any = LCG
+    elif graph_representation == "VCG":
+        graph_representation_rep = VCG
 
     network_definition = get_network_definition(
-        network_type=network_type, graph_representation=graph_representation
+        network_type=network_type, graph_representation=graph_representation_rep
     )
 
     model_registry_path = Path(model_registry)
@@ -365,7 +378,7 @@ def experiment_tracking_train(
                 "N_RUNS_MOSER": n_runs_moser,
                 "network_definition": network_definition.__name__,
                 "path_dataset": data_path,
-                "graph_representation": graph_representation,
+                "graph_representation": graph_representation_rep,
                 "network_type": network_type,
                 "return_candidates": return_candidates,
                 "mlp_layers": mlp_layers,
