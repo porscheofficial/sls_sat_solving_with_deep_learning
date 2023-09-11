@@ -113,7 +113,7 @@ tomlkit==0.11.8
 toolz==0.12.0
 torch==2.0.1
 torchvision==0.15.2
-tornado==6.3.2
+tornado==6.3.3
 traitlets==5.9.0
 typing_extensions==4.5.0
 tzdata==2023.3
