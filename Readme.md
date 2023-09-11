@@ -98,7 +98,7 @@ The plots from the experiments can be found under `Data/plots`, the pre-trained 
 
 To replicate the experiments, you can either **take the trained models or rerun the training**. 
 
-1. To **use the existing models**, simply run the tutorial notebook. 
+1. To **use the existing models**, simply run the tutorial notebook at `python/src/tutorial.ipynb`. 
 
 ### Using retrained models
 
