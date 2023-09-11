@@ -22,24 +22,10 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Install Miniconda
+      - name: Run Python commands
         run: |
-          wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
-          bash Miniconda3-latest-Linux-x86_64.sh -b -p $HOME/miniconda
-          export PATH="$HOME/miniconda/bin:$PATH"
-          hash -r
-          echo "source /home/runner/miniconda/etc/profile.d/conda.sh" >> /home/runner/.bashrc
-          source /home/runner/.bashrc
-
-      - name: Create Conda Environment
-        #run: conda env create -f environment.yml
-        run: conda create --name env --file requirements.txt
-
-      - name: Activate env and Check for Security Issues
-        run: |
-          source /home/runner/miniconda/bin/activate /usr/share/miniconda/envs/NAME_OF_ENV
+          pip install --upgrade pip
+          python3.10 -m venv env
+          source env/bin/activate
+          pip install -r requirements.txt
           safety check
-
-      - name: Cleanup
-        run: |
-          rm -f Miniconda3-latest-Linux-x86_64.sh
