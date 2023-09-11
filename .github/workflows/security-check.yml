@@ -7,6 +7,8 @@ on:
   pull_request:
     branches:
       - main
+env:
+  DEP_PATH: /requirements.txt
 
 jobs:
   security_check:
