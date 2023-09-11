@@ -19,7 +19,7 @@ pairs = [
                 "python/tests/test_instances/single_instance/",
                 "python/tests/test_instances/multiple_instances/",
             ],
-            [VCG, LCG],
+            ["VCG", "LCG"],
             [True, False],
             [1, 2],
             [0, 1],
