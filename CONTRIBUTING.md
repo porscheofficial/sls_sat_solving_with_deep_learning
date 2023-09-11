@@ -40,4 +40,5 @@ git push origin feature/short-description
 Just make sure that:
 
 - Your pull request is focused and you avoid unrelated commits
+- Ensure your code passes the pre-commit hook that is part of the repository and also the github workflow.
 - You read and accept our [Contributor License Agreement](https://opensource.porsche.com/docs/cla)
