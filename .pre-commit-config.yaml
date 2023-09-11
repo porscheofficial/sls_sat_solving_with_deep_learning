@@ -7,15 +7,29 @@ repos:
       - id: black
         args: [--diff, --check]
 
-#  - repo: https://github.com/pre-commit/mirrors-pylint
-#    rev: v3.0.0a3
-#    hooks:
-#      - id: pylint
-#        args: [--enable=unused-import]
-#
-#  - repo: https://github.com/pre-commit/mirrors-mypy
-#    rev: v0.902
-#    hooks:
-#      - id: mypy
-#        exclude: ^tests/
-#        args: [--strict]
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v0.990 #v0.902 
+    hooks:
+      - id: mypy
+        #files: ^python/src/.
+        exclude: ^tests/
+        args: [--ignore-missing-imports, --allow-redefinition, --show-traceback]
+
+  - repo: https://github.com/PyCQA/pydocstyle
+    rev: 6.3.0
+    hooks:
+        - id: pydocstyle
+          args:
+          - --ignore=D104,D203,D212,D213,D214,D215,D404,D405,D406,D407,D408,D409,D410,D411,D413,D415,D416,D417
+          exclude: ^tests/
+
+  - repo: https://github.com/pre-commit/mirrors-pylint
+    rev: v3.0.0a3
+    hooks:
+      - id: pylint
+        #exclude: ^tests/
+        files: ^python/src/.
+        args: 
+        - --enable=unused-import
+        - --disable=C0301,C0413,E0401,R0902,R0903,R0912,R0913,R0914,R0915,R1705, R1732, E1003
+        - --max-line-length=120

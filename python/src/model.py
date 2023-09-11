@@ -1,13 +1,15 @@
+"""Definition of Graph Neural Network (GNN) models."""
 import haiku as hk
 import jax
 import jraph
 from jraph._src import utils
-import jax
-from python.src.sat_representations import SATRepresentation, VCG, LCG
-from typing import Any
+from python.src.sat_representations import VCG, LCG
+
+# from typing import Any
 
 
 def get_embedding(graph: jraph.GraphsTuple):
+    """Get embedded graph."""
     embedding = jraph.GraphMapFeatures(
         embed_edge_fn=jax.vmap(hk.Linear(output_size=32)),
         embed_node_fn=jax.vmap(hk.Linear(output_size=32)),
@@ -21,53 +23,81 @@ def apply_interaction(
     graph: jraph.GraphsTuple,
     num_message_passing_steps: int = 5,
 ):
+    """Apply an interaction net on a graph.
+
+    Args:
+        mlp_layers (list[int]): mlp_layer dimensions
+        graph (jraph.GraphsTuple): graph we want to apply an interaction net on
+        num_message_passing_steps (int, optional): number of message passing steps = number of layers. Defaults to 5.
+
+    Returns:
+        graph after application of interaction.
+    """
+
     def mlp(dims):
+        """Define an MLP."""
         net = []
-        for d in dims:
-            net.extend([hk.Linear(d), jax.nn.relu])
+        for dim in dims:
+            net.extend([hk.Linear(dim), jax.nn.relu])
         return hk.Sequential(net)
 
     @jax.vmap
     @jraph.concatenated_args
     def update_fn(features):
-        ln = hk.LayerNorm(axis=-1, param_axis=-1, create_scale=True, create_offset=True)
+        """Define an update function including a layer norm feature."""
+        layer_norm = hk.LayerNorm(
+            axis=-1, param_axis=-1, create_scale=True, create_offset=True
+        )
         net = mlp(mlp_layers)
-        return ln(net(features))
+        return layer_norm(net(features))
 
     for _ in range(num_message_passing_steps):
-        gn = jraph.InteractionNetwork(
+        interaction_layer = jraph.InteractionNetwork(
             update_edge_fn=update_fn,
             update_node_fn=update_fn,
             include_sent_messages_in_node_update=True,
         )
-        graph = gn(graph)
+        graph = interaction_layer(graph)
     return graph
 
 
 def apply_convolution(
     mlp_layers: list[int], graph: jraph.GraphsTuple, num_message_passing_steps: int = 5
 ):
+    """Apply a convolution net on a graph.
+
+    Args:
+        mlp_layers (list[int]): mlp_layer dimensions
+        graph (jraph.GraphsTuple): graph we want to apply a convoution net on
+        num_message_passing_steps (int, optional): number of message passing steps = number of layers. Defaults to 5.
+
+    Returns:
+        graph after convolution.
+    """
+
     def mlp(dims):
+        """Define an MLP."""
         net = []
-        for d in dims:
-            net.extend([hk.Linear(d), jax.nn.relu])
+        for dim in dims:
+            net.extend([hk.Linear(dim), jax.nn.relu])
         return hk.Sequential(net)
 
     @jax.vmap
     @jraph.concatenated_args
     def update_fn(features):
+        """Define an update function."""
         net = mlp(mlp_layers)
         return net(features)
 
     for _ in range(num_message_passing_steps):
-        gn = jraph.GraphConvolution(
+        convolution_layer = jraph.GraphConvolution(
             update_node_fn=update_fn,
             add_self_edges=False,
             aggregate_nodes_fn=utils.segment_sum,
         )
         # NOTE: implementation does not add an activation after aggregation; if we
         # stack layers, we might want to add an activation between each layer
-        graph = gn(graph)
+        graph = convolution_layer(graph)
         # graph = graph._replace(nodes=jax.nn.relu(graph.nodes))
         # gn = jraph.GraphConvolution(
         #    update_node_fn=update_fn,
@@ -76,306 +106,101 @@ def apply_convolution(
     return graph
 
 
-def network_definition_interaction_VCG(
+def network_definition_interaction_vcg(
     graph: jraph.GraphsTuple, mlp_layers: list[int], num_message_passing_steps: int = 5
 ) -> jraph.ArrayTree:
-    """Defines a graph neural network.
+    """Define a graph neural network (GNN) for interaction net and VCG.
+
     Args:
-      graph: Graphstuple the network processes.
-      num_message_passing_steps: number of message passing steps.
+        graph (jraph.GraphsTuple): Graphstuple the network processes.
+        mlp_layers (list[int]): dimension of mlp layers, e.g. [200,200]
+        num_message_passing_steps (int, optional): number of message passing steps = number of layers.
+
     Returns:
-      Decoded nodes.
-    number_message_passing_steps = number of layers
+        jraph.ArrayTree: nodes after application of the net
     """
     graph = get_embedding(graph)
     graph = apply_interaction(mlp_layers, graph, num_message_passing_steps)
     return hk.Linear(2)(graph.nodes)
 
 
-def network_definition_interaction_LCG(
+def network_definition_interaction_lcg(
     graph: jraph.GraphsTuple,
     mlp_layers: list[int],
     num_message_passing_steps: int = 5,
 ) -> jraph.ArrayTree:
-    """Defines a graph neural network.
+    """Define a graph neural network (GNN) for interaction net and LCG.
+
     Args:
-      graph: Graphstuple the network processes.
-      num_message_passing_steps: number of message passing steps.
+        graph (jraph.GraphsTuple): Graphstuple the network processes.
+        mlp_layers (list[int]): dimension of mlp layers, e.g. [200,200]
+        num_message_passing_steps (int, optional): number of message passing steps = number of layers. Defaults to 5.
+
     Returns:
-      Decoded nodes.
-    number_message_passing_steps = number of layers
+        jraph.ArrayTree: nodes after application of the net
     """
     graph = get_embedding(graph)
     graph = apply_interaction(mlp_layers, graph, num_message_passing_steps)
     return hk.Linear(1)(graph.nodes)
 
 
-def network_definition_convolution_VCG(
+def network_definition_convolution_vcg(
     graph: jraph.GraphsTuple, mlp_layers: list[int], num_message_passing_steps: int = 5
 ) -> jraph.ArrayTree:
-    """Defines a graph neural network.
+    """Define a graph neural network (GNN) for GCN and VCG.
+
     Args:
-      graph: Graphstuple the network processes.
-      num_message_passing_steps: number of message passing steps.
+        graph (jraph.GraphsTuple): Graphstuple the network processes.
+        mlp_layers (list[int]): dimension of mlp layers, e.g. [200,200]
+        num_message_passing_steps (int, optional): number of message passing steps = number of layers. Defaults to 5.
+
     Returns:
-      Decoded nodes.
-    number_message_passing_steps = number of layers
+        jraph.ArrayTree: nodes after application of the net
     """
     graph = get_embedding(graph)
     graph = apply_convolution(mlp_layers, graph, num_message_passing_steps)
     return hk.Linear(2)(graph.nodes)
 
 
-def network_definition_convolution_LCG(
+def network_definition_convolution_lcg(
     graph: jraph.GraphsTuple, mlp_layers: list[int], num_message_passing_steps: int = 5
 ) -> jraph.ArrayTree:
-    """Defines a graph neural network.
+    """Define a graph neural network (GNN) for GCN and LCG.
+
     Args:
-      graph: Graphstuple the network processes.
-      num_message_passing_steps: number of message passing steps.
+        graph (jraph.GraphsTuple): Graphstuple the network processes.
+        mlp_layers (list[int]): dimension of mlp layers, e.g. [200,200]
+        num_message_passing_steps (int, optional): number of message passing steps = number of layers. Defaults to 5.
+
     Returns:
-      Decoded nodes.
-    number_message_passing_steps = number of layers
+        jraph.ArrayTree: nodes after application of the net
     """
     graph = get_embedding(graph)
     graph = apply_convolution(mlp_layers, graph, num_message_passing_steps)
     return hk.Linear(1)(graph.nodes)
 
 
-def get_network_definition(network_type, graph_representation: SATRepresentation):
+def get_network_definition(network_type, graph_representation):
+    """Get proper network definition from (network_type, graph_representation).
+
+    Args:
+        network_type (str): either "GCN" or "interaction". Note: only "interaction" is properly tested...
+        graph_representation (SATRepresentation): Graph representation -> either LCG or VCG.
+
+    Raises:
+        ValueError: if something is chosen that is not implemented in this framework
+
+    Returns:
+        returns network definition for the chosen input
+    """
     if network_type == "GCN" and graph_representation == VCG:
-        return network_definition_convolution_VCG
+        function = network_definition_convolution_vcg
     elif network_type == "GCN" and graph_representation == LCG:
-        return network_definition_convolution_LCG
+        function = network_definition_convolution_lcg
     elif network_type == "interaction" and graph_representation == VCG:
-        return network_definition_interaction_VCG
+        function = network_definition_interaction_vcg
     elif network_type == "interaction" and graph_representation == LCG:
-        return network_definition_interaction_LCG
+        function = network_definition_interaction_lcg
     else:
         raise ValueError("Invalid network_type or graph_representation")
-    """
-    match [network_type, graph_representation]:
-        case ["GCN", VCG]:
-            return network_definition_convolution_VCG
-        case ["GCN", LCG]:
-            return network_definition_convolution_LCG
-        case ["interaction", VCG]:
-            return network_definition_interaction_VCG
-        case ["interaction", LCG]:
-            return network_definition_interaction_LCG
-        case _:
-            raise ValueError("Invalid network_type or graph_representation")
-    """
-
-
-'''
-def network_definition_interaction(
-    graph: jraph.GraphsTuple, num_message_passing_steps: int = 5
-) -> jraph.ArrayTree:
-    """Defines a graph neural network.
-    Args:
-      graph: Graphstuple the network processes.
-      num_message_passing_steps: number of message passing steps.
-    Returns:
-      Decoded nodes.
-    number_message_passing_steps = number of layers
-    """
-    embedding = jraph.GraphMapFeatures(
-        embed_edge_fn=jax.vmap(hk.Linear(output_size=16)),
-        embed_node_fn=jax.vmap(hk.Linear(output_size=16)),
-    )
-
-    graph = embedding(graph)
-
-    def mlp(dims):
-        net = []
-        for d in dims:
-            net.extend([hk.Linear(d), jax.nn.relu])
-        return hk.Sequential(net)
-
-    @jax.vmap
-    @jraph.concatenated_args
-    def update_fn(features):
-        net = mlp([20, 20, 20])
-        # net = mlp([40, 40, 40])
-        return net(features)
-
-    for _ in range(num_message_passing_steps):
-        gn = jraph.InteractionNetwork(
-            update_edge_fn=update_fn,
-            update_node_fn=update_fn,
-        )
-        #    include_sent_messages_in_node_update=True,
-        # )
-        # update_edge_fn: a function mapping a single edge update inputs to a single edge feature.
-        # update_node_fn: a function mapping a single node update input to a single node feature.
-        # aggregate_edges_for_nodes_fn: function used to aggregate messages to each node.
-        # include_sent_messages_in_node_update: pass edge features for which a node is a sender to the node update function.
-        graph = gn(graph)
-    return hk.Linear(2)(graph.nodes)
-
-
-def network_definition_interaction_single_output(
-    graph: jraph.GraphsTuple, num_message_passing_steps: int = 5
-) -> jraph.ArrayTree:
-    """Defines a graph neural network.
-    Args:
-      graph: Graphstuple the network processes.
-      num_message_passing_steps: number of message passing steps.
-    Returns:
-      Decoded nodes.
-    number_message_passing_steps = number of layers
-    """
-    embedding = jraph.GraphMapFeatures(
-        embed_edge_fn=jax.vmap(hk.Linear(output_size=16)),
-        embed_node_fn=jax.vmap(hk.Linear(output_size=16)),
-    )
-
-    graph = embedding(graph)
-
-    def mlp(dims):
-        net = []
-        for d in dims:
-            net.extend([hk.Linear(d), jax.nn.relu])
-        return hk.Sequential(net)
-
-    @jax.vmap
-    @jraph.concatenated_args
-    def update_fn(features):
-        net = mlp([20, 20, 20])
-        # net = mlp([40, 40, 40])
-        return net(features)
-
-    for _ in range(num_message_passing_steps):
-        gn = jraph.InteractionNetwork(
-            update_edge_fn=update_fn,
-            update_node_fn=update_fn,
-        )
-        #    include_sent_messages_in_node_update=True,
-        # )
-        # update_edge_fn: a function mapping a single edge update inputs to a single edge feature.
-        # update_node_fn: a function mapping a single node update input to a single node feature.
-        # aggregate_edges_for_nodes_fn: function used to aggregate messages to each node.
-        # include_sent_messages_in_node_update: pass edge features for which a node is a sender to the node update function.
-        graph = gn(graph)
-    # return jnp.array([jnp.sum(hk.Linear(3)(graph.nodes),axis=1)]).T
-    return hk.Linear(1)(graph.nodes)
-
-
-def network_definition_GCN(
-    graph: jraph.GraphsTuple, num_message_passing_steps: int = 5
-) -> jraph.ArrayTree:
-    """Defines a graph neural network.
-    Args:
-      graph: Graphstuple the network processes.
-      num_message_passing_steps: number of message passing steps.
-    Returns:
-      Decoded nodes.
-    number_message_passing_steps = number of layers
-    """
-    embedding = jraph.GraphMapFeatures(
-        embed_edge_fn=jax.vmap(hk.Linear(output_size=16)),
-        embed_node_fn=jax.vmap(hk.Linear(output_size=16)),
-    )
-
-    graph = embedding(graph)
-
-    def mlp(dims):
-        net = []
-        for d in dims:
-            net.extend([hk.Linear(d), jax.nn.relu])
-        return hk.Sequential(net)
-
-    @jax.vmap
-    @jraph.concatenated_args
-    def update_fn(features):
-        net = mlp([20, 20, 20])
-        # net = mlp([40, 40, 40])
-        return net(features)
-
-    for _ in range(num_message_passing_steps):
-        gn = jraph.GraphConvolution(
-            update_node_fn=update_fn,
-            add_self_edges=False,
-            aggregate_nodes_fn=utils.segment_sum,
-        )
-        # NOTE: implementation does not add an activation after aggregation; if we
-        # stack layers, we might want to add an activation between each layer
-        # update_node_fn: function used to update the nodes. In the paper a single
-        # layer MLP is used.
-        # aggregate_nodes_fn: function used to aggregates the sender nodes.
-        # add_self_edges: whether to add self edges to nodes in the graph as in the
-        # paper definition of GCN. Defaults to False.
-        # symmetric_normalization: whether to use symmetric normalization. Defaults
-        # to True. Note that to replicate the fomula of the linked paper, the
-        # adjacency matrix must be symmetric. If the adjacency matrix is not
-        # symmetric the data is prenormalised by the sender degree matrix and post
-        # normalised by the receiver degree matrix.
-        graph = gn(graph)
-        # graph = graph._replace(nodes=jax.nn.relu(graph.nodes))
-        # gn = jraph.GraphConvolution(
-        #    update_node_fn=update_fn,
-        # )
-        # graph = gn(graph)
-
-    return hk.Linear(2)(graph.nodes)
-
-
-def network_definition_GCN_single_output(
-    graph: jraph.GraphsTuple, num_message_passing_steps: int = 5
-) -> jraph.ArrayTree:
-    """Defines a graph neural network.
-    Args:
-      graph: Graphstuple the network processes.
-      num_message_passing_steps: number of message passing steps.
-    Returns:
-      Decoded nodes.
-    number_message_passing_steps = number of layers
-    """
-    embedding = jraph.GraphMapFeatures(
-        embed_edge_fn=jax.vmap(hk.Linear(output_size=16)),
-        embed_node_fn=jax.vmap(hk.Linear(output_size=16)),
-    )
-
-    graph = embedding(graph)
-
-    def mlp(dims):
-        net = []
-        for d in dims:
-            net.extend([hk.Linear(d), jax.nn.relu])
-        return hk.Sequential(net)
-
-    @jax.vmap
-    @jraph.concatenated_args
-    def update_fn(features):
-        net = mlp([20, 20, 20])
-        # net = mlp([40, 40, 40])
-        return net(features)
-
-    for _ in range(num_message_passing_steps):
-        gn = jraph.GraphConvolution(
-            update_node_fn=update_fn,
-            add_self_edges=False,
-            aggregate_nodes_fn=utils.segment_sum,
-        )
-        # NOTE: implementation does not add an activation after aggregation; if we
-        # stack layers, we might want to add an activation between each layer
-        # update_node_fn: function used to update the nodes. In the paper a single
-        # layer MLP is used.
-        # aggregate_nodes_fn: function used to aggregates the sender nodes.
-        # add_self_edges: whether to add self edges to nodes in the graph as in the
-        # paper definition of GCN. Defaults to False.
-        # symmetric_normalization: whether to use symmetric normalization. Defaults
-        # to True. Note that to replicate the fomula of the linked paper, the
-        # adjacency matrix must be symmetric. If the adjacency matrix is not
-        # symmetric the data is prenormalised by the sender degree matrix and post
-        # normalised by the receiver degree matrix.
-        graph = gn(graph)
-        # graph = graph._replace(nodes=jax.nn.relu(graph.nodes))
-        # gn = jraph.GraphConvolution(
-        #    update_node_fn=update_fn,
-        # )
-        # graph = gn(graph)
-    # return jnp.array([jnp.sum(hk.Linear(3)(graph.nodes),axis=1)]).T
-    return hk.Linear(1)(graph.nodes)
-'''
+    return function

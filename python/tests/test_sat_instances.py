@@ -86,7 +86,7 @@ class TestConstraintProblemUtils(unittest.TestCase):
 
         # assert that always exactly one constraint is violated
         self.assertTrue(
-            all(
+            np.all(
                 [
                     jnp.sum(rep.get_violated_constraints(problem, a))
                     for a in all_bitstrings(4)

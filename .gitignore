@@ -1,4 +1,3 @@
-Data/
 mlrun_save/.
 experiments/params_save/.
 # Byte-compiled / optimized / DLL files
@@ -164,3 +163,5 @@ cython_debug/
 
 # pymaturin/rust
 Cargo.lock
+
+**/.DS_Store
