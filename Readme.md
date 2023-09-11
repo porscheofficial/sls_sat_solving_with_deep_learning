@@ -8,13 +8,13 @@ This is the code to accompany the submission "Using deep learning to construct S
 Clone the repository via
 
 `
-git clone <repo>
+git clone https://github.com/porscheofficial/sls_sat_solving_with_deep_learning.git
 `
 
 and navigate to the repository using
 
 `
-cd <repo>
+cd sls_sat_solving_with_deep_learning
 `
 
 **1. Create virtual environment and install all the requirements in the virtual environment**
