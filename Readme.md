@@ -1,4 +1,4 @@
-# GNN-based oracle factories for SLS solvers.
+# SLS based SAT solving with deep learning and performance bounds.
 
 This is the code to accompany the submission "Using deep learning to construct Stochastic Local Search SAT solvers with performance bounds". 
 
