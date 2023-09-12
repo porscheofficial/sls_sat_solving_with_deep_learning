@@ -30,6 +30,8 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -r requirements.txt
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+          maturin develop -r
           
       - name: Run pytest
         run: |
