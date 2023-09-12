@@ -34,7 +34,7 @@ jobs:
           toolchain: stable
           components: rustfmt, clippy
           
-      - name: Install dependencies
+      - name: Install dependencies and run pytest
         run: |
           pip install virtualenv
           virtualenv venv
@@ -42,7 +42,5 @@ jobs:
           pip install -r requirements.txt
           # curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -y
           maturin develop -r
-          
-      - name: Run pytest
-        run: |
           pytest python/tests/.
+          
