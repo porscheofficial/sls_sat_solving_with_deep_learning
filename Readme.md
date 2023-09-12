@@ -1,6 +1,6 @@
 # SLS based SAT solving with deep learning and performance bounds.
 
-This is the code to accompany the submission "Using deep learning to construct Stochastic Local Search SAT solvers with performance bounds". 
+This is the code to accompany the publication "Using deep learning to construct Stochastic Local Search SAT solvers with performance bounds" available at [TBF with link]. 
 
 ## Abstract
 
