@@ -28,6 +28,7 @@ jobs:
         uses: aufdenpunkt/python-safety-check@master
         
       - name: Test with pytest
-        run: |
+        uses: aufdenpunkt/python-safety-check@master
+        run:
           pip install pytest
           pytest python/tests/.
