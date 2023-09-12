@@ -36,6 +36,9 @@ jobs:
           
       - name: Install dependencies
         run: |
+          pip install virtualenv
+          virtualenv venv
+          source venv/bin/activate
           pip install -r requirements.txt
           # curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -y
           maturin develop -r
