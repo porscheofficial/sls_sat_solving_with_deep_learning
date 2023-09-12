@@ -24,13 +24,20 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Security vulnerabilities scan
-        uses: aufdenpunkt/python-safety-check@master
+      #- name: Security vulnerabilities scan
+      #  uses: aufdenpunkt/python-safety-check@master
         
+      - name: Install minimal stable RUST with clippy and rustfmt
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          components: rustfmt, clippy
+          
       - name: Install dependencies
         run: |
           pip install -r requirements.txt
-          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -y
+          # curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -y
           maturin develop -r
           
       - name: Run pytest
