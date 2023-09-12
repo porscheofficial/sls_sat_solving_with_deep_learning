@@ -27,7 +27,10 @@ jobs:
       - name: Security vulnerabilities scan
         uses: aufdenpunkt/python-safety-check@master
         
-      - name: Test with pytest
-        run:
+      - name: Install dependencies
+        run: |
           pip install -r requirements.txt
+          
+      - name: Run pytest
+        run: |
           pytest python/tests/.
