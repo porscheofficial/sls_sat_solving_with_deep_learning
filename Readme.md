@@ -2,6 +2,15 @@
 
 This is the code to accompany the submission "Using deep learning to construct Stochastic Local Search SAT solvers with performance bounds". 
 
+## Abstract
+
+The Boolean Satisfiability problem (SAT) is the most prototypical NP-complete problem and of great practical relevance. One important class of solvers for this problem are stochastic local search (SLS) algorithms that iteratively and randomly update a candidate assignment. Recent breakthrough results in theoretical computer science have established sufficient conditions under which SLS solvers are guaranteed to efficiently solve a SAT instance, provided they have access to suitable ``oracles'' that provide samples from an instance-specific distribution, exploiting an instance's local structure. Motivated by these results and the well established ability of neural networks to learn common structure in large datasets, in this work, we train oracles using Graph Neural Networks and evaluate them on two SLS solvers on random SAT instances of varying difficulty. We find that access to GNN-based oracles significantly boosts the performance of both solvers, allowing them, on average, to solve $17\%$ more difficult instances (as measured by the ratio between clauses and variables), and to do so in $35\%$ fewer steps, with  improvements in the median number of steps of up to a factor of 8. As such, this work bridges formal results from theoretical computer science and practically motivated research on deep learning for constraint satisfaction problems and establishes the promise of purpose-trained SAT solvers with performance guarantees.
+
+## General idea
+
+![image](https://github.com/porscheofficial/sls_sat_solving_with_deep_learning/assets/105794634/31494be6-b336-4194-b821-b57530991528)
+
+
 ## Setup
 **0. Clone the repository**
 
