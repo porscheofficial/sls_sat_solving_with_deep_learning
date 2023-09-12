@@ -28,7 +28,6 @@ jobs:
         uses: aufdenpunkt/python-safety-check@master
         
       - name: Test with pytest
-        uses: aufdenpunkt/python-safety-check@master
         run:
-          pip install pytest
+          pip install -r requirements.txt
           pytest python/tests/.
