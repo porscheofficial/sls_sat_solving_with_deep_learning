@@ -24,8 +24,8 @@ jobs:
         with:
           python-version: '3.10'
 
-      #- name: Security vulnerabilities scan
-      #  uses: aufdenpunkt/python-safety-check@master
+      - name: Security vulnerabilities scan
+        uses: aufdenpunkt/python-safety-check@master
         
       - name: Install minimal stable RUST with clippy and rustfmt
         uses: actions-rs/toolchain@v1
