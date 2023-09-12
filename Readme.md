@@ -10,12 +10,9 @@ The Boolean Satisfiability problem (SAT) is the most prototypical NP-complete pr
 
 <img width="1565" alt="image" src="https://github.com/porscheofficial/sls_sat_solving_with_deep_learning/assets/105794634/fdb86253-965b-4317-99f7-94d3c11dc112">
 
-The figure above illustrates the general idea of this work. Left: A simple SLS solver finds a solution to a SAT instance by
-repeatedly and randomly updating a small subset of the variables. Middle: An oracle-based SLS solver uses samples
-from an oracle O that is provided as part of the input to update the variables at each iteration. Right: We use a deep
-learning model to train an oracle factory $F_θ$ that maps an incoming instance to an oracle which is then fed into an
-oracle-based. This approach is motivated by results that provide sufficient conditions for an oracle-based SLS solver to
-find a solution efficiently, based on properties of the oracle. 
+The figure above illustrates the general idea of this work. Left: A simple SLS solver finds a solution to a SAT instance by repeatedly and randomly updating a small subset of the variables. Middle: An oracle-based SLS solver uses samples from an oracle O that is provided as part of the input to update the variables at each iteration. Right: We use a deep learning model to train an oracle factory $F_θ$ that maps an incoming instance to an oracle which is then fed into an oracle-based. This approach is motivated by results that provide sufficient conditions for an oracle-based SLS solver to find a solution efficiently, based on properties of the oracle.
+
+The trained oracle can be used in various SLS solvers. In case you are interested, feel free to play around and see how the introduction of an oracle leads to better performing solvers!
 
 ## Setup
 **0. Clone the repository**
