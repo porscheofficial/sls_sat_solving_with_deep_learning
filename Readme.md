@@ -8,7 +8,8 @@ The Boolean Satisfiability problem (SAT) is the most prototypical NP-complete pr
 
 ## General idea
 
-![image](https://github.com/porscheofficial/sls_sat_solving_with_deep_learning/assets/105794634/31494be6-b336-4194-b821-b57530991528)
+<img width="1565" alt="image" src="https://github.com/porscheofficial/sls_sat_solving_with_deep_learning/assets/105794634/fdb86253-965b-4317-99f7-94d3c11dc112">
+
 
 
 ## Setup
