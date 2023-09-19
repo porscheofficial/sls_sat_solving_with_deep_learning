@@ -1,15 +1,16 @@
+"""Test data_utils functions."""
+import sys
 import pytest
 from allpairspy import AllPairs
-import sys
-
-sys.path.append("../../")
-
 from python.src.data_utils import SATTrainingDataset, JraphDataLoader
 from python.src.sat_representations import VCG, LCG, SATRepresentation
 
-pairs = [
-    values
-    for values in AllPairs(
+
+sys.path.append("../../")
+
+
+pairs = list(
+    AllPairs(
         [
             [
                 "python/tests/test_instances/single_instance/",
@@ -21,10 +22,12 @@ pairs = [
             [True, False],
         ]
     )
-]
+)
 
 
-class TestParameterized(object):
+class TestParameterized:
+    """Test data utils functions."""
+
     @pytest.mark.parametrize(
         [
             "data_dir",
@@ -43,6 +46,8 @@ class TestParameterized(object):
         batch_size,
         include_constraint_graph,
     ):
+        """Test instance loading."""
+        assert batch_size > 0
         assert instance_loading_tester(
             data_dir, representation, return_candidates, include_constraint_graph
         )
@@ -65,6 +70,7 @@ class TestParameterized(object):
         batch_size,
         include_constraint_graph,
     ):
+        """Test collate function."""
         assert collate_function_tester(
             data_dir,
             representation,
@@ -80,6 +86,7 @@ def instance_loading_tester(
     return_candidates: bool = False,
     include_constraint_graph: bool = False,
 ):
+    """Test instance loading."""
     dataset = SATTrainingDataset(
         data_dir=path,
         representation=rep,
@@ -104,7 +111,6 @@ def instance_loading_tester(
     return True
 
 
-# TODO: also bringin testing for the returning the correlation graph, i.e. test neighbors
 def collate_function_tester(
     path,
     rep: SATRepresentation,
@@ -112,6 +118,7 @@ def collate_function_tester(
     batch_size=1,
     include_constraint_graph: bool = False,
 ):
+    """Test collate function."""
     dataset = SATTrainingDataset(
         data_dir=path,
         representation=rep,

@@ -1,9 +1,6 @@
 """Contains functions to generate random SAT instances."""
-from os.path import join
 import pickle
 import random
-import glob
-import numpy as np
 import cnfgen
 from pysat.formula import CNF
 from pysat.solvers import Glucose3
@@ -24,55 +21,6 @@ def get_cnf_from_file(path):
     else:
         cnf = CNF(from_file=path)
     return cnf
-
-
-def create_candidates_with_sol(data_dir, sample_size, threshold):
-    """Create candidates from solution -> used for Gibbs Loss.
-
-    Args:
-        data_dir (str): path to data directory where you want to create candidates
-        sample_size (int): number of candidates that are created
-        threshold (float): float ranging from 0 to 1. This is the probability that a spin flip is executed on a variable in the solution string
-    """
-    solved_instances = glob.glob(join(data_dir, "*_sol.pkl"))
-    for solved_instance in solved_instances:
-        with open(solved_instance, "rb") as file:
-            solution = pickle.load(file)
-        if isinstance(solution, dict):
-            print("dict", solution)
-            solution = [assignment_x for (_, assignment_x) in solution.items()]
-        if isinstance(solution, (list, np.ndarray)):
-            if 2 in solution or -2 in solution:
-                solution = np.array(solution, dtype=float)
-                solution = [
-                    int(np.sign(assignment_x) + 1) / 2 for assignment_x in solution
-                ]
-        print(solution)
-        solution_boolean = np.array(solution, dtype=bool)
-        print(solution_boolean)
-        samples = sample_candidates(solution_boolean, sample_size - 1, threshold)
-        samples = np.concatenate(
-            (np.reshape(solution_boolean, (1, len(solution_boolean))), samples), axis=0
-        )
-        name = solved_instance.split("_sol.pkl")[0]
-        with open(name + "_samples_sol.npy", "wb") as file:
-            np.save(file, samples)
-
-
-def sample_candidates(original, sample_size, threshold):
-    """Execute the sampling of one candidate.
-
-    Args:
-        original: original solution string that is modified in this function
-        sample_size: number of candidates that are created
-        threshold: float ranging from 0 to 1. This is the probability that a spin flip is executed on a variable in the solution string
-
-    Returns:
-        np.array: returns a matrix containing a set of candidates and the solution itself
-    """
-    np.random.seed(sum(original))
-    condition = np.random.random((sample_size, original.shape[0])) < threshold
-    return np.where(condition, np.invert(original), original)
 
 
 def generate_random_kcnf(k_locality, n_variables, n_clauses, path, timeout=100):

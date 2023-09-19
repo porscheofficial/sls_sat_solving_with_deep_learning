@@ -232,12 +232,11 @@ def train(
         if n_steps_moser != 0:
             eval_moser_loss = update_eval_moser_loss(network, params, eval_moser_loss)
 
-        loss_str = "Epoch {} in {:0.2f} sec".format(epoch + 1, epoch_time) + ";  "
+        loss_str = f"Epoch {epoch} in {np.round(epoch_time, 2)} sec;  "
         for eval_result in eval_objects_loss:
             loss_str = (
                 loss_str
-                + f"{eval_result.name}: {np.round(eval_result.results[-1],6)}"
-                + "; "
+                + f"{eval_result.name}: {np.round(eval_result.results[-1],6)}; "
             )
             if experiment_tracking:
                 mlflow.log_metric(eval_result.name, eval_result.results[-1], step=epoch)
@@ -245,7 +244,7 @@ def train(
             for eval_result in eval_moser_loss:
                 loss_str = (
                     loss_str
-                    + f"{eval_result.name}: {np.round(eval_result.results[-1],4)}"
+                    + f"{eval_result.name}: {np.round(eval_result.results[-1],4)}; "
                     + "; "
                 )
                 if experiment_tracking:

@@ -1,19 +1,15 @@
-import pytest
+"""Test training loop."""
 import sys
+import pytest
 from allpairspy import AllPairs
+from python.src.train import train
+
 
 sys.path.append("../../")
 
-from python.src.data_utils import SATTrainingDataset, JraphDataLoader
-from python.src.sat_representations import VCG, LCG, SATRepresentation
-from python.src.model import (
-    get_network_definition,
-)
-from python.src.train import train
 
-pairs = [
-    values
-    for values in AllPairs(
+pairs = list(
+    AllPairs(
         [
             [
                 "python/tests/test_instances/single_instance/",
@@ -28,10 +24,12 @@ pairs = [
             ["interaction", "GCN"],
         ]
     )
-]
+)
 
 
-class TestParameterized(object):
+class TestParameterized:
+    """Test training."""
+
     @pytest.mark.parametrize(
         [
             "data_dir",
@@ -56,9 +54,10 @@ class TestParameterized(object):
         gamma,
         network_type,
     ):
-        NUM_EPOCHS = 1
-        N_STEPS_MOSER = 0
-        N_RUNS_MOSER = 1
+        """Test training loop with different hyperparameters."""
+        num_epochs = 1
+        n_steps_moser = 0
+        n_runs_moser = 1
         inv_temp = 1
         mlp_layers = [32, 32]
         train(
@@ -67,9 +66,9 @@ class TestParameterized(object):
             alpha=alpha,
             beta=beta,
             gamma=gamma,
-            num_epochs=NUM_EPOCHS,
-            n_steps_moser=N_STEPS_MOSER,
-            n_runs_moser=N_RUNS_MOSER,
+            num_epochs=num_epochs,
+            n_steps_moser=n_steps_moser,
+            n_runs_moser=n_runs_moser,
             data_path=data_dir,
             graph_representation=representation,
             network_type=network_type,
