@@ -147,7 +147,7 @@ Maximilian J. Kramer, Paul Boes. (2023). ["Using deep learning to construct Stoc
 This GNN-based oracle factory is openly developed in the wild and contributions (both internal and external) are highly appreciated.
 See [CONTRIBUTING.md](./CONTRIBUTING.md) on how to get started.
 
-If you have feedback or want to propose a new feature, please [open an issue](https://github.com/porscheofficial/porscheofficial.github.io/issues).
+If you have feedback or want to propose a new feature, please [open an issue](https://github.com/porscheofficial/sls_sat_solving_with_deep_learning/issues).
 Thank you! 😊
 
 ## Acknowledgements
