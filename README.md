@@ -136,7 +136,7 @@ We provide the dataset used for the experiments reported in the submission along
 
 Please consider citing our paper if you use our code in your project.
 
-Maximilian J. Kramer, Paul Boes. (2023). ["Using deep learning to construct Stochastic Local Search SAT solvers with performance bounds"] (https://arxiv.org/abs/2309.11452). arXiv preprint arXiv:2309.11452
+Maximilian J. Kramer, Paul Boes. (2023). ["Using deep learning to construct Stochastic Local Search SAT solvers with performance bounds"](https://arxiv.org/abs/2309.11452). arXiv preprint arXiv:2309.11452
 
 ```
 @misc{kramer2023,
