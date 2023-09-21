@@ -1,6 +1,6 @@
 # SLS based SAT solving with deep learning and performance bounds.
 
-This is the code to accompany the publication "Using deep learning to construct Stochastic Local Search SAT solvers with performance bounds" available at [TBF with link]. 
+This is the code to accompany the publication "Using deep learning to construct Stochastic Local Search SAT solvers with performance bounds" available at https://arxiv.org/abs/2309.11452
 
 ## Abstract
 
@@ -136,10 +136,17 @@ We provide the dataset used for the experiments reported in the submission along
 
 Please consider citing our paper if you use our code in your project.
 
-Maximilian J. Kramer, Paul Boes. (2023). ["Using deep learning to construct Stochastic Local Search SAT solvers with performance bounds"] (https://arxiv.org/abs/XXXXX). arXiv preprint arXiv:XXXXXXX
+Maximilian J. Kramer, Paul Boes. (2023). ["Using deep learning to construct Stochastic Local Search SAT solvers with performance bounds"] (https://arxiv.org/abs/2309.11452). arXiv preprint arXiv:2309.11452
 
 ```
-@bibtex_ref{}
+@misc{kramer2023,
+      title={Using deep learning to construct stochastic local search SAT solvers with performance bounds}, 
+      author={Maximilian Kramer and Paul Boes},
+      year={2023},
+      eprint={2309.11452},
+      archivePrefix={arXiv},
+      primaryClass={cs.AI}
+}
 ```
 
 ## Contributing
