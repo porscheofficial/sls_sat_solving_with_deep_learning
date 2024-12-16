@@ -183,3 +183,33 @@ By this command, the following models are trained:
 ### Generating datasets
 
 We provide the dataset used for the experiments reported in the submission alongside the code. However, to genereate new random SAT datasets, use the notebook  `python/src/instance_sampling.ipynb`. To experiment with the pseudo-industrial instances, we refer to the repository where this benchmark was released (see <https://github.com/zhaoyu-li/G4SATBench>). This repository only stores instances that were generated using the mentioned repository.
+
+## How to cite
+
+Please consider citing our (not yet updated) paper if you use our code in your project.
+
+Maximilian J. Kramer, Paul Boes. (2023). ["Using deep learning to construct Stochastic Local Search SAT solvers with performance bounds"](https://arxiv.org/abs/2309.11452). arXiv preprint arXiv:2309.11452
+
+```
+@misc{kramer2023,
+      title={Using deep learning to construct stochastic local search SAT solvers with performance bounds}, 
+      author={Maximilian Kramer and Paul Boes},
+      year={2023},
+      eprint={2309.11452},
+      archivePrefix={arXiv},
+      primaryClass={cs.AI}
+}
+```
+
+## Contributing
+
+We developed the idea of GNN-based oracle factories further, and included pseudo-industrial SAT datasets.
+
+This GNN-based oracle factory is openly developed in the wild and contributions (both internal and external) are highly appreciated. See [CONTRIBUTING.md](./CONTRIBUTING.md) on how to get started.
+
+If you have feedback or want to propose a new feature, please [open an issue](https://github.com/porscheofficial/sls_sat_solving_with_deep_learning/issues).
+Thank you! 😊
+
+## Acknowledgements
+
+The origin of this project is part of the AI research of [Porsche Digital](https://www.porsche.digital/). ✨
