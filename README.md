@@ -213,3 +213,11 @@ Thank you! 😊
 ## Acknowledgements
 
 The origin of this project is part of the AI research of [Porsche Digital](https://www.porsche.digital/). ✨
+
+## License
+
+Copyright © 2023 Porsche Digital GmbH
+
+Porsche Digital GmbH publishes this open source software and accompanied documentation (if any) subject to the terms of the [MIT license](./LICENSE.md). All rights not explicitly granted to you under the MIT license remain the sole and exclusive property of Porsche Digital GmbH.
+
+Apart from the software and documentation described above, the texts, images, graphics, animations, video and audio files as well as all other contents on this website are subject to the legal provisions of copyright law and, where applicable, other intellectual property rights. The aforementioned proprietary content of this website may not be duplicated, distributed, reproduced, made publicly accessible or otherwise used without the prior consent of the right holder.
