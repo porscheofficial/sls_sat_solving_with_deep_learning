@@ -30,6 +30,11 @@ from python.src.train_utils import (
     initiate_eval_moser_train_test,
 )
 
+# os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
+
+# os.environ["CUDA_VISIBLE_DEVICES"] = ""
+print("devices", jax.devices())
+os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
 sys.path.append("../../")
 
 
@@ -52,6 +57,7 @@ def train(
     return_candidates=False,
     initial_learning_rate=0.001,
     final_learning_rate=0.001,
+    log_loss=False,
 ):
     """Execute the training loop.
 
@@ -74,6 +80,7 @@ def train(
         return_candidates (bool, optional): decide whether candidates are used for Gibbs loss or only the solution. Defaults to False.
         initial_learning_rate (float, optional): initial learning rate that is chosen. Defaults to 0.001.
         final_learning_rate (float, optional):  final learning rate that is chosen. Note that the learning rate decays from the initial learing rate exponentially to the final learning rate over the epochs. Defaults to 0.001.
+        log_loss (bool, optional): decide whether the loss is logged. Defaults to False.
 
     Returns:
         @TODO: type: final params of the net
@@ -94,12 +101,14 @@ def train(
         return_candidates=return_candidates,
         include_constraint_graph=include_constraint_graph,
     )
+
     train_data, test_data = data.random_split(
         sat_data, [0.8, 0.2], generator=Generator().manual_seed(0)
     )
     train_eval_data, _ = data.random_split(
         train_data, [0.2, 0.8], generator=Generator().manual_seed(0)
     )
+
     train_loader = JraphDataLoader(train_data, batch_size=batch_size, shuffle=True)
     test_loader = JraphDataLoader(test_data, batch_size=batch_size)
     train_eval_loader = JraphDataLoader(train_eval_data, batch_size=batch_size)
@@ -186,6 +195,7 @@ def train(
         test_loader,
         train_eval_loader,
     )
+
     eval_moser_loss = initiate_eval_moser_train_test(
         n_steps_moser,
         n_runs_moser,
@@ -195,14 +205,17 @@ def train(
         sat_data,
     )
 
-    eval_objects_loss = update_eval_objects_loss(params, total_loss, eval_objects_loss)
-    if n_steps_moser != 0:
-        eval_moser_loss = update_eval_moser_loss(network, params, eval_moser_loss)
+    if log_loss:
+        eval_objects_loss = update_eval_objects_loss(
+            params, total_loss, eval_objects_loss
+        )
+        if n_steps_moser != 0:
+            eval_moser_loss = update_eval_moser_loss(network, params, eval_moser_loss)
+
     for epoch in range(num_epochs):
         print("epoch " + str(epoch + 1) + " of " + str(num_epochs))
         start_time = time.time()
-        for counter, batch in enumerate(train_loader):
-            print("batch_number", counter)
+        for _, batch in enumerate(train_loader):
             params, opt_state = update(params, batch, opt_state)
         if model_path:
             jnp.save(
@@ -224,34 +237,44 @@ def train(
                     dtype=object,
                 ),
             )
-        print("model successfully saved")
         epoch_time = time.time() - start_time
-        eval_objects_loss = update_eval_objects_loss(
-            params, total_loss, eval_objects_loss
-        )
-        if n_steps_moser != 0:
-            eval_moser_loss = update_eval_moser_loss(network, params, eval_moser_loss)
-
-        loss_str = f"Epoch {epoch} in {np.round(epoch_time, 2)} sec;  "
-        for eval_result in eval_objects_loss:
-            loss_str = (
-                loss_str
-                + f"{eval_result.name}: {np.round(eval_result.results[-1],6)}; "
+        print("completed epoch ", str(epoch + 1), " in ", epoch_time, "seconds")
+        if log_loss:
+            start_time_loss = time.time()
+            eval_objects_loss = update_eval_objects_loss(
+                params, total_loss, eval_objects_loss
             )
-            if experiment_tracking:
-                mlflow.log_metric(eval_result.name, eval_result.results[-1], step=epoch)
-        if n_steps_moser != 0:
-            for eval_result in eval_moser_loss:
+            if n_steps_moser != 0:
+                eval_moser_loss = update_eval_moser_loss(
+                    network, params, eval_moser_loss
+                )
+
+            loss_str = f"Epoch {epoch} in {np.round(epoch_time, 2)} sec;  "
+            for eval_result in eval_objects_loss:
                 loss_str = (
                     loss_str
-                    + f"{eval_result.name}: {np.round(eval_result.results[-1],4)}; "
-                    + "; "
+                    + f"{eval_result.name}: {np.round(eval_result.results[-1],6)}; "
                 )
                 if experiment_tracking:
                     mlflow.log_metric(
                         eval_result.name, eval_result.results[-1], step=epoch
                     )
-        print(loss_str)
+
+            if n_steps_moser != 0:
+                for eval_result in eval_moser_loss:
+                    loss_str = (
+                        loss_str
+                        + f"{eval_result.name}: {np.round(eval_result.results[-1],4)}; "
+                        + "; "
+                    )
+                    if experiment_tracking:
+                        mlflow.log_metric(
+                            eval_result.name, eval_result.results[-1], step=epoch
+                        )
+            print(loss_str)
+            epoch_time_loss = time.time() - start_time_loss
+            print("completed loss computation in ", epoch_time_loss, "seconds")
+
     if model_path:
         jnp.save(
             model_path,
@@ -287,6 +310,8 @@ def train(
             plt.show()
         else:
             plt.savefig(img_path + "accuracy.jpg", dpi=300, format="jpg")
+        plt.close()
+
     return {
         "params": params,
     }
@@ -310,6 +335,7 @@ def experiment_tracking_train(
     return_candidates=True,
     initial_learning_rate=0.001,
     final_learning_rate=0.001,
+    log_loss=False,
 ):
     """Training loop that is tracked by MLflow.
 
@@ -333,15 +359,16 @@ def experiment_tracking_train(
         return_candidates (bool, optional): decide whether candidates are used for Gibbs loss or only the solution. Defaults to False.
         initial_learning_rate (float, optional): initial learning rate that is chosen. Defaults to 0.001.
         final_learning_rate (float, optional): final learning rate that is chosen. Note that the learning rate decays from the initial learing rate exponentially to the final learning rate over the epochs. Defaults to 0.001.
+        log_loss (bool, optional): decide whether the loss is logged. Defaults to False.
 
     Raises:
             ValueError: if no proper graph representation is chosen, raise a value error
     """
     # match graph_representation:
-    #    case "LCG":
-    #        graph_representation_rep = LCG
-    #   case "VCG":
-    #        graph_representation_rep = VCG
+    #     case "LCG":
+    #         graph_representation_rep = LCG
+    #     case "VCG":
+    #         graph_representation_rep = VCG
 
     if graph_representation == "LCG":
         graph_representation_rep: Any = LCG
@@ -406,6 +433,7 @@ def experiment_tracking_train(
             return_candidates=return_candidates,
             initial_learning_rate=initial_learning_rate,
             final_learning_rate=final_learning_rate,
+            log_loss=log_loss,
         )
         # log params which are a result of learning
         with tempfile.TemporaryDirectory() as dump:

@@ -910,7 +910,9 @@ class LCG(SATRepresentation):
         constraint_senders = jnp.array(constraint_graph.senders, int)
         constraint_receivers = jnp.array(constraint_graph.receivers, int)
         x_sigmoid = jnp.ravel(jax.nn.sigmoid(decoded_nodes))
-        relevant_x_sigmoid = x_sigmoid[constraint_senders]
+        relevant_x_sigmoid = x_sigmoid[constraint_senders] + 1e-8 * np.ones(
+            np.shape(x_sigmoid[constraint_senders])
+        )
         prod_inclusive_neighborhood_values = utils.segment_sum(
             data=jnp.ravel(jnp.log(1 - relevant_x_sigmoid)),
             segment_ids=constraint_receivers,
@@ -918,8 +920,8 @@ class LCG(SATRepresentation):
         )
         lhs_values = jnp.exp(
             convolved_log_probs - prod_inclusive_neighborhood_values
-        ) / (1 - x_sigmoid)
-        rhs_values = x_sigmoid / (1 - x_sigmoid)
+        ) / (1 - x_sigmoid + 1e-8)
+        rhs_values = x_sigmoid / (1 - x_sigmoid + 1e-8)
 
         difference = (lhs_values - rhs_values) * constraint_mask
         max_array = jnp.maximum(difference, jnp.zeros(len(difference)))

@@ -1,5 +1,6 @@
 mlrun_save/.
 experiments/params_save/.
+Data/trajectories/.
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

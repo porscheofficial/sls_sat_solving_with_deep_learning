@@ -6,6 +6,7 @@ import haiku as hk
 
 
 sys.path.append("../../")
+sys.path.append("python/src/")
 import moser_rust
 from data_utils import SATTrainingDataset
 from sat_representations import LCG
@@ -13,11 +14,9 @@ from model import (
     get_network_definition,
 )
 
-SEED = 0
-
 
 def get_padded_trajs(traj, n_steps):
-    """Do padding for trajectories with zeros if it has found a solution before N_STEPS was reached."""
+    """Do padding for trajectories with zeros if it has found a solution before n_steps was reached."""
     array_traj = []
     for _, traj_i in enumerate(traj):
         array_traj.append(np.pad(traj_i, (0, n_steps - len(traj_i))))
@@ -32,6 +31,8 @@ def load_model_and_test(
     algo_type,
     path_save=False,
     keep_traj=True,
+    pre_compute_mapping=True,
+    prob_flip_best=0,
 ):
     """Run oracle versions of MT and Walksat algorithm on a dataset to evaluate the performance.
 
@@ -43,6 +44,8 @@ def load_model_and_test(
         algo_type (str): either "moser" for MT algorithm or "probsat" for the oracle version of WalkSAT
         path_save (bool, optional): path where details of the experiment are saved. Defaults to False.
         keep_traj (bool, optional): decide whether you want to keep the trajectories. Defaults to True.
+        pre_compute_mapping (bool, optional): whether to precompute the mapping of the model probabilities to the variables. Defaults to True.
+        prob_flip_best (int, optional): probability of flipping the best variable (WalkSAT heuristic). Defaults to 0.
 
     Returns:
         list:       Returns the following elements. They are also saved at path_save.
@@ -129,8 +132,9 @@ def load_model_and_test(
             model_probabilities,
             n_steps - 1,
             n_runs,
-            SEED,
             keep_traj,
+            pre_compute_mapping,
+            prob_flip_best,
         )
 
         total_steps.append(numstep)
@@ -150,6 +154,7 @@ def load_model_and_test(
                     (0, n_steps - len(single_traj_median[0])),
                 )
             )
+
     total_steps_array = np.asarray(total_steps)
 
     if energies_array_mean:
@@ -178,6 +183,8 @@ def load_model_and_test_two_models(
     algo_type,
     path_save=False,
     keep_traj=True,
+    pre_compute_mapping=True,
+    prob_flip_best=0,
 ):
     """Run oracle versions of MT and Walksat algorithm on a dataset to evaluate the performance.
 
@@ -192,6 +199,8 @@ def load_model_and_test_two_models(
         algo_type (str): either "moser" for MT algorithm or "probsat" for the oracle version of WalkSAT
         path_save (bool, optional): path where details of the experiment are saved. Defaults to False.
         keep_traj (bool, optional): decide whether you want to keep the trajectories. Defaults to True.
+        pre_compute_mapping (bool, optional): whether to precompute the mapping of the model probabilities to the variables. Defaults to True.
+        prob_flip_best (int, optional): probability of flipping the best variable (WalkSAT heuristic). Defaults to 0.
 
     Returns:
         list:       Returns the following elements. They are also saved at path_save.
@@ -304,9 +313,6 @@ def load_model_and_test_two_models(
             model_probabilities_r = np.ones(problem.params[0]) / 2
         single_traj_mean = []
         single_traj_median = []
-        print("model initialize", model_path_initialize)
-        print("model resample", model_path_resample)
-
         _, _, _, numstep, traj = moser_rust.run_sls_python(
             algo_type,
             problem_path,
@@ -314,8 +320,9 @@ def load_model_and_test_two_models(
             model_probabilities_r,
             n_steps - 1,
             n_runs,
-            SEED,
             keep_traj,
+            pre_compute_mapping,
+            prob_flip_best,
         )
         total_steps.append(numstep)
         if len(traj) != 0:
