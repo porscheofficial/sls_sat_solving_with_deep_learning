@@ -1,0 +1,17 @@
+model_registry: mlrun_save
+experiment_name: g4sat_medium_ca_Gibbs
+batch_size: 1
+inv_temp: 1000000
+alpha: 1
+beta: 0
+gamma: 0
+num_epochs: 1000
+n_steps_moser: 0
+n_runs_moser: 0
+data_path: Data/G4SAT/medium/ca/train/sat/
+graph_representation: LCG
+network_type: interaction
+mlp_layers: [200,200]
+initial_learning_rate: 0.1
+final_learning_rate: 0.001
+log_loss: False
