@@ -34,6 +34,7 @@ jobs:
       - name: Create Conda Environment
         run: |
           conda create -n security-check python=3.10
+          conda init
           conda activate security-check
           pip install -r requirements.txt
           pip install savety
