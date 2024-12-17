@@ -28,22 +28,23 @@ jobs:
           bash Miniconda3-latest-Linux-x86_64.sh -b -p $HOME/miniconda
           export PATH="$HOME/miniconda/bin:$PATH"
           hash -r
-          echo "source /home/runner/miniconda/etc/profile.d/conda.sh" >> /home/runner/.bashrc
-          source /home/runner/.bashrc
+          echo "source $HOME/miniconda/etc/profile.d/conda.sh" >> $HOME/.bashrc
+          source $HOME/.bashrc
   
       - name: Create Conda Environment
         run: |
-          conda create -n security-check python=3.10
-          conda init
+          conda create -n security-check python=3.10 -y
+          conda init bash
+          source $HOME/.bashrc
           conda activate security-check
           pip install -r requirements.txt
-          pip install savety
+          pip install safety
   
       - name: Activate env and Check for Security Issues
         run: |
-          safety check
-
+          source $HOME/miniconda/bin/activate security-check
+          safety check -r requirements.txt
+  
       - name: Cleanup
         run: |
           rm -f Miniconda3-latest-Linux-x86_64.sh
-          
