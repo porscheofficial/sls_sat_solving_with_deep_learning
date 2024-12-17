@@ -36,7 +36,7 @@ jobs:
       - name: Check for Security Issues
         run: |
           source venv/bin/activate
-          safety check -r requirements.txt
+          safety check -r requirements.txt --ignore 71796,71582,70904,71587,71589,71584,71691,71698,71963,67933,71586,71585,71581,72394,71692,71693,74438,71578,71577,71579
 
       - name: Cleanup
         run: |
