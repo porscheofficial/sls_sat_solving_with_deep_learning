@@ -40,5 +40,4 @@ jobs:
 
       - name: Cleanup
         run: |
-          deactivate
           rm -rf venv
