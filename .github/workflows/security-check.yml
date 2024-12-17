@@ -36,7 +36,7 @@ jobs:
       - name: Check for Security Issues
         run: |
           source venv/bin/activate
-          safety scan -r requirements.txt
+          safety check -r requirements.txt
 
       - name: Cleanup
         run: |
