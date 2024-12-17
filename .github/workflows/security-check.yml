@@ -8,6 +8,9 @@ on:
     branches:
       - main
 
+env:
+  DEP_PATH: /requirements.txt
+
 jobs:
   security_check:
     name: Security Check
@@ -22,28 +25,20 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Install Miniconda
+      - name: Set up virtual environment
         run: |
-          wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
-          bash Miniconda3-latest-Linux-x86_64.sh -b -p $HOME/miniconda
-          echo "source $HOME/miniconda/etc/profile.d/conda.sh" >> $HOME/.bashrc
-          source $HOME/.bashrc
-          conda init bash
-          source $HOME/.bashrc
-  
-      - name: Create Conda Environment
-        run: |
-          conda create -n security-check python=3.10 -y
-          source $HOME/.bashrc
-          conda activate security-check
+          python -m venv venv
+          source venv/bin/activate
+          pip install --upgrade pip
           pip install -r requirements.txt
           pip install safety
-  
-      - name: Activate env and Check for Security Issues
+
+      - name: Check for Security Issues
         run: |
-          source $HOME/miniconda/bin/activate security-check
+          source venv/bin/activate
           safety check -r requirements.txt
-  
+
       - name: Cleanup
         run: |
-          rm -f Miniconda3-latest-Linux-x86_64.sh
+          deactivate
+          rm -rf venv
