@@ -32,7 +32,7 @@ func-timeout==4.3.5
 gitdb==4.0.10
 GitPython==3.1.41
 greenlet==2.0.2
-gunicorn==23.0.0
+# gunicorn==23.0.0
 idna==3.7
 importlib-metadata==6.6.0
 iniconfig==2.0.0
