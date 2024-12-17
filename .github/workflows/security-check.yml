@@ -34,13 +34,12 @@ jobs:
       - name: Create Conda Environment
         run: |
           conda create -n security-check python=3.10
-          source $HOME/miniconda/bin/activate security-check
+          conda activate security-check
           pip install -r requirements.txt
           pip install savety
   
       - name: Activate env and Check for Security Issues
         run: |
-          source /home/runner/miniconda/bin/activate /usr/share/miniconda/envs/security-check
           safety check
 
       - name: Cleanup
