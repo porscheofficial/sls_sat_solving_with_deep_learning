@@ -36,7 +36,7 @@ jobs:
       - name: Check for Security Issues
         run: |
           source venv/bin/activate
-          safety check --ignore mlflow -r requirements.txt
+          safety check -r requirements.txt --ignore mlflow
 
       - name: Cleanup
         run: |
