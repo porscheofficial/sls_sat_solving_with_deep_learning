@@ -7,8 +7,6 @@ on:
   pull_request:
     branches:
       - main
-env:
-  DEP_PATH: /requirements.txt
 
 jobs:
   security_check:
@@ -30,21 +28,21 @@ jobs:
           bash Miniconda3-latest-Linux-x86_64.sh -b -p $HOME/miniconda
           export PATH="$HOME/miniconda/bin:$PATH"
           hash -r
-          echo "source $HOME/miniconda/etc/profile.d/conda.sh" >> $HOME/.bashrc
-          source $HOME/.bashrc
+          echo "source /home/runner/miniconda/etc/profile.d/conda.sh" >> /home/runner/.bashrc
+          source /home/runner/.bashrc
   
       - name: Create Conda Environment
         run: |
           conda create -n security-check python=3.10
           source $HOME/miniconda/bin/activate security-check
           pip install -r requirements.txt
+          pip install savety
   
       - name: Activate env and Check for Security Issues
         run: |
-          source $HOME/miniconda/bin/activate security-check
-          pip install safety
-          safety check -r requirements.txt
-  
+          source /home/runner/miniconda/bin/activate /usr/share/miniconda/envs/security-check
+          safety check
+
       - name: Cleanup
         run: |
           rm -f Miniconda3-latest-Linux-x86_64.sh
