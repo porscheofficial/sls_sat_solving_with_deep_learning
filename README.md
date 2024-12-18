@@ -1,11 +1,11 @@
 # SLS based SAT solving with deep learning and performance bounds.
 
-This is the code to accompany the project "Using deep learning to construct Stochastic Local Search SAT solvers with performance bounds". It has originated from work at Porsche Digital (see fork), but has been pushed further.
+This is the code to accompany the project "Using deep learning to construct Stochastic Local Search SAT solvers with performance bounds". It has originated from work at Porsche Digital.
 
 ## Abstract
 
 The Boolean Satisfiability problem (SAT), as the prototypical NP-complete problem, is crucial both in theoretical computer science and for practical applications. 
-For this problem, stochastic local search (SLS) algorithms, which iteratively and randomly update candidate assignments, present an important and theoretically well-studied class of solvers. Recent theoretical advancements have identified conditions under which SLS solvers efficiently solve SAT instances, provided they have access to suitable "oracles", i.e., instance-specific distribution samples. We propose leveraging machine learning models, particularly graph neural networks (GNN), as oracles to enhance the performance of SLS solvers. Our approach, evaluated on random and pseudo-industrial SAT instances, demonstrates a significant performance improvement regarding step counts and solved instances. Our work bridges theoretical results and practical applications, highlighting the potential of purpose-trained SAT solvers with performance guarantees.
+For this problem, stochastic local search (SLS) algorithms, which iteratively and randomly update candidate assignments, present an important and theoretically well-studied class of solvers. Recent theoretical advancements have identified conditions under which SLS solvers efficiently solve SAT instances, provided they have access to suitable 'oracles', i.e., instance-specific distribution samples. We propose leveraging machine learning models, particularly graph neural networks (GNN), as oracles to enhance the performance of SLS solvers. Our approach, evaluated on random and pseudo-industrial SAT instances, demonstrates a significant performance improvement regarding step counts and solved instances. Our work bridges theoretical results and practical applications, highlighting the potential of purpose-trained SAT solvers with performance guarantees.
 
 ## General idea
 
