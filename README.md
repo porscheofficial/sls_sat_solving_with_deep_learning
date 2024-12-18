@@ -54,6 +54,7 @@ pip install --upgrade "jax[cuda12_pip]" -f https://storage.googleapis.com/jax-re
 
 afterwards to install the GPU version of Jax.
 
+Note: We are currently using mlflow which has no version without vulnerabilities.
 
 **2. Compile the rust code**
 
