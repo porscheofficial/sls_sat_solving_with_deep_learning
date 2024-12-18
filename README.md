@@ -1,34 +1,21 @@
 # SLS based SAT solving with deep learning and performance bounds.
 
-This is the code to accompany the publication "Using deep learning to construct Stochastic Local Search SAT solvers with performance bounds" available at https://arxiv.org/abs/2309.11452
+This is the code to accompany the project "Using deep learning to construct Stochastic Local Search SAT solvers with performance bounds".
 
 ## Abstract
 
-The Boolean Satisfiability problem (SAT) is the most prototypical NP-complete problem and of great practical relevance. One important class of solvers for this problem are stochastic local search (SLS) algorithms that iteratively and randomly update a candidate assignment. Recent breakthrough results in theoretical computer science have established sufficient conditions under which SLS solvers are guaranteed to efficiently solve a SAT instance, provided they have access to suitable "oracles" that provide samples from an instance-specific distribution, exploiting an instance's local structure. Motivated by these results and the well established ability of neural networks to learn common structure in large datasets, in this work, we train oracles using Graph Neural Networks and evaluate them on two SLS solvers on random SAT instances of varying difficulty. We find that access to GNN-based oracles significantly boosts the performance of both solvers, allowing them, on average, to solve 17% more difficult instances (as measured by the ratio between clauses and variables), and to do so in 35% fewer steps, with  improvements in the median number of steps of up to a factor of 8. As such, this work bridges formal results from theoretical computer science and practically motivated research on deep learning for constraint satisfaction problems and establishes the promise of purpose-trained SAT solvers with performance guarantees.
+The Boolean Satisfiability problem (SAT), as the prototypical NP-complete problem, is crucial both in theoretical computer science and for practical applications. 
+For this problem, stochastic local search (SLS) algorithms, which iteratively and randomly update candidate assignments, present an important and theoretically well-studied class of solvers. Recent theoretical advancements have identified conditions under which SLS solvers efficiently solve SAT instances, provided they have access to suitable 'oracles', i.e., instance-specific distribution samples. We propose leveraging machine learning models, particularly graph neural networks (GNN), as oracles to enhance the performance of SLS solvers. Our approach, evaluated on random and pseudo-industrial SAT instances, demonstrates a significant performance improvement regarding step counts and solved instances. Our work bridges theoretical results and practical applications, highlighting the potential of purpose-trained SAT solvers with performance guarantees.
 
 ## General idea
 
-<img width="1000" alt="oracle_idea" src="https://github.com/porscheofficial/sls_sat_solving_with_deep_learning/assets/105794634/fb115e3b-c829-49cd-9d97-96eaeaf18948">
+![oracle_SLS_idea](oracle_SLS_idea.png)
 
 The figure above illustrates the general idea of this work. Left: A simple SLS solver finds a solution to a SAT instance by repeatedly and randomly updating a small subset of the variables. Middle: An oracle-based SLS solver uses samples from an oracle $O$ that is provided as part of the input to update the variables at each iteration. Right: We use a deep learning model to train an oracle factory $F_θ$ that maps an incoming instance to an oracle which is then fed into an oracle-based. This approach is motivated by results that provide sufficient conditions for an oracle-based SLS solver to find a solution efficiently, based on properties of the oracle.
 
-The trained oracle can be used in various SLS solvers. In case you are interested, feel free to play around and see how the introduction of an oracle leads to better performing solvers! 🚀🚀🚀
+The trained oracle can be used in various SLS solvers and on various datasets. In case you are interested, feel free to play around and see how the introduction of an oracle leads to better performing solvers! 🚀🚀🚀
 
 ## Setup
-**0. Clone the repository**
-
-Clone the repository via
-
-`
-git clone https://github.com/porscheofficial/sls_sat_solving_with_deep_learning.git
-`
-
-and navigate to the repository using
-
-`
-cd sls_sat_solving_with_deep_learning
-`
-
 **1. Create virtual environment and install all the requirements in the virtual environment**
 
 This app has been run and tested with Python 3.10. To start with, ensure you have a version of Python3.10 installed locally. To install virtualenv type
@@ -62,14 +49,10 @@ pip install -r requirements.txt
 Note that if you want to use a GPU for training, you should run
 
 `
-pip install "jax[cuda]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+pip install --upgrade "jax[cuda12_pip]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 `
 
-afterwards to install the GPU version of Jax. If you use a TPU, use the following command:
-
-`
-pip install "jax[tpu]" -f https://storage.googleapis.com/jax-releases/libtpu_releases.html
-`
+afterwards to install the GPU version of Jax.
 
 
 **2. Compile the rust code**
@@ -100,8 +83,20 @@ pytest
 
 ### Files from document
 
-The plots from the experiments can be found under `Data/plots`, the pre-trained models
+The plots from the experiments can be found under `Data/plots`, the pre-trained models can be found under `Data/models`. In our study, we investigated two kinds of datasets:
 
+- We created a **random 3-SAT dataset** with instances of varying difficulty. Here, our measure of difficulty is the ratio $\alpha = m/n$. The datasets can be found under `Data/random_sat_data/{train,test}`.
+- As **pseudo-industrial datasets**, we have used the ones provided in the benchmark in <https://github.com/zhaoyu-li/G4SATBench> [1]. This includes instances drawn from the Community Attachment (CA) model [2] and the Popularity-Similarity (PS) model [3]. For each model, three difficulties are generated (easy, medium, hard). The various datasets can be found under `Data/G4SAT` in the corresponding sub-folders `Data/G4SAT/{easy,medium,hard}/{ps,ca}/{train,test}/sat`.
+
+The details about the datasets can be found in the submission. For each dataset we provide a training and a test dataset.
+
+References:
+
+[1] Zhaoyu Li, Jinpei Guo, and Xujie Si. G4SATBench: Benchmarking and advancing SAT solving with graph neural networks, 2023
+
+[2] Jesús Giráldez-Cru and Jordi Levy. A modularity-based random sat instances generator. In Proceedings of the 24th International Conference on Artificial Intelligence, IJCAI’15, page 1952–1958. AAAI Press, 2015.
+
+[3] Jesús Giráldez-Cru and Jordi Levy. Locality in random sat instances. In Proceedings of the Twenty-Sixth International Joint Conference on Artificial Intelligence, IJCAI-17, pages 638–644, 2017. doi: 10.24963/ijcai.2017/89.
 
 ### Run GNN-boosted SLS solvers
 
@@ -112,29 +107,86 @@ To replicate the experiments, you can either **take the trained models or rerun 
 
 1. To **use the existing models**, simply run the tutorial notebook at `python/src/tutorial.ipynb`. 
 
+In total, we provide three pre-trained models for the 3-SAT dataset and six pre-trained models for the pseudo-industrial datasets. They found in the folders `Data/models/random_3SAT/` and `Data/models/pseudo-industrial/`, respectively. The following table summarizes the characteristics of the models.
+
+| Path of the pre-trained model        | Description of model                                                                                                    |
+|----------------------------------|-----------------------------------------------------------------------------------------------------------------|
+| `Data/models/random_3SAT/3_SAT_LLL.npy`| model trained on random 3-SAT using only the LLL-Loss     |
+| `Data/models/random_3SAT/3_SAT_Gibbs.npy`|  model trained on random 3-SAT using only the Gibbs-Loss |
+| `Data/models/random_3SAT/3_SAT_Gibbs_LLL.npy`|model trained on random 3-SAT using both the LLL-Loss and the Gibbs-Loss |
+| `Data/models/pseudo_industrial/g4sat_easy_ca.npy`| model trained on easy CA instances using only the Gibbs-Loss     |
+| `Data/models/pseudo_industrial/g4sat_medium_ca.npy`| model trained on medium CA instances using only the Gibbs-Loss     |
+| `Data/models/pseudo_industrial/g4sat_hard_ca.npy`| model trained on hard CA instances using only the Gibbs-Loss     |
+| `Data/models/pseudo_industrial/g4sat_easy_ps.npy`| model trained on easy PS instances using only the Gibbs-Loss     |
+| `Data/models/pseudo_industrial/g4sat_medium_ps.npy`| model trained on medium PS instances using only the Gibbs-Loss     |
+| `Data/models/pseudo_industrial/g4sat_hard_ps.npy`| model trained on hard PS instances using only the Gibbs-Loss     |
+
+The corresponding hyperparameters used for the training are specified in the corresponding config files in `experiments/configs/`.
+
+
 ### Using retrained models
 
-1. Run the "run_all_experiments" config file by typing 
+
+1. For the random 3-SAT experiments:
+
+Run the "run_all_experiments_random3SAT" config file by typing 
+
 
 `
- chmod +x run_all_experiments.sh 
+ chmod +x run_all_experiments_random3SAT.sh 
 `
 
 and then
 
 `
-./run_all_experiments.sh 
+./run_all_experiments_random3SAT.sh 
 `
 
-2. Point the tutorial notebook to those model files saved in there (by default, the model files will be stored under "experiments/params_save"). You can do this in the first cell of the tutorial notebook. 
+By this command, the following models are trained:
+
+| Path of the corresponding config-file        | Description of model                                                                                                    |
+|----------------------------------|-----------------------------------------------------------------------------------------------------------------|
+| `experiments/configs/random_3SAT/config_LLL.yaml`| model trained on random 3-SAT using only the LLL-Loss     |
+| `experiments/configs/random_3SAT/config_Gibbs.yaml`|  model trained on random 3-SAT using only the Gibbs-Loss |
+| `experiments/configs/random_3SAT/config_Gibbs_LLL.yaml`|model trained on random 3-SAT using both the LLL-Loss and the Gibbs-Loss |
+
+
+2. For the experiments with the pseudo-industrial datasets
+
+Run the "run_all_experiments_g4sat" config file by typing 
+
+
+`
+ chmod +x run_all_experiments_g4sat.sh 
+`
+
+and then
+
+`
+./run_all_experiments_g4sat.sh 
+`
+
+By this command, the following models are trained:
+
+| Path of the corresponding config-file       | Description of model                                                                                                    |
+|----------------------------------|-----------------------------------------------------------------------------------------------------------------|
+| `experiments/configs/g4sat/easy_ca_config_Gibbs.yaml`| model trained on easy CA instances using only the Gibbs-Loss     |
+| `experiments/configs/g4sat/medium_ca_config_Gibbs.yaml`| model trained on medium CA instances using only the Gibbs-Loss     |
+| `experiments/configs/g4sat/hard_ca_config_Gibbs.yaml`| model trained on hard CA instances using only the Gibbs-Loss     |
+| `experiments/configs/g4sat/easy_ps_config_Gibbs.yaml`| model trained on easy PS instances using only the Gibbs-Loss     |
+| `experiments/configs/g4sat/medium_ps_config_Gibbs.yaml`| model trained on medium PS instances using only the Gibbs-Loss     |
+| `experiments/configs/g4sat/hard_ps_config_Gibbs.yaml`| model trained on hard PS instances using only the Gibbs-Loss     |
+
+3. Point the tutorial notebook to those model files saved in there (by default, the model files will be stored under `experiments/params_save`).
+
 
 ### Generating datasets
 
-We provide the dataset used for the experiments reported in the submission alongside the code. However, to genereate new datasets, use the notebook  `python/src/instace_sampling.ipynb`.
+We provide the dataset used for the experiments reported in the submission alongside the code. However, to genereate new random SAT datasets, use the notebook  `python/src/instance_sampling.ipynb`. To experiment with the pseudo-industrial instances, we refer to the repository where this benchmark was released (see <https://github.com/zhaoyu-li/G4SATBench>). This repository only stores instances that were generated using the mentioned repository.
 
 ## How to cite
 
-Please consider citing our paper if you use our code in your project.
+Please consider citing our (not yet updated) paper if you use our code in your project.
 
 Maximilian J. Kramer, Paul Boes. (2023). ["Using deep learning to construct Stochastic Local Search SAT solvers with performance bounds"](https://arxiv.org/abs/2309.11452). arXiv preprint arXiv:2309.11452
 
@@ -151,16 +203,14 @@ Maximilian J. Kramer, Paul Boes. (2023). ["Using deep learning to construct Stoc
 
 ## Contributing
 
-This GNN-based oracle factory is openly developed in the wild and contributions (both internal and external) are highly appreciated.
-See [CONTRIBUTING.md](./CONTRIBUTING.md) on how to get started.
+This GNN-based oracle factory is openly developed in the wild and contributions (both internal and external) are highly appreciated. See [CONTRIBUTING.md](./CONTRIBUTING.md) on how to get started.
 
 If you have feedback or want to propose a new feature, please [open an issue](https://github.com/porscheofficial/sls_sat_solving_with_deep_learning/issues).
 Thank you! 😊
 
 ## Acknowledgements
 
-This project is part of the AI research of [Porsche Digital](https://www.porsche.digital/). ✨
-
+The origin of this project is part of the AI research of [Porsche Digital](https://www.porsche.digital/). ✨
 
 ## License
 

@@ -14,10 +14,12 @@ from func_timeout import func_timeout, FunctionTimedOut
 from jax import vmap
 from pysat.formula import CNF
 from torch.utils import data
-from python.src.sat_representations import SATRepresentation  # , LCG, VCG
-from python.src.sat_instances import get_problem_from_cnf
+
 
 sys.path.append("../../")
+
+from python.src.sat_representations import SATRepresentation  # , LCG, VCG
+from python.src.sat_instances import get_problem_from_cnf
 
 
 MAX_TIME = 20
@@ -121,7 +123,10 @@ class SATTrainingDataset(data.Dataset):
         violated_constraints = vmap(
             self.representation.get_violated_constraints, in_axes=(None, 0), out_axes=0
         )(problem, candidates)
-        energies = jnp.sum(violated_constraints, axis=1)  # (n_candidates,)
+        # we normalize the energy by the total number of clauses
+        energies = (
+            jnp.sum(violated_constraints, axis=1) / problem.params[1]
+        )  # (n_candidates,)
         assert energies[0] == 0
         return problem, (padded_candidates, energies)
 
@@ -261,13 +266,15 @@ def create_solutions(path, time_limit, suffix, open_util):
                     print(f"written solution for {root}")
 
 
-def create_candidates(data_dir, sample_size: int, threshold):
+def create_candidates(data_dir, sample_size: int, threshold, alternative: bool = False):
     """Create candidates from solution -> used for Gibbs Loss.
 
     Args:
         data_dir (str): path to data directory where you want to create candidates
         sample_size (int): number of candidates that are created
-        threshold (float): float ranging from 0 to 1. This is the probability that a spin flip is executed on a variable in the solution string
+        threshold (float): float ranging from 0 to 1. This is the probability that
+            a spin flip is executed on a variable in the solution string
+        alternative (bool): determines whether the alternative sampling method is used for the candidates
     """
     solved_instances = glob.glob(join(data_dir, "*_sol.pkl"))
     for instance in solved_instances:
@@ -285,7 +292,13 @@ def create_candidates(data_dir, sample_size: int, threshold):
                     int(np.sign(assignment_x) + 1) / 2 for assignment_x in solution
                 ]
         solution_boolean = np.array(solution, dtype=bool)
-        samples = sample_candidates(solution_boolean, sample_size - 1, threshold)
+
+        if alternative:
+            samples = sample_candidates_alternative(
+                solution_boolean, sample_size - 1, threshold
+            )
+        else:
+            samples = sample_candidates(solution_boolean, sample_size - 1, threshold)
         samples = np.concatenate(
             (np.reshape(solution_boolean, (1, len(solution_boolean))), samples), axis=0
         )
@@ -300,11 +313,37 @@ def sample_candidates(original, sample_size, threshold):
     Args:
         original: original solution string that is modified in this function
         sample_size: number of candidates that are created
-        threshold: float ranging from 0 to 1. This is the probability that a spin flip is executed on a variable in the solution string
+        threshold: float ranging from 0 to 1. This is the probability that a spin
+            flip is executed on a variable in the solution string
 
     Returns:
         np.array: returns a matrix containing a set of candidates and the solution itself
     """
-    np.random.seed(sum(original))
     condition = np.random.random((sample_size, original.shape[0])) < threshold
     return np.where(condition, np.invert(original), original)
+
+
+def sample_candidates_alternative(solution, sample_size, alpha):
+    """Execute the sampling of one candidate.
+
+    Args:
+        original: original solution string that is modified in this function
+        sample_size: number of candidates that are created
+        alpha: float ranging from 0 to 1. This is the maximum relative number of variables that are flipped in the solution string
+
+    Returns:
+        np.array: returns a matrix containing a set of candidates and the solution itself
+
+    """
+    n_variables = len(solution)
+    n_clauses = int(alpha * n_variables)
+    candidates = [solution.copy()]
+
+    for i in range(1, sample_size + 1):
+        diff_elements = int(i * n_clauses / sample_size)
+        candidate = solution.copy()
+        change_indices = np.random.choice(n_variables, diff_elements, replace=False)
+        candidate[change_indices] = np.random.rand(diff_elements)
+        candidates.append(candidate)
+
+    return np.asarray(candidates)

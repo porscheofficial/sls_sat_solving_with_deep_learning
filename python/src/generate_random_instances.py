@@ -1,4 +1,6 @@
 """Contains functions to generate random SAT instances."""
+import glob
+import os
 import pickle
 import random
 import cnfgen
@@ -246,3 +248,24 @@ def generate_dataset_van_der_waerden(
                         path + "VanDerWaerden" + params + index,
                         timeout=timeout,
                     )
+
+
+def generate_solutions(path):
+    """Generate solutions for SAT dataset.
+
+    Args:
+        path (str): path where instances are saved
+    """
+    files_list = glob.glob(path + "*.cnf")
+    for file in files_list:
+        cnf = CNF(from_file=file)
+        solver_result = Glucose3(cnf)
+        if solver_result.solve():
+            sol = solver_result.get_model()
+            file_path, _ = os.path.splitext(file)
+            # Create new file name by appending "_sol.pkl" to the file path
+            output_file = f"{file_path}_sol.pkl"
+            # Save sol to the new file
+            with open(output_file, "wb") as file_here:
+                pickle.dump(sol, file_here)
+        print(file, solver_result.get_model())

@@ -184,7 +184,6 @@ def update_eval_moser_loss(network, params, eval_moser_loss):
                     mode_probabilities=eval_moser.loss_params[2],
                     n_steps_moser=eval_moser.loss_params[0],
                     n_runs_moser=eval_moser.loss_params[1],
-                    seed=0,
                 )[0]
             )
         elif eval_moser_loss[i].loss_params[2] == "uniform":
@@ -251,7 +250,6 @@ def evaluate_moser_rust(
     mode_probabilities="model",
     n_steps_moser=100,
     n_runs_moser=1,
-    seed=0,
 ):
     """Run MT algorithm in rust and get results. This is used above.
 
@@ -264,7 +262,6 @@ def evaluate_moser_rust(
         mode_probabilities (str, optional): either "model" or "uniform" -> "model" means we use the model for the oracle and "uniform" means we use a uniform oracle in the MT algorithm. Defaults to "model".
         n_steps_moser (int, optional): number of steps MT algorithm takes. Defaults to 100.
         n_runs_moser (int, optional): number of runs MT algorithm takes. Defaults to 1.
-        seed (int, optional): SEED used in MT algorithm. Defaults to 0.
 
     Returns:
         (@TODO:specify type): (np.mean(av_energies), np.mean(av_entropies)) -> mean energies = #violated clauses / #clause after N_STEPS_MOSER and mean entropy of the oracle probabilities
@@ -287,22 +284,24 @@ def evaluate_moser_rust(
             print("not valid argument for mode_probabilities")
         model_probabilities = model_probabilities.ravel()
         # print(np.round(model_probabilities, 4))
-        print(
-            np.max(model_probabilities),
-            np.min(model_probabilities),
-            model_probabilities.shape,
-        )
+        # print(
+        #     np.max(model_probabilities),
+        #     np.min(model_probabilities),
+        #     model_probabilities.shape,
+        # )
 
         _, _, final_energies, _, _ = moser_rust.run_sls_python(
             "moser",
             problem_path,
             model_probabilities,
             model_probabilities,
-            n_steps_moser,
+            n_steps_moser - 1,
             n_runs_moser,
-            seed,
             return_trajectories=False,
+            pre_compute_mapping=True,
+            prob_flip_best=0,
         )
+
         av_energies.append(np.mean(final_energies) / n_clauses)
         prob = np.vstack(
             (
